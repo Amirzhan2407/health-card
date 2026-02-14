@@ -1,0 +1,14 @@
+{
+  "dependencies": {
+    "@heroicons/react": "^2.2.0",
+    "@supabase/supabase-js": "^2.94.1",
+    "dayjs": "^1.11.19",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.1.0",
+    "qrcode.react": "^4.2.0",
+    "react-hot-toast": "^2.6.0",
+    "react-router-dom": "^7.13.0",
+    "recharts": "^3.7.0",
+    "zustand": "^5.0.11"
+  }
+}
