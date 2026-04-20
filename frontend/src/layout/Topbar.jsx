@@ -1,4 +1,5 @@
 import React from "react";
+import "../styles/layout.css";
 
 export default function Topbar({ title, onBurgerClick, onLogout }) {
   return (
@@ -9,14 +10,7 @@ export default function Topbar({ title, onBurgerClick, onLogout }) {
 
       <div className="topbarTitle">{title}</div>
 
-      <button
-        className="iconBtn"
-        onClick={() => {
-          // Роль: выйти из системы и вернуться на логин
-          onLogout?.();
-        }}
-        aria-label="Выйти"
-      >
+      <button className="iconBtn" onClick={onLogout} aria-label="Выйти">
         ✕
       </button>
     </header>

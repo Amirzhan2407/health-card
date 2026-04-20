@@ -1,32 +1,52 @@
 import React from "react";
+import "../styles/home.css";
+import { useNavigate } from "react-router-dom";
 
 export default function HomePage() {
+  const navigate = useNavigate();
+
   return (
     <div className="pageGrid">
-      {/* Это заглушка под твой контент как на макете */}
       <section className="cardWide">
-        <div className="cardTitle">Экстренные данные</div>
-        <div className="cardText">Кровь • Аллергии • Контакты • Хронические</div>
-      </section>
+        <div className="emergencyLeft">
+          <div className="emergencyIcon">
+            <div className="emergencyIconPlus" />
+          </div>
 
-      <section className="card">
-        <div className="cardTitle">Паспорт здоровья</div>
-        <div className="cardText">Кровь: O(I)+ • Резус: + • Аллергии: 2</div>
-      </section>
+          <div style={{ minWidth: 0 }}>
+            <div className="cardTitle">Мед карта</div>
+            <div className="cardText">ФИО • ИИН • данные из ЭЦП</div>
+          </div>
+        </div>
 
-      <section className="card">
-        <div className="cardTitle">Быстрые действия</div>
-        <div className="cardText">Добавить запись • Загрузить документ • QR • PDF</div>
+        <button
+          className="emergencyRight"
+          type="button"
+          onClick={() => navigate("/passport")}
+          aria-label="Открыть медкарту"
+        >
+          ›
+        </button>
       </section>
 
       <section className="card">
         <div className="cardTitle">Последние документы</div>
-        <div className="cardText">Анализы • УЗИ • Выписка</div>
+        <div className="cardText">PDF / JPG / DOCX — быстрый просмотр</div>
       </section>
 
       <section className="card">
-        <div className="cardTitle">Витальные показатели</div>
-        <div className="cardText">АД • Глюкоза • Вес</div>
+        <div className="cardTitle">Напоминания</div>
+        <div className="cardText">Лекарства • справки • проверки</div>
+      </section>
+
+      <section className="card">
+        <div className="cardTitle">Оценка сна</div>
+        <div className="cardText">Сводка за неделю</div>
+      </section>
+
+      <section className="card">
+        <div className="cardTitle">Быстрые действия</div>
+        <div className="cardText">Загрузить документ • QR • PDF</div>
       </section>
     </div>
   );

@@ -1,222 +1,153 @@
-/* =========================
-   БАЗА
-   ========================= */
-:root{
-  --bg: #f3f6fb;
-  --panel: #ffffff;
-  --border: rgba(15, 23, 42, 0.10);
-  --text: #0f172a;
-  --muted: rgba(15, 23, 42, 0.65);
-  --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-  --radius: 16px;
-}
-
-* { box-sizing: border-box; }
-html, body { height: 100%; }
-body {
-  margin: 0;
-  background: var(--bg);
-  color: rgb(32, 29, 29);
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-}
-
-/* =========================
-   КАРКАС (Sidebar + Main)
-   ========================= */
-.appShell{
-  display: flex;          /* Линия, которая делает 2 колонки (Sidebar + Main) */
-  min-height: 100vh;      /* Растягиваем на весь экран */
-  width: 100%;
-}
-
-/* Правая часть */
-.appMain{
-  flex: 1;                /* Занимает всё оставшееся место */
+/* ===== Layout root ===== */
+.layoutRoot {
+  min-height: 100vh;
+  background: #eef2f7;
   display: flex;
-  flex-direction: column; /* topbar сверху, контент ниже */
-  min-width: 0;           /* важно для корректного shrink */
+  flex-direction: column;
 }
 
-/* =========================
-   TOPBAR
-   ========================= */
-.topbar{
-  height: 64px;
-  display: grid;
-  grid-template-columns: 44px 1fr 44px; /* слева кнопка, центр заголовок, справа кнопка */
+/* ===== Topbar ===== */
+.topbar {
+  height: 56px;
+  display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
-
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
+  padding: 0 12px;
+  background: #ffffff;
+  border-bottom: 1px solid #e6e9ef;
+  position: sticky;
+  top: 0;
+  z-index: 30;
 }
 
-.topbarTitle{
-  text-align: center;
-  font-weight: 600;
-  color: var(--text);
+.topbarTitle {
+  font-weight: 700;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .iconBtn {
-  height: 40px;
   width: 40px;
-  border: 1px solid var(--border);
-  background: var(--panel);
-  border-radius: 12px;
+  height: 40px;
+  border: 1px solid #e6e9ef;
+  background: #fff;
+  border-radius: 10px;
   cursor: pointer;
-  color: var(--text);
+  font-size: 18px;
+  line-height: 1;
+}
 
+.iconBtn:active {
+  transform: translateY(1px);
+}
+
+/* ===== Body ===== */
+.layoutBody {
+  flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
-
-  padding: 0;          /* важно /
-  font-size: 20px;     / можно отрегулировать /
-  line-height: 1;      / убирает лишний вертикальный сдвиг */
+  position: relative;
 }
 
-/* =========================
-   CONTENT
-   ========================= */
-.contentArea{
-  padding: 18px;
-  width: 100%;
-}
-
-/* Пример сетки как на макете */
-.pageGrid{
-  display: grid;
-  grid-template-columns: 1.2fr 0.8fr; /* две колонки */
-  gap: 14px;
-}
-
-.card, .cardWide{
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
+/* ===== Sidebar ===== */
+.sidebar {
+  width: 280px;
+  background: #ffffff;
+  border-right: 1px solid #e6e9ef;
   padding: 14px;
-}
-
-.cardWide{
-  grid-column: 1 / -1; /* растягиваем на всю ширину сетки */
-}
-
-.cardTitle{
-  font-weight: 700;
-  margin-bottom: 6px;
-}
-
-.cardText{
-  color: var(--muted);
-}
-
-/* =========================
-   SIDEBAR (ПК)
-   ========================= */
-.sidebar{
-  width: 300px;                 /* ПК ширина меню */
-  background: var(--panel);
-  border-right: 1px solid var(--border);
-  padding: 12px;
-  position: sticky;             /* держим на месте */
-  top: 0;
-  height: 100vh;                /* весь экран */
-  overflow: auto; 
-  color: black;              /* скролл внутри */
-}
-
-.sidebar--collapsed{
-  width: 88px;                  /* узкая версия */
-}
-
-.sidebarHeader{
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px;
-  border-radius: var(--radius);
-}
-
-.sidebarTitleSmall{
-  font-size: 12px;
-  color:black;
-}
-
-.sidebarTitleBig{
-  font-size: 13px;
-  font-weight: 600;
-  margin-top: 2px;
-}
-
-.sidebarCloseBtn{
-  display: none; /* на ПК не показываем */
-}
-
-.navList{
-  margin-top: 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-
-.navItem{
-  display: flex;
-  align-items: center;
   gap: 10px;
+
+  /* Desktop default: visible */
+  position: relative;
+  z-index: 40;
+}
+
+.sidebarTitle {
+  font-weight: 800;
+  margin-bottom: 6px;
+  opacity: 0.85;
+}
+
+.sidebarSpacer {
+  flex: 1;
+}
+
+/* ===== Nav items ===== */
+.navItem {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid transparent;
-  background: transparent;
-  border-radius: 14px;
-  cursor: pointer;
   text-align: left;
-  color: var(--text)  ;
+  padding: 12px 12px;
+  border-radius: 12px;
+  border: 1px solid #e6e9ef;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
 }
 
-.navItem:hover{
-  background: rgba(37, 99, 235, 0.08); /* мягкий “медицинский” голубой */
-  border-color: rgba(37, 99, 235, 0.12);
+.navItem:hover {
+  background: #f6f8fc;
 }
 
-.navIcon{ width: 22px; text-align: center; }
-.navLabel{ font-weight: 500; }
-
-/* =========================
-   MOBILE DRAWER
-   ========================= */
-.backdrop{
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.35);
-  z-index: 50;
+.navItem.active {
+  background: #eef2ff;
+  border-color: #d7ddff;
 }
 
-/* На мобилке sidebar должен быть поверх и выезжать */
-@media (max-width: 1023px){
-  .pageGrid{
-    grid-template-columns: 1fr; /* всё в одну колонку */
-  }
+.navItem.danger {
+  background: #fff5f5;
+  border-color: #ffd7d7;
+}
 
-  .sidebar{
+/* ===== Content ===== */
+.layoutContent {
+  flex: 1;
+  padding: 16px;
+}
+
+/* ===== Backdrop (mobile) ===== */
+.backdrop {
+  display: none;
+}
+
+/* ===== Mobile behavior ===== */
+@media (max-width: 900px) {
+  .sidebar {
     position: fixed;
+    top: 56px;
     left: 0;
-    top: 0;
-    z-index: 60;
-    transform: translateX(-110%); /* по умолчанию скрыт */
-    transition: transform 0.25s ease;
-    box-shadow: var(--shadow);
+    height: calc(100vh - 56px);
+    transform: translateX(-105%);
+    transition: transform 180ms ease;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
   }
 
-  .sidebar--mobileOpen{
-    transform: translateX(0); /* когда открыто — показываем */
+  .sidebar.open {
+    transform: translateX(0);
   }
 
-  .sidebarCloseBtn{
-    display: inline-flex; /* на мобилке показываем ✕ */
-    align-items: center;
-    justify-content: center;
+  .backdrop {
+    display: block;
+    position: fixed;
+    top: 56px;
+    left: 0;
+    width: 100%;
+    height: calc(100vh - 56px);
+    background: rgba(0, 0, 0, 0.25);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease;
+    z-index: 35;
+  }
+
+  .backdrop.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .layoutContent {
+    padding: 14px;
   }
 }

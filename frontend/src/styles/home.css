@@ -1,0 +1,316 @@
+/* src/styles/home.css */
+
+/* ====== ОБЩИЙ КОНТЕЙНЕР СТРАНИЦЫ ====== */
+.pageGrid {
+  /* серый фон как в макете */
+  background: #eef2f7;
+
+  /* чтобы контент не прилипал */
+  padding: 22px;
+  box-sizing: border-box;
+
+  /* центрируем "рабочую область" */
+  max-width: 1100px;
+  margin: 0 auto;
+
+  /* сетка карточек */
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+
+  /* чтобы сетка не ломалась по высоте */
+  align-content: start;
+}
+
+/* ====== БАЗОВАЯ КАРТОЧКА ====== */
+.card,
+.cardWide {
+  background: #ffffff;
+  border: 1px solid #e6edf6;
+  border-radius: 18px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+/* ====== ШИРОКАЯ КАРТОЧКА (как тёмная в макете) ====== */
+.cardWide {
+  grid-column: 1 / -1;
+
+  background: linear-gradient(135deg, #0b1220, #111c33);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+
+  padding: 18px 18px;
+}
+
+/* ====== ЗАГОЛОВКИ/ТЕКСТ ====== */
+.cardTitle {
+  font-weight: 900;
+  font-size: 15px;
+  color: #0b1b2b;
+  margin-bottom: 6px;
+}
+
+.cardText {
+  font-size: 13px;
+  color: #5b6b80;
+  line-height: 1.35;
+}
+
+/* заголовок на тёмной карточке */
+.cardWide .cardTitle {
+  color: #ffffff;
+  margin: 0;
+  font-size: 15px;
+}
+
+.cardWide .cardText {
+  color: rgba(255, 255, 255, 0.75);
+  margin-top: 2px;
+}
+
+/* ====== ИКОНКА/КНОПКА СТРЕЛКИ НА ШИРОКОЙ КАРТОЧКЕ ====== */
+.emergencyLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.emergencyIcon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: rgba(34, 197, 94, 0.16);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.emergencyIconPlus {
+  width: 18px;
+  height: 18px;
+  position: relative;
+}
+
+.emergencyIconPlus:before,
+.emergencyIconPlus:after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: #22c55e;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+}
+
+.emergencyIconPlus:before {
+  width: 18px;
+  height: 3px;
+}
+
+.emergencyIconPlus:after {
+  width: 3px;
+  height: 18px;
+}
+
+.emergencyRight {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+
+  display: grid;
+  place-items: center;
+
+  cursor: pointer;
+}
+
+/* ====== ЧИПЫ (как в “Паспорт здоровья”) ====== */
+.chipsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.chip {
+  background: #f3f7ff;
+  border: 1px solid #e2ebff;
+  color: #0b1b2b;
+
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* ====== БЛОК “БЫСТРЫЕ ДЕЙСТВИЯ” ====== */
+.actionsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.actionBtn {
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid #e6edf6;
+  background: #f7fbff;
+  color: #0b1b2b;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-weight: 900;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.actionBtn:hover {
+  filter: brightness(0.98);
+}
+
+.actionBtn.green {
+  background: #ecfdf3;
+  border-color: #bbf7d0;
+}
+
+.actionBtn.yellow {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+/* ====== ПОСЛЕДНИЕ ДОКУМЕНТЫ (список) ====== */
+.docList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.docItem {
+  border: 1px solid #e6edf6;
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: #fbfdff;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.docName {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0b1b2b;
+}
+
+.docMeta {
+  font-size: 12px;
+  color: #6b7c92;
+}
+
+.docTag {
+  font-size: 11px;
+  font-weight: 900;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #e6edf6;
+  background: #f3f7ff;
+  color: #1f3b73;
+  flex: 0 0 auto;
+}
+
+/* ====== ВИТАЛЬНЫЕ ПОКАЗАТЕЛИ (мини график) ====== */
+.vitalsTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.vitalsHint {
+  font-size: 12px;
+  color: #6b7c92;
+}
+
+.sparkline {
+  margin-top: 10px;
+  height: 58px;
+  border-radius: 14px;
+  background: #f6f9ff;
+  border: 1px solid #e6edf6;
+  position: relative;
+  overflow: hidden;
+}
+
+/* псевдо-линия графика (без библиотек) */
+.sparkline:before {
+  content: "";
+  position: absolute;
+  left: -10%;
+  top: 50%;
+  width: 130%;
+  height: 3px;
+  background: #1d4ed8;
+  opacity: 0.85;
+  transform: translateY(-50%) rotate(-6deg);
+  border-radius: 999px;
+}
+
+/* точки “данных” */
+.sparkDot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #1d4ed8;
+  top: 28px;
+}
+.sparkDot.d1 { left: 14%; top: 34px; }
+.sparkDot.d2 { left: 34%; top: 30px; }
+.sparkDot.d3 { left: 54%; top: 26px; }
+.sparkDot.d4 { left: 74%; top: 32px; }
+.sparkDot.d5 { left: 90%; top: 22px; }
+
+.vitalsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.vitalPill {
+  background: #f3f7ff;
+  border: 1px solid #e2ebff;
+  border-radius: 999px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 900;
+  color: #0b1b2b;
+}
+
+/* ====== АДАПТИВНОСТЬ ====== */
+@media (max-width: 900px) {
+  .pageGrid {
+    grid-template-columns: 1fr;
+  }
+  .actionsGrid {
+    grid-template-columns: 1fr;
+  }
+}

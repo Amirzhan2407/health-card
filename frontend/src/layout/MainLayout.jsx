@@ -1,45 +1,57 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import "../styles/layout.css";
 
-export default function MainLayout({ title, children, onLogout }) {
-  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+export default function MainLayout() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1024px)");
-    const handler = () => {
-      if (mq.matches) setIsMobileDrawerOpen(false);
-    };
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
+  const title = useMemo(() => {
+    const p = location.pathname;
+    if (p.startsWith("/home")) return "Главное меню";
+    if (p.startsWith("/passport")) return "Мед карта";
+    if (p.startsWith("/documents-cloud")) return "Облако документов";
+    if (p.startsWith("/documents")) return "Справки";
+    if (p.startsWith("/search")) return "Поиск";
+    return "МедКарта";
+  }, [location.pathname]);
 
-  const handleBurgerClick = () => {
-    if (window.matchMedia("(min-width: 1024px)").matches) {
-      setIsCollapsed((v) => !v);
-    } else {
-      setIsMobileDrawerOpen(true);
-    }
+  const onLogout = () => {
+    // если у тебя есть authStorage — тут можно вызвать его вместо localStorage
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("auth");
+    navigate("/login", { replace: true });
   };
 
   return (
-    <div className="appShell">
-      <Sidebar
-        collapsed={isCollapsed}
-        mobileOpen={isMobileDrawerOpen}
-        onMobileClose={() => setIsMobileDrawerOpen(false)}
+    <div className="layoutRoot">
+      <Topbar
+        title={title}
+        onBurgerClick={() => setSidebarOpen((v) => !v)}
+        onLogout={onLogout}
       />
 
-      <div className="appMain">
-        <Topbar
-          title={title}
-          onBurgerClick={handleBurgerClick}
-          onLogout={onLogout} // ← добавили
+      <div className="layoutBody">
+        <Sidebar
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          onLogout={onLogout}
         />
 
-        <main className="contentArea">{children}</main>
+        {/* затемнение для мобилки */}
+        <div
+          className={`backdrop ${sidebarOpen ? "show" : ""}`}
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+
+        <main className="layoutContent">
+          <Outlet />
+        </main>
       </div>
     </div>
   );

@@ -1,36 +1,36 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+
 import MainLayout from "./layout/MainLayout";
+
 import HomePage from "./pages/HomePage";
+import Passport from "./pages/Passport";
+import DocumentsPage from "./pages/DocumentsPage";
+import DocumentsCloudPage from "./pages/DocumentsCloudPage";
+import Search from "./pages/Search";
 import Login from "./pages/Login";
 
-import { getAuth, setAuth, clearAuth } from "./services/authStorage";
-
 export default function App() {
-  const [isAuthed, setIsAuthed] = useState(false);
-
-  useEffect(() => {
-    setIsAuthed(getAuth()); // читаем сохранённый статус входа
-  }, []);
-
-  const handleLoginSuccess = () => {
-    setAuth(true);        // запоминаем вход
-    setIsAuthed(true);    // переключаем UI на главное меню
-  };
-
-  const handleLogout = () => {
-    clearAuth();          // забываем вход
-    setIsAuthed(false);   // возвращаем на страницу логина
-  };
-
-  // 🔒 Если не вошёл — показываем Login
-  if (!isAuthed) {
-    return <Login onSuccess={handleLoginSuccess} />;
-  }
-
-  // ✅ Если вошёл — показываем главное меню + HomePage
   return (
-    <MainLayout title="Личная карта здоровья" onLogout={handleLogout}>
-      <HomePage />
-    </MainLayout>
+    <Routes>
+      {/* Стартовая страница — логин */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
+
+      {/* Логин без layout */}
+      <Route path="/login" element={<Login />} />
+
+      {/* Все внутренние страницы внутри layout */}
+      <Route element={<MainLayout />}>
+        <Route path="/home" element={<HomePage />} />
+        <Route path="/passport" element={<Passport />} />
+
+        <Route path="/documents" element={<DocumentsPage />} />
+        <Route path="/documents-cloud" element={<DocumentsCloudPage />} />
+        <Route path="/search" element={<Search />} />
+      </Route>
+
+      {/* Фолбэк */}
+      <Route path="*" element={<Navigate to="/home" replace />} />
+    </Routes>
   );
 }
