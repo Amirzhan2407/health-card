@@ -9,6 +9,7 @@ import DocumentsPage from "./pages/DocumentsPage";
 import DocumentsCloudPage from "./pages/DocumentsCloudPage";
 import Search from "./pages/Search";
 import Login from "./pages/Login";
+import HealthPage from "./pages/HealthPage";
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="/documents" element={<DocumentsPage />} />
         <Route path="/documents-cloud" element={<DocumentsCloudPage />} />
         <Route path="/search" element={<Search />} />
+        <Route path="/health" element={<HealthPage />} />
       </Route>
 
       {/* Фолбэк */}

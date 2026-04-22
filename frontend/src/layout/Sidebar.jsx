@@ -48,6 +48,15 @@ export default function Sidebar({ open, onClose, onLogout }) {
       >
         Мед карта
       </button>
+      
+      
+       <button
+          className={`navItem ${isActive("/health") ? "active" : ""}`}
+          type="button"
+          onClick={() => go("/health")}
+        >
+          Мониторинг здоровья
+        </button>
 
       <div className="sidebarSpacer" />
 

@@ -1,0 +1,186 @@
+.healthPage {
+  padding: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.healthHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.healthHeader h2 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.healthEmpty {
+  background: #fff;
+  border: 1px solid #e6e9ef;
+  border-radius: 16px;
+  padding: 20px;
+  color: #5b6475;
+}
+
+.healthCards {
+  display: grid;
+  gap: 14px;
+}
+
+.healthCard {
+  background: #fff;
+  border: 1px solid #e6e9ef;
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.06);
+}
+
+.healthCardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.healthCardTitle {
+  font-size: 18px;
+  font-weight: 900;
+  color: #111827;
+}
+
+.healthCardDate {
+  font-size: 13px;
+  color: #667085;
+}
+
+.healthCardValue {
+  font-size: 24px;
+  font-weight: 900;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.healthExtra {
+  font-size: 14px;
+  font-weight: 700;
+  color: #475467;
+  margin-bottom: 14px;
+}
+
+.healthHistoryTitle {
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 8px;
+  color: #111827;
+}
+
+.healthHistory {
+  display: grid;
+  gap: 8px;
+}
+
+.healthHistoryItem {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #344054;
+  font-size: 14px;
+}
+
+.addButton {
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid #d6deea;
+  background: #111827;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.actionButton {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid #d6deea;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  color: #111827;
+}
+
+.primaryBtn {
+  background: #111827;
+  color: #fff;
+  border-color: #111827;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.modalBox {
+  width: min(520px, 100%);
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+.modalTitle {
+  padding: 18px 20px;
+  font-size: 18px;
+  font-weight: 900;
+  border-bottom: 1px solid #eef1f6;
+}
+
+.modalContent {
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+}
+
+.modalLabel {
+  font-size: 14px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.modalInput {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #d6deea;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.modalButtons {
+  padding: 16px 20px;
+  border-top: 1px solid #eef1f6;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.errorText {
+  background: #fff5f5;
+  border: 1px solid #ffd1d1;
+  color: #b42318;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 800;
+}

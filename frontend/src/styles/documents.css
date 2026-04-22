@@ -52,6 +52,7 @@
   color: #111827;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
 }
 
@@ -70,6 +71,16 @@
 
 .deleteButton:hover {
   background: #ffecec;
+}
+
+.primaryBtn {
+  background: #111827;
+  color: #fff;
+  border-color: #111827;
+}
+
+.primaryBtn:hover {
+  opacity: 0.92;
 }
 
 /* ===== Empty state ===== */
@@ -91,7 +102,7 @@
   background: #fff;
   border: 1px solid #e6e9ef;
   border-radius: 16px;
-  padding: 14px 14px;
+  padding: 14px;
   box-shadow: 0 8px 24px rgba(17, 24, 39, 0.06);
 }
 
@@ -125,30 +136,34 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 18px;
+  padding: 20px;
   z-index: 1000;
 }
 
 .modalBox {
-  width: min(560px, 100%);
+  width: min(720px, 100%);
+  max-height: 90vh;
   background: #fff;
   border: 1px solid #e6e9ef;
-  border-radius: 18px;
+  border-radius: 20px;
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .modalTitle {
-  padding: 14px 16px;
-  font-size: 16px;
+  padding: 18px 20px;
+  font-size: 22px;
   font-weight: 900;
   border-bottom: 1px solid #eef1f6;
 }
 
 .modalContent {
-  padding: 16px;
+  padding: 20px;
   display: grid;
-  gap: 12px;
+  gap: 16px;
+  overflow-y: auto;
 }
 
 .modalSection {
@@ -157,39 +172,54 @@
 }
 
 .modalLabel {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
   color: #111827;
 }
 
 .modalInput {
   width: 100%;
+  min-height: 46px;
   padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid #d6deea;
   outline: none;
+  box-sizing: border-box;
+  font-size: 15px;
 }
 
 .modalInput:focus {
   border-color: #111827;
 }
 
+.modalInput[type="file"] {
+  padding: 9px 12px;
+}
+
+.modalInput[type="date"] {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.fileHint {
+  font-size: 14px;
+  color: #5b6475;
+}
+
+.quickButtons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
 .modalButtons {
-  padding: 14px 16px;
+  padding: 16px 20px;
   border-top: 1px solid #eef1f6;
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-}
-
-.primaryBtn {
-  background: #111827;
-  color: #fff;
-  border-color: #111827;
-}
-
-.primaryBtn:hover {
-  opacity: 0.92;
+  flex-wrap: wrap;
 }
 
 .errorText {
@@ -206,7 +236,42 @@
   .documentsPage {
     padding: 16px;
   }
+
+  .documentsHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .documentsHeader h2 {
     font-size: 22px;
+  }
+
+  .modalOverlay {
+    padding: 12px;
+  }
+
+  .modalBox {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: 16px;
+  }
+
+  .modalTitle {
+    font-size: 18px;
+    padding: 14px 16px;
+  }
+
+  .modalContent {
+    padding: 16px;
+  }
+
+  .modalButtons {
+    padding: 14px 16px;
+    justify-content: stretch;
+  }
+
+  .modalButtons .actionButton,
+  .modalButtons .primaryBtn {
+    flex: 1 1 auto;
   }
 }
