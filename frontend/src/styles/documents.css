@@ -275,3 +275,14 @@
     flex: 1 1 auto;
   }
 }
+.documentItem.expired {
+  border: 1px solid #ffb4b4;
+  background: #fff5f5;
+}
+
+.expiredText {
+  color: #d92d20;
+  font-weight: 800;
+  font-size: 13px;
+  margin-top: 6px;
+}

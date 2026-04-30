@@ -253,35 +253,49 @@ export default function DocumentsPage() {
         <div className="documentsEmpty">Справок пока нет.</div>
       ) : (
         <div className="documentsList">
-          {items.map((it) => (
-            <div key={it.id} className="documentItem">
-              <div className="documentTitle">{it.title}</div>
+          {items.map((it) => {
+  const isExpired = new Date(it.valid_until) < new Date();
 
-              <div className="documentMeta">
-                <span>Прохождение: {formatDateRu(it.passed_date)}</span>
-                <span>Действует до: {formatDateRu(it.valid_until)}</span>
-                <span>{it.file_name}</span>
-              </div>
+  return (
+    <div
+      key={it.id}
+      className={`documentItem ${isExpired ? "expired" : ""}`}
+    >
+      <div className="documentTitle">{it.title}</div>
 
-              <div className="documentActions">
-                <button
-                  className="actionButton"
-                  type="button"
-                  onClick={() => openFile(it.file_path)}
-                >
-                  Открыть
-                </button>
+      <div className="documentMeta">
+        <span>Прохождение: {formatDateRu(it.passed_date)}</span>
+        <span>Действует до: {formatDateRu(it.valid_until)}</span>
+        <span>{it.file_name}</span>
+      </div>
 
-                <button
-                  className="actionButton deleteButton"
-                  type="button"
-                  onClick={() => removeCertificate(it.id, it.file_path)}
-                >
-                  Удалить
-                </button>
-              </div>
-            </div>
-          ))}
+      {/* 🔴 ТЕКСТ ЕСЛИ ПРОСРОЧЕНО */}
+      {isExpired && (
+        <div className="expiredText">
+          Справка истекла, обновите в течение 2 дней
+        </div>
+      )}
+
+      <div className="documentActions">
+        <button
+          className="actionButton"
+          type="button"
+          onClick={() => openFile(it.file_path)}
+        >
+          Открыть
+        </button>
+
+        <button
+          className="actionButton deleteButton"
+          type="button"
+          onClick={() => removeCertificate(it.id, it.file_path)}
+        >
+          Удалить
+        </button>
+      </div>
+    </div>
+  );
+})}
         </div>
       )}
 
