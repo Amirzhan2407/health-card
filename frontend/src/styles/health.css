@@ -291,3 +291,44 @@
   appearance: textfield;
   -moz-appearance: textfield;
 }
+
+
+.fluoroGreen {
+  color: #15803d;
+  background: #dcfce7;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.fluoroBlue {
+  color: #0369a1;
+  background: #e0f2fe;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.fluoroYellow {
+  color: #92400e;
+  background: #fef3c7;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.fluoroRed {
+  color: #991b1b;
+  background: #fee2e2;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.fluoroGray {
+  color: #374151;
+  background: #e5e7eb;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+}

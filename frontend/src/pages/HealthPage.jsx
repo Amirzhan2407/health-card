@@ -83,10 +83,26 @@ function getBmiStatus(bmi) {
   return "Ожирение";
 }
 
+function getFluoroClass(status) {
+  if (status === "Без патологий") return "fluoroGreen";
+  if (status === "Норма") return "fluoroBlue";
+  if (status === "Требуется повтор") return "fluoroYellow";
+  if (status === "Обнаружены изменения") return "fluoroRed";
+  return "fluoroGray";
+}
+
 export default function HealthPage() {
   const todayISO = useMemo(() => getTodayISO(), []);
   const userData = JSON.parse(localStorage.getItem("userData") || "{}");
   const userIin = userData?.iin || "";
+  const userGender = userData?.gender || "unknown";
+
+const genderLabel =
+  userGender === "male"
+    ? "Мужской"
+    : userGender === "female"
+    ? "Женский"
+    : "Не определён";
 
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -377,11 +393,14 @@ const chartRecords = allChartRecords.filter(
 
               {card.value === "weight" && bmi && (
                 <div className="bmiBox">
-                  <div>
-                    <strong>ИМТ:</strong> {bmi}
-                  </div>
-                  <div>{getBmiStatus(bmi)}</div>
-                </div>
+  <div>
+    <strong>ИМТ:</strong> {bmi}
+  </div>
+  <div>{getBmiStatus(bmi)}</div>
+  <div>
+    <strong>Пол:</strong> {genderLabel}
+  </div>
+</div>
               )}
 
               <div className="healthHistoryTitle">История</div>
@@ -390,13 +409,19 @@ const chartRecords = allChartRecords.filter(
                 {card.history.slice(0, 5).map((item) => (
                   <div key={item.id} className="healthHistoryItem">
                     <span>{formatDateRu(item.measured_at)}</span>
-                    <span>
-                      {item.category_code === "vision"
-                        ? item.value_text
-                        : item.value_number !== null
-                        ? `${item.value_number} ${card.unit}`
-                        : item.value_text}
-                    </span>
+                    <span className={card.value === "fluorography" ? getFluoroClass(item.value_text) : ""}>
+  {item.category_code === "vision"
+    ? item.value_text
+    : item.value_number !== null
+    ? `${item.value_number} ${card.unit}`
+    : item.value_text}
+</span>
+
+{card.value === "fluorography" && item.note && (
+  <div className="fluoroComment">
+    Комментарий: {item.note}
+  </div>
+)}
                   </div>
                 ))}
               </div>
@@ -484,23 +509,36 @@ const chartRecords = allChartRecords.filter(
                   </div>
                 </div>
               )}
+{currentCategory.type === "text" && (
+  <>
+    <div className="modalSection">
+      <label className="modalLabel">Заключение</label>
+      <select
+        className="modalInput"
+        value={fluoroStatus}
+        onChange={(e) => setFluoroStatus(e.target.value)}
+      >
+        {fluoroOptions.map((item) => (
+          <option key={item} value={item}>
+            {item}
+          </option>
+        ))}
+      </select>
+    </div>
 
-              {currentCategory.type === "text" && (
-                <div className="modalSection">
-                  <label className="modalLabel">Заключение</label>
-                  <select
-                    className="modalInput"
-                    value={fluoroStatus}
-                    onChange={(e) => setFluoroStatus(e.target.value)}
-                  >
-                    {fluoroOptions.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+    {fluoroStatus === "Другое" && (
+      <div className="modalSection">
+        <label className="modalLabel">Комментарий врача</label>
+        <textarea
+          className="modalInput textareaInput"
+          placeholder="Напишите заключение вручную"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
+      </div>
+    )}
+  </>
+)}
 
               <div className="modalSection">
                 <label className="modalLabel">Дата</label>
@@ -513,15 +551,17 @@ const chartRecords = allChartRecords.filter(
                 />
               </div>
 
-              <div className="modalSection">
-                <label className="modalLabel">Комментарий</label>
-                <textarea
-                  className="modalInput textareaInput"
-                  placeholder="Необязательно"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                />
-              </div>
+              {currentCategory.type !== "text" && (
+  <div className="modalSection">
+    <label className="modalLabel">Комментарий</label>
+    <textarea
+      className="modalInput textareaInput"
+      placeholder="Необязательно"
+      value={note}
+      onChange={(e) => setNote(e.target.value)}
+    />
+  </div>
+)}
 
               {error && <div className="errorText">{error}</div>}
             </div>

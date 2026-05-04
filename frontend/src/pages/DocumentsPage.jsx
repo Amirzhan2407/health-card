@@ -55,8 +55,14 @@ export default function DocumentsPage() {
   const userIin = userData?.iin || "";
 
   useEffect(() => {
+  loadCertificates();
+
+  const interval = setInterval(() => {
     loadCertificates();
-  }, []);
+  }, 60000);
+
+  return () => clearInterval(interval);
+}, []);
 
   useEffect(() => {
     if (!passedDate) return;

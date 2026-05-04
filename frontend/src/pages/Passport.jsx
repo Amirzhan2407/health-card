@@ -7,11 +7,19 @@ export default function Passport() {
 
   const savedUser = JSON.parse(localStorage.getItem("userData") || "{}");
 
-  const user = {
-    fullName: savedUser.fullName || "—",
-    iin: savedUser.iin || "—",
-    certExpire: savedUser.certExpire || "—",
-  };
+  const genderLabel =
+  savedUser.gender === "male"
+    ? "Мужской"
+    : savedUser.gender === "female"
+    ? "Женский"
+    : "Не определён";
+
+const user = {
+  fullName: savedUser.fullName || "—",
+  iin: savedUser.iin || "—",
+  gender: genderLabel,
+  certExpire: savedUser.certExpire || "—",
+};
 
   return (
     <div className="passportWrap">
@@ -48,6 +56,14 @@ export default function Passport() {
             <div className="pLabel">Срок действия ЭЦП</div>
             <div className="pValue">{user.certExpire}</div>
           </div>
+            
+            
+            <div className="pField">
+              <div className="pLabel">Пол</div>
+              <div className="pValue">{user.gender}</div>
+            </div>
+
+
         </div>
       </section>
     </div>

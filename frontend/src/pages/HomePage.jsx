@@ -5,6 +5,15 @@ import { useNavigate } from "react-router-dom";
 export default function HomePage() {
   const navigate = useNavigate();
 
+  const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+
+const genderLabel =
+  userData?.gender === "male"
+    ? "Мужской"
+    : userData?.gender === "female"
+    ? "Женский"
+    : "Не определён";
+
   return (
     <div className="pageGrid">
       <section className="cardWide">
@@ -15,7 +24,9 @@ export default function HomePage() {
 
           <div style={{ minWidth: 0 }}>
             <div className="cardTitle">Мед карта</div>
-            <div className="cardText">ФИО • ИИН • данные из ЭЦП</div>
+            <div className="cardText">
+  ФИО • ИИН • Пол: {genderLabel}
+</div>
           </div>
         </div>
 

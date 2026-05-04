@@ -58,14 +58,28 @@ export default function Login() {
       // 3. Из CMS берем fallback для ИИН/срока, если keyInfo что-то не дал
       const cmsData = parseCmsSignature(signatureText);
 
-      const userData = {
-        fullName: keyData.fullName || "—",
-        iin: keyData.iin !== "—" ? keyData.iin : cmsData.iin || "—",
-        certExpire:
-          keyData.certExpire !== "—"
-            ? keyData.certExpire
-            : cmsData.certExpire || "—",
-      };
+      const userIin = keyData.iin !== "—" ? keyData.iin : cmsData.iin || "—";
+const genderDigit = userIin?.[6];
+
+let gender = "unknown";
+
+if (["1", "3", "5"].includes(genderDigit)) {
+  gender = "male";
+}
+
+if (["2", "4", "6"].includes(genderDigit)) {
+  gender = "female";
+}
+
+const userData = {
+  fullName: keyData.fullName || "—",
+  iin: userIin,
+  gender,
+  certExpire:
+    keyData.certExpire !== "—"
+      ? keyData.certExpire
+      : cmsData.certExpire || "—",
+};
 
       localStorage.setItem("userData", JSON.stringify(userData));
       localStorage.setItem("authSignature", signatureText);
