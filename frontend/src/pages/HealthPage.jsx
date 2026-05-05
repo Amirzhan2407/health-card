@@ -14,6 +14,7 @@ import "../styles/health.css";
 const categoryOptions = [
   { value: "weight", label: "Вес", unit: "кг", type: "number" },
   { value: "height", label: "Рост", unit: "см", type: "number" },
+    { value: "blood_sugar", label: "Уровень сахара", unit: "ммоль/л", type: "number" },
   { value: "vision", label: "Зрение", unit: "диоптрии", type: "vision" },
   { value: "fluorography", label: "Флюорография", unit: "заключение", type: "text" },
 ];
@@ -89,6 +90,29 @@ function getFluoroClass(status) {
   if (status === "Требуется повтор") return "fluoroYellow";
   if (status === "Обнаружены изменения") return "fluoroRed";
   return "fluoroGray";
+}
+function getSugarStatus(value) {
+  const n = Number(value);
+
+  if (!n) return "";
+
+  if (n < 3.9) return "Низкий сахар";
+  if (n <= 5.5) return "Норма";
+  if (n <= 6.9) return "Повышенный сахар";
+
+  return "Высокий риск диабета";
+}
+
+function getSugarClass(value) {
+  const n = Number(value);
+
+  if (!n) return "";
+
+  if (n < 3.9) return "sugarBlue";
+  if (n <= 5.5) return "sugarGreen";
+  if (n <= 6.9) return "sugarYellow";
+
+  return "sugarRed";
 }
 
 export default function HealthPage() {
@@ -402,6 +426,14 @@ const chartRecords = allChartRecords.filter(
   </div>
 </div>
               )}
+              {card.value === "blood_sugar" && (
+  <div className={`bmiBox ${getSugarClass(card.latest.value_number)}`}>
+    <div>
+      <strong>Статус:</strong>{" "}
+      {getSugarStatus(card.latest.value_number)}
+    </div>
+  </div>
+)}
 
               <div className="healthHistoryTitle">История</div>
 
@@ -472,10 +504,14 @@ const chartRecords = allChartRecords.filter(
                     type="text"
                     inputMode="decimal"
                     placeholder={
-                      category === "weight"
-                        ? "Например: 78.5"
-                        : "Например: 172"
-                    }
+  category === "weight"
+    ? "Например: 78.5"
+    : category === "height"
+    ? "Например: 172"
+    : category === "blood_sugar"
+    ? "Например: 5.4"
+    : "Введите значение"
+}
                     value={value}
                     onChange={(e) => setValue(e.target.value)}
                   />
