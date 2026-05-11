@@ -1,0 +1,89 @@
+.historyPage {
+  padding: 16px;
+}
+
+.historyHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.historyTitle {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.historySub {
+  margin-top: 6px;
+  color: #64748b;
+}
+
+.historyAddBtn {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 16px;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.historyCard {
+  background: #fff;
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.historyCardTop {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.historyCardName {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.historyCaseType {
+  margin-top: 4px;
+  color: #64748b;
+}
+
+.historySeverity {
+  background: #fef3c7;
+  color: #92400e;
+  padding: 6px 12px;
+  border-radius: 999px;
+  height: fit-content;
+  font-weight: 600;
+}
+
+.historyRow {
+  margin-bottom: 10px;
+  color: #1e293b;
+}
+
+.historyCommentBox {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 12px;
+  margin-top: 14px;
+}
+
+.historyCommentText {
+  margin-top: 6px;
+  color: #334155;
+}
+
+.historyEmpty {
+  background: #fff;
+  border-radius: 18px;
+  padding: 30px;
+  text-align: center;
+  color: #64748b;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}

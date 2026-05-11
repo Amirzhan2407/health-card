@@ -177,3 +177,36 @@
     font-size: 14px;
   }
 }
+
+
+.loginTabs {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.loginTab {
+  flex: 1;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-weight: 700;
+  cursor: pointer;
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.loginTab.active {
+  background: #2563eb;
+  color: #fff;
+}
+
+.loginInput {
+  width: 100%;
+  margin-top: 10px;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  padding: 12px;
+  box-sizing: border-box;
+  font-size: 15px;
+}

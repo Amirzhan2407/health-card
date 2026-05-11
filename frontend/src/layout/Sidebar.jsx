@@ -38,7 +38,7 @@ export default function Sidebar({ open, onClose, onLogout }) {
         type="button"
         onClick={() => go("/documents-cloud")}
       >
-        Облако
+        История болезни
       </button>
 
       <button
