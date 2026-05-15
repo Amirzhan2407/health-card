@@ -70,6 +70,13 @@ export default function Sidebar({ open, onClose, onLogout }) {
       >
         Выйти
       </button>
+      <button
+  className={`navItem ${isActive("/ai-assistant") ? "active" : ""}`}
+  type="button"
+  onClick={() => go("/ai-assistant")}
+>
+  ИИ помощник
+</button>
     </aside>
   );
 }
