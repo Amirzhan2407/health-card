@@ -40,13 +40,6 @@ export default function Sidebar({ open, onClose, onLogout }) {
       >
         История болезни
       </button>
-      <button
-  className={`navItem ${isActive("/ai-assistant") ? "active" : ""}`}
-  type="button"
-  onClick={() => go("/ai-assistant")}
->
-  ИИ помощник
-</button>
 
       <button
         className={`navItem ${isActive("/passport") ? "active" : ""}`}
@@ -54,6 +47,13 @@ export default function Sidebar({ open, onClose, onLogout }) {
         onClick={() => go("/passport")}
       >
         Мед карта
+      </button>
+      <button
+        className={`navItem ${isActive("/ai-assistant") ? "active" : ""}`}
+        type="button"
+        onClick={() => go("/ai-assistant")}
+      >
+        ИИ помощник
       </button>
       
       
@@ -77,13 +77,6 @@ export default function Sidebar({ open, onClose, onLogout }) {
       >
         Выйти
       </button>
-      <button
-  className={`navItem ${isActive("/ai-assistant") ? "active" : ""}`}
-  type="button"
-  onClick={() => go("/ai-assistant")}
->
-  ИИ помощник
-</button>
     </aside>
   );
 }
