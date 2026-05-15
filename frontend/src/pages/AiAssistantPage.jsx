@@ -10,22 +10,53 @@ export default function AiAssistantPage() {
   ]);
   const [input, setInput] = useState("");
 
-  const sendMessage = () => {
-    if (!input.trim()) return;
+  const sendMessage = async () => {
+  if (!input.trim()) return;
 
-    const userMessage = {
-      role: "user",
-      text: input,
-    };
+  const userMessage = {
+    role: "user",
+    text: input,
+  };
+
+  setMessages((prev) => [...prev, userMessage]);
+
+  const currentMessage = input;
+  setInput("");
+
+  try {
+    const response = await fetch(
+      "https://health-card.onrender.com/api/ai/chat",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: currentMessage,
+        }),
+      }
+    );
+
+    const data = await response.json();
 
     const botMessage = {
       role: "assistant",
-      text: "Пока это тестовый ответ. Позже подключим Gemini API и данные из вашей медкарты.",
+      text: data.answer || "Нет ответа от ИИ",
     };
 
-    setMessages((prev) => [...prev, userMessage, botMessage]);
-    setInput("");
-  };
+    setMessages((prev) => [...prev, botMessage]);
+  } catch (error) {
+    console.error(error);
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        text: "Ошибка подключения к серверу",
+      },
+    ]);
+  }
+};
 
   const onKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
