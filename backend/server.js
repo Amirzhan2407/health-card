@@ -1,8 +1,10 @@
 import express from "express";
+import aiRoutes from "./routes/ai.js";
 import cors from "cors";
 import dotenv from "dotenv";
 
 import pharmacyRoutes from "./routes/pharmacy.js";
+app.use("/api/ai", aiRoutes);
 
 dotenv.config();
 
