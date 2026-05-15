@@ -40,6 +40,13 @@ export default function Sidebar({ open, onClose, onLogout }) {
       >
         История болезни
       </button>
+      <button
+  className={`navItem ${isActive("/ai-assistant") ? "active" : ""}`}
+  type="button"
+  onClick={() => go("/ai-assistant")}
+>
+  ИИ помощник
+</button>
 
       <button
         className={`navItem ${isActive("/passport") ? "active" : ""}`}
