@@ -13,7 +13,7 @@ app.use(express.json());
 
 app.use("/api/pharmacy", pharmacyRoutes);
 
-const PORT = 5000;
+const PORT = 1000;
 
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
