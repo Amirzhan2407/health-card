@@ -1,10 +1,9 @@
 import express from "express";
-import aiRoutes from "./routes/ai.js";
 import cors from "cors";
 import dotenv from "dotenv";
 
 import pharmacyRoutes from "./routes/pharmacy.js";
-app.use("/api/ai", aiRoutes);
+import aiRoutes from "./routes/ai.js";
 
 dotenv.config();
 
@@ -14,6 +13,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use("/api/pharmacy", pharmacyRoutes);
+app.use("/api/ai", aiRoutes);
 
 const PORT = process.env.PORT || 5000;
 
