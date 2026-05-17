@@ -10,7 +10,8 @@ export async function askGemini(message) {
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
-        model: "openai/gpt-3.5-turbo",
+        model: "deepseek/deepseek-chat-v3-0324:free",
+
         messages: [
           {
             role: "system",
@@ -40,7 +41,9 @@ export async function askGemini(message) {
       {
         headers: {
           Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://health-card-rose.vercel.app",
+          "X-Title": "Health Card AI"
         }
       }
     );
@@ -48,7 +51,11 @@ export async function askGemini(message) {
     return response.data.choices[0].message.content;
 
   } catch (error) {
-    console.log("OPENROUTER ERROR:", error.response?.data || error.message);
+    console.log(
+      "OPENROUTER ERROR:",
+      error.response?.data || error.message
+    );
+
     return "Ошибка ответа ИИ";
   }
 }
