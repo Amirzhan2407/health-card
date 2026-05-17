@@ -10,7 +10,7 @@ export async function askGemini(message) {
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
-        model: "openrouter/free",
+        model: "google/gemma-3-27b-it:free",
 
         messages: [
           {
