@@ -26,7 +26,7 @@ export async function askGemini(message) {
 Вопрос пользователя:
 ${message}
 `;
-const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
   const response = await axios.post(url, {
     contents: [
       {
