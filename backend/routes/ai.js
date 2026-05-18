@@ -5,15 +5,15 @@ const router = express.Router();
 
 router.post("/chat", async (req, res) => {
   try {
-    const { message } = req.body;
+    const { messages } = req.body;
 
-    if (!message) {
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({
-        answer: "Сообщение пустое",
+        answer: "История сообщений пустая",
       });
     }
 
-    const answer = await askGemini(message);
+    const answer = await askGemini(messages);
 
     res.json({ answer });
   } catch (error) {

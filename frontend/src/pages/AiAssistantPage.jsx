@@ -32,8 +32,11 @@ export default function AiAssistantPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          message: currentMessage,
-        }),
+  messages: [
+    ...messages,
+    userMessage
+  ]
+}),
       }
     );
 
