@@ -1,4 +1,3 @@
-// src/pages/Login.jsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
@@ -24,6 +23,7 @@ export default function Login() {
   const navigate = useNavigate();
 
   const [mode, setMode] = useState("ecp");
+  const [theme, setTheme] = useState("light");
 
   const [version, setVersion] = useState("");
   const [status, setStatus] = useState("init");
@@ -70,9 +70,6 @@ export default function Login() {
       const rawKeyInfo = await nca.getKeyInfo();
       const keyData = mapKeyInfo(rawKeyInfo);
 
-      console.log("KEY INFO RAW:", rawKeyInfo);
-      console.log("KEY INFO MAPPED:", keyData);
-
       setStatus("signing");
 
       const payload = makeLoginPayload();
@@ -88,13 +85,8 @@ export default function Login() {
 
       let gender = "unknown";
 
-      if (["1", "3", "5"].includes(genderDigit)) {
-        gender = "male";
-      }
-
-      if (["2", "4", "6"].includes(genderDigit)) {
-        gender = "female";
-      }
+      if (["1", "3", "5"].includes(genderDigit)) gender = "male";
+      if (["2", "4", "6"].includes(genderDigit)) gender = "female";
 
       const userData = {
         fullName: keyData.fullName || "—",
@@ -112,9 +104,7 @@ export default function Login() {
         .eq("iin", userData.iin)
         .maybeSingle();
 
-      if (userError) {
-        throw userError;
-      }
+      if (userError) throw userError;
 
       localStorage.setItem("authSignature", signatureText);
 
@@ -229,67 +219,95 @@ export default function Login() {
     navigate("/home");
   };
 
-  const statusText =
-    status === "checking"
-      ? "Проверяем NCALayer..."
-      : status === "ready"
-      ? "NCALayer подключен"
-      : status === "reading"
-      ? "Считываем данные сертификата..."
-      : status === "signing"
-      ? "Подписываем вход..."
-      : status === "createPassword"
-      ? "Создайте пароль"
-      : status === "ok"
-      ? "Вход выполнен"
-      : status === "error"
-      ? "Ошибка"
-      : "…";
-
   return (
-    <div className="loginWrap">
+    <div className={`loginWrap ${theme === "dark" ? "dark" : ""}`}>
       <div className="loginCard">
-        <div className="loginHeader">
-          <div className="loginHeaderRow">
-            <div className="loginLogo">+</div>
-            <div>
-              <div className="loginTitle">Личная карта здоровья</div>
-              <div className="loginSub">Авторизация</div>
+        <section className="loginBrand">
+          <div className="brandGlow brandGlowOne" />
+          <div className="brandGlow brandGlowTwo" />
+
+          <div className="logoHeart">
+            <div className="heartShape">+</div>
+          </div>
+
+          <h1 className="brandName">
+            <span>Мед</span>Карта
+          </h1>
+
+          <p className="brandText">
+            Ваш личный помощник
+            <br />в мире здоровья
+          </p>
+
+          <div className="brandFeatures">
+            <div className="brandFeature">
+              <div className="featureIcon">💬</div>
+              <div>
+                <b>ИИ помощник</b>
+                <p>Ответы на вопросы о здоровье</p>
+              </div>
+            </div>
+
+            <div className="brandFeature">
+              <div className="featureIcon">🔎</div>
+              <div>
+                <b>Поиск лекарств и аптек</b>
+                <p>Быстрый поиск и сравнение</p>
+              </div>
+            </div>
+
+            <div className="brandFeature">
+              <div className="featureIcon">🛡</div>
+              <div>
+                <b>Конфиденциальность</b>
+                <p>Ваши данные под защитой</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="loginTabs">
-          <button
-            type="button"
-            className={`loginTab ${mode === "ecp" ? "active" : ""}`}
-            onClick={() => {
-              setMode("ecp");
-              setErr("");
-            }}
-          >
-            ЭЦП
-          </button>
+          <div className="brandBottom">🔒 Ваше здоровье — наша забота</div>
+        </section>
 
-          <button
-            type="button"
-            className={`loginTab ${mode === "password" ? "active" : ""}`}
-            onClick={() => {
-              setMode("password");
-              setErr("");
-            }}
-          >
-            ИИН + пароль
-          </button>
-        </div>
+        <section className="loginContent">
+          <div className="loginTop">
+            <button type="button" onClick={() => setTheme("light")}>
+              ☀ Светлый
+            </button>
+            <button type="button" onClick={() => setTheme("dark")}>
+              🌙 Тёмный
+            </button>
+            <button type="button">RU</button>
+          </div>
 
-        {mode === "ecp" && (
-          <>
-            
+          <div className="loginBox">
+            <h2>Добро пожаловать!</h2>
+            <p>Войдите в свой аккаунт, чтобы продолжить</p>
 
-            
+            <div className="loginTabs">
+              <button
+                type="button"
+                className={`loginTab ${mode === "ecp" ? "active" : ""}`}
+                onClick={() => {
+                  setMode("ecp");
+                  setErr("");
+                }}
+              >
+                ЭЦП
+              </button>
 
-            {!needPasswordCreate && (
+              <button
+                type="button"
+                className={`loginTab ${mode === "password" ? "active" : ""}`}
+                onClick={() => {
+                  setMode("password");
+                  setErr("");
+                }}
+              >
+                ИИН + пароль
+              </button>
+            </div>
+
+            {mode === "ecp" && !needPasswordCreate && (
               <button
                 type="button"
                 onClick={onSign}
@@ -302,10 +320,8 @@ export default function Login() {
               </button>
             )}
 
-            {needPasswordCreate && (
-              <div className="loginPanel">
-                <div className="loginSummaryTitle">Создайте пароль</div>
-
+            {mode === "ecp" && needPasswordCreate && (
+              <div>
                 <input
                   className="loginInput"
                   type="password"
@@ -322,9 +338,8 @@ export default function Login() {
                   onChange={(e) => setRepeatPassword(e.target.value)}
                 />
 
-                <div className="loginChipGreen">
-                  Пароль должен содержать минимум 8 символов, большую и
-                  маленькую букву, цифру и спецсимвол.
+                <div className="loginHint">
+                  Пароль: минимум 8 символов, большая и маленькая буква, цифра и спецсимвол.
                 </div>
 
                 <button
@@ -336,53 +351,41 @@ export default function Login() {
                 </button>
               </div>
             )}
-          </>
-        )}
 
-        {mode === "password" && (
-          <div className="loginPanel">
-            <div className="loginSummaryTitle">Вход по ИИН и паролю</div>
+            {mode === "password" && (
+              <div>
+                <input
+                  className="loginInput"
+                  type="text"
+                  placeholder="ИИН"
+                  maxLength={12}
+                  value={iinLogin}
+                  onChange={(e) =>
+                    setIinLogin(e.target.value.replace(/\D/g, ""))
+                  }
+                />
 
-            <input
-              className="loginInput"
-              type="text"
-              placeholder="ИИН"
-              maxLength={12}
-              value={iinLogin}
-              onChange={(e) =>
-                setIinLogin(e.target.value.replace(/\D/g, ""))
-              }
-            />
+                <input
+                  className="loginInput"
+                  type="password"
+                  placeholder="Пароль"
+                  value={passwordLogin}
+                  onChange={(e) => setPasswordLogin(e.target.value)}
+                />
 
-            <input
-              className="loginInput"
-              type="password"
-              placeholder="Пароль"
-              value={passwordLogin}
-              onChange={(e) => setPasswordLogin(e.target.value)}
-            />
+                <button
+                  type="button"
+                  className="loginBtn"
+                  onClick={loginByPassword}
+                >
+                  Войти
+                </button>
+              </div>
+            )}
 
-            <button
-              type="button"
-              className="loginBtn"
-              onClick={loginByPassword}
-            >
-              Войти
-            </button>
+            {err && <div className="loginError">{err}</div>}
           </div>
-        )}
-
-        {err && <div className="loginError">{err}</div>}
-
-        {result && mode === "ecp" && (
-          <div className="loginCms">
-            <div className="loginCmsTitle">CMS подпись (часть):</div>
-            <pre className="loginCmsPre">
-              {result.slice(0, 800)}
-              {result.length > 800 ? "..." : ""}
-            </pre>
-          </div>
-        )}
+        </section>
       </div>
     </div>
   );
