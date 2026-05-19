@@ -144,12 +144,33 @@
 
 .brandBottom {
   position: absolute;
-  bottom: 34px;
-  background: rgba(255, 255, 255, 0.58);
-  padding: 15px 26px;
+
+  left: 50%;
+  transform: translateX(-50%);
+
+  bottom: 25px;
+
+  width: 340px;
+
+  padding: 16px 24px;
+
   border-radius: 18px;
-  color: #64748b;
+
+  background: rgba(255, 255, 255, 0.16);
+
+  border: 1px solid rgba(255, 255, 255, 0.12);
+
+  backdrop-filter: blur(10px);
+
+  color: #ffffff;
+
   font-size: 15px;
+
+  text-align: center;
+
+  box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+
+  z-index: 5;
 }
 
 .loginContent {
@@ -299,9 +320,12 @@
 
 .loginWrap.dark .brandText,
 .loginWrap.dark .brandFeature p,
-.loginWrap.dark .brandBottom,
 .loginWrap.dark .loginBox > p {
   color: #94a3b8;
+}
+
+.loginWrap.dark .brandBottom {
+  color: #ffffff;
 }
 
 .loginWrap.dark .brandFeature,
