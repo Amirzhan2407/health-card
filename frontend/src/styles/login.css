@@ -10,8 +10,8 @@
   align-items: center;
   justify-content: center;
   background:
-    radial-gradient(circle at 8% 18%, rgba(20, 184, 166, 0.18), transparent 28%),
-    radial-gradient(circle at 85% 82%, rgba(59, 130, 246, 0.16), transparent 32%),
+    radial-gradient(circle at 8% 18%, rgba(20, 184, 166, 0.22), transparent 28%),
+    radial-gradient(circle at 85% 82%, rgba(59, 130, 246, 0.18), transparent 32%),
     linear-gradient(135deg, #f3fbff, #eef8f7);
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   color: #0f172a;
@@ -35,9 +35,9 @@
   overflow: hidden;
   padding: 58px 70px;
   background:
-    radial-gradient(circle at 12% 28%, rgba(255, 255, 255, 0.9), transparent 16%),
-    radial-gradient(circle at 77% 25%, rgba(255, 255, 255, 0.72), transparent 13%),
-    radial-gradient(circle at 18% 82%, rgba(20, 184, 166, 0.20), transparent 30%),
+    radial-gradient(circle at 12% 28%, rgba(20, 184, 166, 0.14), transparent 18%),
+    radial-gradient(circle at 77% 25%, rgba(20, 184, 166, 0.16), transparent 15%),
+    radial-gradient(circle at 18% 82%, rgba(20, 184, 166, 0.22), transparent 30%),
     linear-gradient(160deg, #e9fffc, #e9f8ff);
   display: flex;
   flex-direction: column;
@@ -48,8 +48,7 @@
 .brandGlow {
   position: absolute;
   border-radius: 999px;
-  background: rgba(20, 184, 166, 0.12);
-  filter: blur(1px);
+  background: rgba(20, 184, 166, 0.18);
 }
 
 .brandGlowOne {
@@ -83,8 +82,13 @@
 }
 
 @keyframes loginFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  0%, 100% { 
+    transform: translateY(0); 
+  }
+
+  50% { 
+    transform: translateY(-10px); 
+  }
 }
 
 .brandName {
@@ -100,7 +104,7 @@
 }
 
 .brandText {
-  margin: 18px 0 48px;
+  margin: 18px 0 44px;
   color: #64748b;
   font-size: 22px;
   line-height: 1.45;
@@ -113,15 +117,16 @@
   max-width: 360px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
   z-index: 2;
+  margin-bottom: 95px;
 }
 
 .brandFeature {
   display: flex;
   align-items: center;
   gap: 16px;
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.86);
   border: 1px solid rgba(219, 234, 254, 0.95);
   padding: 15px 17px;
   border-radius: 19px;
@@ -156,18 +161,21 @@
 .brandBottom {
   position: absolute;
   left: 50%;
-  bottom: 24px;
+  bottom: 28px;
   transform: translateX(-50%);
-  width: 340px;
-  padding: 15px 24px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(14px);
-  color: #64748b;
+  width: 360px;
+  padding: 18px 24px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  color: #475569;
   font-size: 15px;
+  font-weight: 700;
   text-align: center;
-  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.09);
+  box-shadow:
+    0 12px 30px rgba(15, 23, 42, 0.08),
+    0 4px 12px rgba(15, 23, 42, 0.04);
   z-index: 5;
 }
 
@@ -176,7 +184,7 @@
   display: flex;
   flex-direction: column;
   background:
-    radial-gradient(circle at 88% 18%, rgba(20, 184, 166, 0.07), transparent 20%),
+    radial-gradient(circle at 88% 18%, rgba(20, 184, 166, 0.08), transparent 20%),
     #ffffff;
 }
 
@@ -302,6 +310,7 @@
 }
 
 /* DARK THEME */
+
 .loginWrap.dark {
   background:
     radial-gradient(circle at 12% 10%, rgba(20, 184, 166, 0.16), transparent 30%),
@@ -346,6 +355,7 @@
   color: #ffffff;
   background: rgba(255, 255, 255, 0.10);
   border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
 }
 
 .loginWrap.dark .loginContent {
