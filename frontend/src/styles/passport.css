@@ -1,17 +1,30 @@
 .passportWrap {
   min-height: calc(100vh - 86px);
   padding: 46px 56px;
+
   background:
-    radial-gradient(circle at 15% 10%, rgba(0, 255, 255, 0.16), transparent 28%),
-    radial-gradient(circle at 85% 80%, rgba(0, 165, 80, 0.12), transparent 30%),
-    linear-gradient(135deg, #d7d3c8 0%, #cbc7bd 45%, #bfbab0 100%);
+    radial-gradient(circle at top left, rgba(0, 255, 255, 0.10), transparent 22%),
+    radial-gradient(circle at bottom right, rgba(0, 165, 80, 0.10), transparent 24%),
+    linear-gradient(
+      135deg,
+      #edf4ff 0%,
+      #dfeaf7 35%,
+      #d7e4f3 65%,
+      #edf4ff 100%
+    );
 }
 
 .layoutRoot.dark .passportWrap {
   background:
-    radial-gradient(circle at 15% 10%, rgba(0, 255, 255, 0.08), transparent 28%),
-    radial-gradient(circle at 85% 80%, rgba(0, 165, 80, 0.10), transparent 30%),
-    linear-gradient(135deg, #111827 0%, #1f2933 55%, #0f172a 100%);
+    radial-gradient(circle at top left, rgba(0, 255, 255, 0.08), transparent 22%),
+    radial-gradient(circle at bottom right, rgba(0, 165, 80, 0.10), transparent 24%),
+    linear-gradient(
+      135deg,
+      #0f172a 0%,
+      #111827 35%,
+      #1e293b 70%,
+      #0b1120 100%
+    );
 }
 
 .passportTop {
@@ -26,11 +39,16 @@
   padding: 0 24px;
   border: none;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.9);
   color: #111827;
   font-weight: 900;
   cursor: pointer;
   box-shadow: 0 12px 30px rgba(17, 24, 39, 0.12);
+  transition: 0.2s;
+}
+
+.passportBack:hover {
+  transform: translateY(-2px);
 }
 
 .passportTitle {
@@ -58,16 +76,16 @@
   margin-bottom: 34px;
   padding: 38px;
   border-radius: 34px;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.75);
   box-shadow:
-    0 24px 60px rgba(17, 24, 39, 0.14),
+    0 24px 60px rgba(17, 24, 39, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(14px);
 }
 
 .layoutRoot.dark .passportCard {
-  background: rgba(17, 24, 39, 0.78);
+  background: rgba(17, 24, 39, 0.82);
   border: 1px solid rgba(0, 255, 255, 0.16);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
 }
@@ -93,7 +111,7 @@
   min-height: 148px;
   padding: 26px;
   border-radius: 26px;
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.78);
   border: 1px solid rgba(17, 24, 39, 0.10);
   display: flex;
   flex-direction: column;
@@ -108,7 +126,7 @@
 }
 
 .layoutRoot.dark .pField {
-  background: rgba(31, 41, 55, 0.82);
+  background: rgba(31, 41, 55, 0.85);
   border-color: rgba(255, 255, 255, 0.10);
 }
 
@@ -152,7 +170,7 @@
   height: 64px;
   border-radius: 20px;
   border: 1.8px solid rgba(17, 24, 39, 0.14);
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.9);
   padding: 0 20px;
   font-size: 17px;
   outline: none;
