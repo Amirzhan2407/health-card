@@ -1,7 +1,11 @@
 .passportWrap {
-  min-height: calc(100vh - 82px);
-  padding: 42px 56px;
-  background: linear-gradient(135deg, #dff4ff, #f6fbff);
+  min-height: calc(100vh - 86px);
+  padding: 44px 56px;
+  background: #cbc7bd;
+}
+
+.layoutRoot.dark .passportWrap {
+  background: #1f2933;
 }
 
 .passportTop {
@@ -13,54 +17,73 @@
 }
 
 .passportBack {
-  height: 50px;
-  padding: 0 22px;
+  height: 52px;
+  padding: 0 24px;
   border: none;
   border-radius: 16px;
-  background: white;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 15px;
   font-weight: 900;
   cursor: pointer;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.12);
 }
 
 .passportTitle {
-  font-size: 38px;
+  font-size: 40px;
   font-weight: 950;
-  color: #0f172a;
+  color: #111827;
+}
+
+.layoutRoot.dark .passportTitle {
+  color: #ffffff;
 }
 
 .passportSub {
   margin-top: 6px;
-  color: #55708a;
+  color: #4b5563;
   font-size: 16px;
+}
+
+.layoutRoot.dark .passportSub {
+  color: #cbd5e1;
 }
 
 .passportCard {
   width: 100%;
-  margin-bottom: 32px;
+  margin-bottom: 34px;
   padding: 36px;
-  border-radius: 32px;
-  background: white;
-  border: 1px solid #cfe8f8;
-  box-shadow: 0 22px 50px rgba(15, 23, 42, 0.08);
+  border-radius: 30px;
+  background: #ffffff;
+  border: 2px solid rgba(0, 165, 80, 0.22);
+  box-shadow: 0 22px 55px rgba(0, 0, 0, 0.12);
+}
+
+.layoutRoot.dark .passportCard {
+  background: #111827;
+  border-color: rgba(0, 255, 255, 0.25);
 }
 
 .passportCardTitle {
   font-size: 30px;
   font-weight: 950;
-  color: #0f172a;
-  margin-bottom: 30px;
+  color: #111827;
+  margin-bottom: 32px;
   display: flex;
   align-items: center;
   gap: 14px;
 }
 
+.layoutRoot.dark .passportCardTitle {
+  color: #ffffff;
+}
+
 .passportCardTitle::before {
   content: "";
   width: 12px;
-  height: 36px;
+  height: 38px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #3b82f6, #60a5fa);
+  background: linear-gradient(180deg, #00a550, #00ffff);
 }
 
 .passportGrid {
@@ -70,27 +93,48 @@
 }
 
 .pField {
-  min-height: 140px;
+  min-height: 145px;
   padding: 26px;
-  border-radius: 26px;
-  background: #f8fcff;
-  border: 1px solid #cfe2ef;
+  border-radius: 24px;
+  background: #f7f7f4;
+  border: 2px solid #e2dfd6;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  transition: 0.2s;
+}
+
+.layoutRoot.dark .pField {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+.pField:hover {
+  transform: translateY(-3px);
+  border-color: #00a550;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.12);
 }
 
 .pLabel {
   font-size: 15px;
   font-weight: 900;
-  color: #5d7690;
+  color: #4b5563;
   margin-bottom: 14px;
+}
+
+.layoutRoot.dark .pLabel {
+  color: #9ca3af;
 }
 
 .pValue {
   font-size: 22px;
   font-weight: 950;
-  color: #0f172a;
+  color: #111827;
+  word-break: break-word;
+}
+
+.layoutRoot.dark .pValue {
+  color: #ffffff;
 }
 
 .passportContactCard .passportGrid {
@@ -103,23 +147,30 @@
 }
 
 .passportContactCard .pField {
-  min-height: 160px;
+  min-height: 165px;
 }
 
 .pInput {
   width: 100%;
-  height: 62px;
+  height: 64px;
   border-radius: 18px;
-  border: 2px solid #cfe2ef;
+  border: 2px solid #d1d5db;
   background: white;
-  padding: 0 18px;
+  padding: 0 20px;
   font-size: 17px;
   outline: none;
+  color: #111827;
+}
+
+.layoutRoot.dark .pInput {
+  background: #111827;
+  border-color: #374151;
+  color: white;
 }
 
 .pInput:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.14);
+  border-color: #00a550;
+  box-shadow: 0 0 0 5px rgba(0, 165, 80, 0.18);
 }
 
 .passportSaveBtn {
@@ -128,54 +179,31 @@
   padding: 0 38px;
   border: none;
   border-radius: 20px;
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  background: #00a550;
   color: white;
   font-size: 17px;
   font-weight: 950;
   cursor: pointer;
-  box-shadow: 0 18px 38px rgba(37, 99, 235, 0.28);
+  box-shadow: 0 18px 38px rgba(0, 165, 80, 0.28);
+}
+
+.passportSaveBtn:hover {
+  background: #008f46;
 }
 
 .passportMessage {
-  margin-top: 20px;
+  margin-top: 22px;
   max-width: 560px;
   padding: 16px 18px;
   border-radius: 18px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  color: #1d4ed8;
+  background: rgba(0, 255, 255, 0.16);
+  border: 1px solid #00ffff;
+  color: #006060;
   font-weight: 900;
 }
 
-.layoutRoot.dark .passportWrap {
-  background: linear-gradient(135deg, #071827, #0b1f33);
-}
-
-.layoutRoot.dark .passportCard {
-  background: #0f1f33;
-  border-color: #1f3a52;
-}
-
-.layoutRoot.dark .passportTitle,
-.layoutRoot.dark .passportCardTitle,
-.layoutRoot.dark .pValue {
-  color: white;
-}
-
-.layoutRoot.dark .passportSub,
-.layoutRoot.dark .pLabel {
-  color: #9fb4c8;
-}
-
-.layoutRoot.dark .pField {
-  background: #10263a;
-  border-color: #24445f;
-}
-
-.layoutRoot.dark .pInput {
-  background: #0b1f33;
-  border-color: #24445f;
-  color: white;
+.layoutRoot.dark .passportMessage {
+  color: #00ffff;
 }
 
 @media (max-width: 1200px) {
@@ -189,8 +217,17 @@
     padding: 22px;
   }
 
+  .passportTop {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .passportGrid,
   .passportContactCard .passportGrid {
     grid-template-columns: 1fr;
+  }
+
+  .passportTitle {
+    font-size: 30px;
   }
 }

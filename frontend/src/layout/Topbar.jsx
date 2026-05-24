@@ -15,12 +15,12 @@ export default function Topbar({ theme, setTheme, onLogout }) {
     { title: "Мониторинг", path: "/health" },
   ];
 
-  const isActive = (path) => location.pathname.startsWith(path);
+  const isActive = (path) => location.pathname === path;
 
   return (
     <header className="topbar">
       <div className="topbarLogo" onClick={() => navigate("/home")}>
-        <span>＋</span>
+        <img src="/логтип медицины.jpg" alt="МедКарта" />
         <b>МедКарта</b>
       </div>
 
