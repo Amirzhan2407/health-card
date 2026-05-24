@@ -422,6 +422,37 @@
 
 @media (max-width: 700px) {
 
+  .topbar {
+    height: 84px;
+
+    padding:
+      0 18px;
+
+    justify-content:
+      center;
+  }
+
+  .topbarNav {
+    display: none;
+  }
+
+  .topbarRight {
+    display: none;
+  }
+
+  .topbarLogo {
+    gap: 12px;
+  }
+
+  .topbarLogo img {
+    width: 46px;
+    height: 46px;
+  }
+
+  .topbarLogoText {
+    font-size: 20px;
+  }
+
   .mobileBurger {
     position: fixed;
 
@@ -445,17 +476,166 @@
     align-items: center;
     justify-content: center;
 
-    z-index: 2000;
+    z-index: 3000;
+
+    cursor: pointer;
 
     box-shadow:
       0 12px 30px rgba(15,23,42,0.18);
-
-    cursor: pointer;
   }
 
   .layoutRoot.dark .mobileBurger {
     background: #111827;
     color: white;
+  }
+
+  .mobileSidebar {
+    position: fixed;
+
+    top: 0;
+    left: -100%;
+
+    width: 280px;
+    height: 100vh;
+
+    background:
+      linear-gradient(
+        180deg,
+        #031525 0%,
+        #071d33 100%
+      );
+
+    padding: 110px 20px 30px;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 14px;
+
+    transition: 0.3s;
+
+    z-index: 2500;
+
+    box-shadow:
+      0 0 40px rgba(0,0,0,0.35);
+  }
+
+  .mobileSidebar.open {
+    left: 0;
+  }
+
+  .mobileSidebar .navItem {
+    width: 100%;
+
+    min-height: 58px;
+
+    border-radius: 18px;
+
+    border: 1px solid rgba(255,255,255,0.06);
+
+    background: rgba(255,255,255,0.04);
+
+    color: white;
+
+    font-size: 17px;
+    font-weight: 700;
+
+    display: flex;
+    align-items: center;
+
+    padding: 0 18px;
+
+    transition: 0.2s;
+  }
+
+  .mobileSidebar .navItem.active {
+    background:
+      linear-gradient(
+        135deg,
+        #00ffff,
+        #4facfe
+      );
+
+    color: #031525;
+
+    box-shadow:
+      0 12px 24px rgba(0,255,255,0.24);
+  }
+
+  .mobileSidebar .logoutBtn {
+    margin-top: auto;
+
+    background:
+      linear-gradient(
+        135deg,
+        #ff4d4d,
+        #ff6b6b
+      );
+
+    color: white;
+  }
+
+  .mobileBackdrop {
+    position: fixed;
+
+    inset: 0;
+
+    background:
+      rgba(0,0,0,0.45);
+
+    backdrop-filter: blur(4px);
+
+    opacity: 0;
+    pointer-events: none;
+
+    transition: 0.25s;
+
+    z-index: 2400;
+  }
+
+  .mobileBackdrop.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .layoutContent {
+    padding:
+      24px 16px 40px;
+  }
+
+  .passportTitle {
+    font-size: 20px;
+  }
+
+  .passportSub {
+    font-size: 14px;
+  }
+
+  .passportCard {
+    padding: 20px;
+    border-radius: 28px;
+  }
+
+  .passportCardTitle {
+    font-size: 17px;
+  }
+
+  .passportGrid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .pField {
+    min-height: 120px;
+  }
+
+  .pValue {
+    font-size: 16px;
+  }
+
+  .passportSaveBtn {
+    width: 100%;
+    height: 56px;
   }
 
 }
