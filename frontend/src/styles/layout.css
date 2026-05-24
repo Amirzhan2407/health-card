@@ -111,128 +111,24 @@ body {
   min-height: calc(100vh - 86px);
 }
 
-@media (max-width: 1200px) {
-  .topbar {
-    height: auto;
-    padding: 18px;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .topbarNav {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-}
+/* мобильная кнопка скрыта на компьютере */
 .mobileMenuBtn {
-  position: fixed;
-
-  top: 92px;
-  left: 16px;
-
-  width: 52px;
-  height: 52px;
-
-  border: none;
-  border-radius: 16px;
-
-  background: white;
-  color: #111827;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  font-size: 28px;
-  font-weight: 900;
-
-  z-index: 9999;
-
-  cursor: pointer;
-
-  box-shadow:
-    0 10px 30px rgba(0,0,0,0.18);
+  display: none;
 }
 
-.mobileBackdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  z-index: 150;
-  opacity: 0;
-  pointer-events: none;
-  transition: 0.2s;
-}
-
-.mobileBackdrop.show {
-  opacity: 1;
-  pointer-events: auto;
-}
-
+/* боковое меню скрыто на компьютере */
+.mobileBackdrop,
 .mobileSidebar {
-  position: fixed;
-  top: 0;
-  left: -320px;
-  width: 300px;
-  height: 100vh;
-  background: #00a550;
-  z-index: 200;
-  padding: 22px;
-  transition: 0.25s;
-  box-shadow: 20px 0 50px rgba(0, 0, 0, 0.25);
+  display: none;
 }
 
-.mobileSidebar.open {
-  left: 0;
-}
+/* ================= МОБИЛЬНАЯ ВЕРСИЯ НАЧИНАЕТСЯ ЗДЕСЬ ================= */
 
-.mobileSidebarTop {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 26px;
-}
-
-.mobileSidebarTop button {
-  width: 40px;
-  height: 40px;
-  border: none;
-  border-radius: 12px;
-  background: white;
-  font-weight: 900;
-  cursor: pointer;
-}
-
-.mobileNavItem {
-  width: 100%;
-  height: 50px;
-  margin-bottom: 12px;
-  border: none;
-  border-radius: 16px;
-  background: transparent;
-  color: white;
-  font-size: 16px;
-  font-weight: 900;
-  text-align: left;
-  padding: 0 16px;
-  cursor: pointer;
-}
-
-.mobileNavItem.active {
-  background: #00ffff;
-  color: #003b3b;
-}
-
-.mobileNavItem.danger {
-  background: #ef4444;
-  color: white;
-  margin-top: 20px;
-}
-
-@media (max-width: 900px) {
+@media (max-width: 700px) {
   .topbar {
-    height: 76px;
-    padding: 0 18px;
+    height: 78px;
+    padding: 0 16px;
+    justify-content: space-between;
   }
 
   .topbarNav,
@@ -240,16 +136,148 @@ body {
     display: none;
   }
 
-  .mobileMenuBtn {
-    display: block;
+  .topbarLogo {
+    gap: 12px;
   }
 
   .topbarLogo img {
     width: 44px;
     height: 44px;
+    border-radius: 14px;
   }
 
   .topbarLogo b {
     font-size: 20px;
+    color: white;
+  }
+
+  .mobileMenuBtn {
+    display: flex;
+    position: static;
+
+    width: 46px;
+    height: 46px;
+
+    border: none;
+    border-radius: 15px;
+
+    background: white;
+    color: #111827;
+
+    font-size: 26px;
+    font-weight: 900;
+
+    align-items: center;
+    justify-content: center;
+
+    cursor: pointer;
+
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+  }
+
+  .mobileBackdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+
+    background: rgba(0, 0, 0, 0.45);
+
+    opacity: 0;
+    pointer-events: none;
+
+    z-index: 2500;
+
+    transition: 0.2s;
+  }
+
+  .mobileBackdrop.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .mobileSidebar {
+    display: block;
+
+    position: fixed;
+    top: 0;
+    left: -320px;
+
+    width: 300px;
+    height: 100vh;
+
+    background: #00a550;
+
+    z-index: 3001;
+
+    padding: 22px;
+
+    transition: 0.25s;
+
+    box-shadow: 18px 0 45px rgba(0, 0, 0, 0.35);
+  }
+
+  .mobileSidebar.open {
+    left: 0;
+  }
+
+  .mobileSidebarTop {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    margin-bottom: 24px;
+  }
+
+  .mobileSidebarTop button {
+    width: 42px;
+    height: 42px;
+
+    border: none;
+    border-radius: 14px;
+
+    background: #ffffff;
+
+    font-weight: 900;
+
+    cursor: pointer;
+  }
+
+  .mobileNavItem {
+    width: 100%;
+    height: 52px;
+
+    margin-bottom: 12px;
+
+    border: none;
+    border-radius: 16px;
+
+    background: transparent;
+
+    color: #ffffff;
+
+    font-size: 16px;
+    font-weight: 900;
+
+    text-align: left;
+
+    padding: 0 16px;
+
+    cursor: pointer;
+  }
+
+  .mobileNavItem.active {
+    background: #00ffff;
+    color: #003b3b;
+  }
+
+  .mobileNavItem.danger {
+    background: #ef4444;
+    color: #ffffff;
+
+    margin-top: 18px;
+  }
+
+  .layoutContent {
+    min-height: calc(100vh - 78px);
   }
 }
