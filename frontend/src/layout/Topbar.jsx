@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "../styles/layout.css";
 
 export default function Topbar({ theme, setTheme, onLogout }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const links = [
     { title: "Главная", path: "/home" },
@@ -17,39 +18,93 @@ export default function Topbar({ theme, setTheme, onLogout }) {
 
   const isActive = (path) => location.pathname === path;
 
-  return (
-    <header className="topbar">
-      <div className="topbarLogo" onClick={() => navigate("/home")}>
-        <img src="/логтип медицины.jpg" alt="МедКарта" />
-        <b>МедКарта</b>
-      </div>
+  const go = (path) => {
+    navigate(path);
+    setMobileOpen(false);
+  };
 
-      <nav className="topbarNav">
+  return (
+    <>
+      <header className="topbar">
+        <div className="topbarLogo" onClick={() => navigate("/home")}>
+          <img src="/логтип медицины.jpg" alt="МедКарта" />
+          <b>МедКарта</b>
+        </div>
+
+        <nav className="topbarNav">
+          {links.map((link) => (
+            <button
+              key={link.path}
+              type="button"
+              className={`topNavItem ${isActive(link.path) ? "active" : ""}`}
+              onClick={() => go(link.path)}
+            >
+              {link.title}
+            </button>
+          ))}
+        </nav>
+
+        <div className="topbarActions">
+          <button
+            type="button"
+            className="themeBtn"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          >
+            {theme === "dark" ? "☀ Светлая" : "🌙 Тёмная"}
+          </button>
+
+          <button type="button" className="logoutBtn" onClick={onLogout}>
+            Выйти
+          </button>
+        </div>
+
+        <button
+          type="button"
+          className="mobileMenuBtn"
+          onClick={() => setMobileOpen(true)}
+        >
+          ☰
+        </button>
+      </header>
+
+      <div
+        className={`mobileBackdrop ${mobileOpen ? "show" : ""}`}
+        onClick={() => setMobileOpen(false)}
+      />
+
+      <aside className={`mobileSidebar ${mobileOpen ? "open" : ""}`}>
+        <div className="mobileSidebarTop">
+          <div className="topbarLogo">
+            <img src="/логтип медицины.jpg" alt="МедКарта" />
+            <b>МедКарта</b>
+          </div>
+
+          <button onClick={() => setMobileOpen(false)}>✕</button>
+        </div>
+
         {links.map((link) => (
           <button
             key={link.path}
             type="button"
-            className={`topNavItem ${isActive(link.path) ? "active" : ""}`}
-            onClick={() => navigate(link.path)}
+            className={`mobileNavItem ${isActive(link.path) ? "active" : ""}`}
+            onClick={() => go(link.path)}
           >
             {link.title}
           </button>
         ))}
-      </nav>
 
-      <div className="topbarActions">
         <button
           type="button"
-          className="themeBtn"
+          className="mobileNavItem"
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         >
           {theme === "dark" ? "☀ Светлая" : "🌙 Тёмная"}
         </button>
 
-        <button type="button" className="logoutBtn" onClick={onLogout}>
+        <button type="button" className="mobileNavItem danger" onClick={onLogout}>
           Выйти
         </button>
-      </div>
-    </header>
+      </aside>
+    </>
   );
 }
