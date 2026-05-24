@@ -422,66 +422,40 @@
 
 @media (max-width: 700px) {
 
-  .passportWrap {
-    padding: 18px;
-  }
+  .mobileBurger {
+    position: fixed;
 
-  .passportTop {
-    padding: 26px;
-    border-radius: 28px;
-  }
+    top: 92px;
+    left: 18px;
 
-  .passportTitle {
-    font-size: 22px;
-  }
+    width: 52px;
+    height: 52px;
 
-  .passportSub {
-    font-size: 13px;
-  }
-
-  .passportGrid,
-  .passportContactCard .passportGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .passportCard {
-    padding: 22px;
-    border-radius: 28px;
-  }
-
-  .passportCardTitle {
-    font-size: 20px;
-    margin-bottom: 20px;
-  }
-
-  .passportCardTitle::before {
-    width: 10px;
-    height: 30px;
-  }
-
-  .pField {
-    min-height: 120px;
-    padding: 20px;
-    border-radius: 24px;
-  }
-
-  .pLabel {
-    font-size: 12px;
-  }
-
-  .pValue {
-    font-size: 16px;
-  }
-
-  .pInput {
-    height: 54px;
-    font-size: 15px;
-    border-radius: 16px;
-  }
-
-  .passportSaveBtn {
-    width: 100%;
-    height: 56px;
+    border: none;
     border-radius: 18px;
+
+    background: white;
+
+    color: #111827;
+
+    font-size: 28px;
+    font-weight: 900;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    z-index: 2000;
+
+    box-shadow:
+      0 12px 30px rgba(15,23,42,0.18);
+
+    cursor: pointer;
   }
+
+  .layoutRoot.dark .mobileBurger {
+    background: #111827;
+    color: white;
+  }
+
 }
