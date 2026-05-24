@@ -118,11 +118,12 @@
 
 .passportCardTitle::before {
   content: "";
-  width: 12px;
-  height: 42px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #00ffff, #00a550);
-  box-shadow: 0 0 18px rgba(0, 255, 255, 0.45);
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: rgba(0, 255, 255, 0.18);
+  border: 1px solid rgba(0, 255, 255, 0.35);
+  box-shadow: 0 8px 18px rgba(0, 255, 255, 0.14);
 }
 
 .passportGrid {
