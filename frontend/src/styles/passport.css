@@ -375,3 +375,44 @@
   }
 
 }
+/* ===== DARK THEME FOR MED CARD ===== */
+
+.layoutRoot.dark .passportWrap {
+  background: linear-gradient(135deg, #0f172a 0%, #111827 50%, #0b1120 100%);
+}
+
+.layoutRoot.dark .passportTop {
+  background: rgba(17, 24, 39, 0.86);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.layoutRoot.dark .passportTitle,
+.layoutRoot.dark .passportCardTitle,
+.layoutRoot.dark .pValue {
+  color: #f8fafc;
+}
+
+.layoutRoot.dark .passportSub,
+.layoutRoot.dark .pLabel {
+  color: #cbd5e1;
+}
+
+.layoutRoot.dark .passportCard {
+  background: rgba(17, 24, 39, 0.88);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.layoutRoot.dark .pField {
+  background: #1f2937;
+  border-color: #334155;
+}
+
+.layoutRoot.dark .pInput {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+.layoutRoot.dark .pInput::placeholder {
+  color: #94a3b8;
+}
