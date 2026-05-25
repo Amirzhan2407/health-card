@@ -11,7 +11,6 @@ export default function Topbar({ theme, setTheme, onLogout }) {
     { title: "Главная", path: "/home" },
     { title: "Справки", path: "/documents" },
     { title: "История болезни", path: "/documents-cloud" },
-    { title: "Мед карта", path: "/passport" },
     { title: "ИИ помощник", path: "/ai-assistant" },
     { title: "Мониторинг", path: "/health" },
   ];
@@ -26,7 +25,7 @@ export default function Topbar({ theme, setTheme, onLogout }) {
   return (
     <>
       <header className="topbar">
-        <div className="topbarLogo" onClick={() => navigate("/home")}>
+        <div className="topbarLogo" onClick={() => navigate("/passport")}>
           <img src="/логтип медицины.jpg" alt="МедКарта" />
           <b>МедКарта</b>
         </div>
@@ -74,12 +73,14 @@ export default function Topbar({ theme, setTheme, onLogout }) {
 
       <aside className={`mobileSidebar ${mobileOpen ? "open" : ""}`}>
         <div className="mobileSidebarTop">
-          <div className="topbarLogo">
+          <div className="topbarLogo" onClick={() => go("/passport")}>
             <img src="/логтип медицины.jpg" alt="МедКарта" />
             <b>МедКарта</b>
           </div>
 
-          <button onClick={() => setMobileOpen(false)}>✕</button>
+          <button type="button" onClick={() => setMobileOpen(false)}>
+            ✕
+          </button>
         </div>
 
         {links.map((link) => (

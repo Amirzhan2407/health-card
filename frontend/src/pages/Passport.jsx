@@ -1,11 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
 import "../styles/passport.css";
 
 export default function Passport() {
-  const navigate = useNavigate();
-
   const savedUser = JSON.parse(localStorage.getItem("userData") || "{}");
 
   const [phone, setPhone] = useState(savedUser.phone || "");
@@ -80,14 +77,6 @@ export default function Passport() {
   return (
     <div className="passportWrap">
       <div className="passportTop">
-        <button
-          className="passportBack"
-          type="button"
-          onClick={() => navigate("/home")}
-        >
-          ← Назад
-        </button>
-
         <div>
           <div className="passportTitle">Мед карта</div>
           <div className="passportSub">Данные владельца и контакты</div>
@@ -122,6 +111,7 @@ export default function Passport() {
 
       <section className="passportCard passportContactCard">
         <div className="passportCardTitle">Контактные данные</div>
+
         <div className="passportSub">
           Эти данные можно использовать для уведомлений и связи.
         </div>
