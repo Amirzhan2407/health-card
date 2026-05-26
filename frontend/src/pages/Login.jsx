@@ -19,6 +19,18 @@ function isStrongPassword(password) {
   );
 }
 
+function isValidIin(iin) {
+  return /^\d{12}$/.test(iin);
+}
+
+function isValidFullName(name) {
+  if (!name) return false;
+  if (name === "—") return false;
+  if (name === "1.4") return false;
+  if (name.length < 5) return false;
+  return true;
+}
+
 export default function Login() {
   const navigate = useNavigate();
 
@@ -27,7 +39,6 @@ export default function Login() {
 
   const [version, setVersion] = useState("");
   const [status, setStatus] = useState("init");
-  const [result, setResult] = useState("");
   const [err, setErr] = useState("");
 
   const [iinLogin, setIinLogin] = useState("");
@@ -40,7 +51,7 @@ export default function Login() {
   const [repeatPassword, setRepeatPassword] = useState("");
 
   useEffect(() => {
-    (async () => {
+    async function checkNca() {
       try {
         setStatus("checking");
         const v = await nca.getVersion();
@@ -51,7 +62,9 @@ export default function Login() {
         setErr(e?.message || "NCALayer недоступен");
         setStatus("error");
       }
-    })();
+    }
+
+    checkNca();
   }, []);
 
   const saveUserData = (userData) => {
@@ -62,7 +75,6 @@ export default function Login() {
     if (status === "reading" || status === "signing") return;
 
     setErr("");
-    setResult("");
 
     try {
       setStatus("reading");
@@ -76,12 +88,35 @@ export default function Login() {
       const signature = await nca.basicsSignCMS(payload, "ru");
       const signatureText = String(signature);
 
-      setResult(signatureText);
-
       const cmsData = parseCmsSignature(signatureText);
 
-      const userIin = keyData.iin !== "—" ? keyData.iin : cmsData.iin || "—";
-      const genderDigit = userIin?.[6];
+      const userIin =
+        keyData.iin && keyData.iin !== "—"
+          ? keyData.iin
+          : cmsData.iin || "—";
+
+      const userFullName =
+        keyData.fullName && keyData.fullName !== "—"
+          ? keyData.fullName
+          : cmsData.fullName || "—";
+
+      if (!isValidIin(userIin)) {
+        setErr(
+          "Не удалось получить правильный ИИН из ЭЦП. Выберите ключ физического лица."
+        );
+        setStatus("error");
+        return;
+      }
+
+      if (!isValidFullName(userFullName)) {
+        setErr(
+          "Не удалось получить ФИО из ЭЦП. Выберите правильный ключ физического лица."
+        );
+        setStatus("error");
+        return;
+      }
+
+      const genderDigit = userIin[6];
 
       let gender = "unknown";
 
@@ -89,7 +124,7 @@ export default function Login() {
       if (["2", "4", "6"].includes(genderDigit)) gender = "female";
 
       const userData = {
-        fullName: keyData.fullName || "—",
+        fullName: userFullName,
         iin: userIin,
         gender,
         certExpire:
@@ -115,6 +150,8 @@ export default function Login() {
           iin: existingUser.iin,
           gender: existingUser.gender || userData.gender,
           certExpire: userData.certExpire,
+          phone: existingUser.phone || "",
+          email: existingUser.email || "",
         });
 
         setStatus("ok");
@@ -136,6 +173,16 @@ export default function Login() {
 
     if (!ecpUserData?.iin) {
       setErr("Сначала подтвердите личность через ЭЦП.");
+      return;
+    }
+
+    if (!isValidIin(ecpUserData.iin)) {
+      setErr("Неверный ИИН. Повторите вход через правильный ЭЦП.");
+      return;
+    }
+
+    if (!isValidFullName(ecpUserData.fullName)) {
+      setErr("Неверное ФИО. Повторите вход через правильный ЭЦП.");
       return;
     }
 
@@ -174,6 +221,8 @@ export default function Login() {
       iin: ecpUserData.iin,
       gender: ecpUserData.gender,
       certExpire: ecpUserData.certExpire,
+      phone: "",
+      email: "",
     });
 
     setStatus("ok");
@@ -183,7 +232,7 @@ export default function Login() {
   const loginByPassword = async () => {
     setErr("");
 
-    if (!/^\d{12}$/.test(iinLogin)) {
+    if (!isValidIin(iinLogin)) {
       setErr("ИИН должен содержать 12 цифр.");
       return;
     }
@@ -214,6 +263,8 @@ export default function Login() {
       iin: data.user.iin,
       gender: data.user.gender || "unknown",
       certExpire: "—",
+      phone: data.user.phone || "",
+      email: data.user.email || "",
     });
 
     navigate("/home");
@@ -339,7 +390,8 @@ export default function Login() {
                 />
 
                 <div className="loginHint">
-                  Пароль: минимум 8 символов, большая и маленькая буква, цифра и спецсимвол.
+                  Пароль: минимум 8 символов, большая и маленькая буква, цифра
+                  и спецсимвол.
                 </div>
 
                 <button
