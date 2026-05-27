@@ -130,7 +130,17 @@ function getMedicineScore(title, queryWords) {
     капсула: ["капсулы", "капс"],
   };
 
+  const mainWord = queryWords[0];
+
+  if (mainWord && !titleLower.includes(mainWord)) {
+    return 0;
+  }
+
   let score = 0;
+
+  if (mainWord && titleLower.includes(mainWord)) {
+    score += 10;
+  }
 
   for (const word of queryWords) {
     if (titleLower.includes(word)) {
@@ -147,12 +157,6 @@ function getMedicineScore(title, queryWords) {
     if (hasSynonym) {
       score += 2;
     }
-  }
-
-  const mainWord = queryWords[0];
-
-  if (mainWord && titleLower.includes(mainWord)) {
-    score += 6;
   }
 
   return score;
@@ -438,6 +442,27 @@ async function sortByDistance(pharmacies, citySlug, options) {
     }
   }
 
+  if (options.priority === "nearby_price") {
+    result.sort((a, b) => {
+      if (a.distanceKm === null && b.distanceKm === null) {
+        return (a.priceNumber || 999999999) - (b.priceNumber || 999999999);
+      }
+
+      if (a.distanceKm === null) return 1;
+      if (b.distanceKm === null) return -1;
+
+      const distanceDiff = Math.abs(a.distanceKm - b.distanceKm);
+
+      if (distanceDiff <= 2) {
+        return (a.priceNumber || 999999999) - (b.priceNumber || 999999999);
+      }
+
+      return a.distanceKm - b.distanceKm;
+    });
+
+    return result;
+  }
+
   result.sort((a, b) => {
     if (a.distanceKm === null && b.distanceKm === null) {
       return (a.priceNumber || 999999999) - (b.priceNumber || 999999999);
@@ -490,8 +515,11 @@ export async function searchMedicine(medicine, city, options = {}) {
 
     let pharmacies = parsed.pharmacies;
 
-    if (priority === "nearby") {
-      pharmacies = await sortByDistance(pharmacies, citySlug, options);
+    if (priority === "nearby" || priority === "nearby_price") {
+      pharmacies = await sortByDistance(pharmacies, citySlug, {
+        ...options,
+        priority,
+      });
     }
 
     return {
@@ -500,7 +528,7 @@ export async function searchMedicine(medicine, city, options = {}) {
       city,
       priority,
       locationUsed:
-        priority === "nearby"
+        priority === "nearby" || priority === "nearby_price"
           ? options.lat && options.lng
             ? "geolocation"
             : options.address

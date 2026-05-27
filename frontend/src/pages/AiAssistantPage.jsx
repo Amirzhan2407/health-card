@@ -124,24 +124,41 @@ function detectCity(text) {
 function detectPriority(text) {
   const lower = text.toLowerCase();
 
-  if (
+  const hasPrice =
     lower.includes("дешев") ||
+    lower.includes("самый дешев") ||
+    lower.includes("самая дешевая") ||
     lower.includes("цена") ||
+    lower.includes("цене") ||
     lower.includes("по цене") ||
     lower.includes("лучшая цена") ||
+    lower.includes("лучшей цене") ||
+    lower.includes("по лучшей цене") ||
+    lower.includes("выгодная цена") ||
+    lower.includes("выгодной цене") ||
+    lower.includes("по выгодной цене") ||
+    lower.includes("нормальной ценой") ||
+    lower.includes("не самая высокая") ||
     lower.includes("дешево") ||
-    lower.includes("подешевле")
-  ) {
-    return "price";
-  }
+    lower.includes("подешевле");
 
-  if (
+  const hasNearby =
     lower.includes("ближай") ||
     lower.includes("рядом") ||
     lower.includes("поближе") ||
     lower.includes("возле") ||
-    lower.includes("недалеко")
-  ) {
+    lower.includes("недалеко") ||
+    lower.includes("поблизости");
+
+  if (hasNearby && hasPrice) {
+    return "nearby_price";
+  }
+
+  if (hasPrice) {
+    return "price";
+  }
+
+  if (hasNearby) {
     return "nearby";
   }
 
@@ -151,6 +168,7 @@ function detectPriority(text) {
 function priorityLabel(priority) {
   if (priority === "price") return "лучшая цена";
   if (priority === "nearby") return "ближайшая аптека";
+  if (priority === "nearby_price") return "ближайшая аптека с выгодной ценой";
   return "";
 }
 
@@ -289,6 +307,7 @@ function cutBeforeExtraInfo(value) {
     " нужно ",
     " лучше ",
     " по лучшей",
+    " по выгодной",
     " по цене",
     " ближай",
     " я нахожусь",
@@ -468,10 +487,10 @@ function formatPharmacyResults(data, search) {
   const details = [
     search.dosage ? `Дозировка: ${search.dosage}` : "",
     search.form ? `Форма: ${search.form}` : "",
-    search.priority === "nearby" && search.address
+    search.priority !== "price" && search.address
       ? `Ваш адрес/ориентир: ${search.address}`
       : "",
-    search.priority === "nearby" && search.lat && search.lng
+    search.priority !== "price" && search.lat && search.lng
       ? "Поиск выполнен по вашей геолокации"
       : "",
   ]
@@ -601,7 +620,7 @@ export default function AiAssistantPage() {
 
     if (
       !detectedAddress &&
-      pharmacySearch.priority === "nearby" &&
+      pharmacySearch.priority !== "price" &&
       pharmacySearch.city &&
       isLikelyAddress(text)
     ) {
@@ -680,7 +699,8 @@ export default function AiAssistantPage() {
 
 Что вам важнее:
 — ближайшая аптека;
-— лучшая цена?`);
+— лучшая цена;
+— ближайшая аптека с выгодной ценой?`);
 
       return;
     }
@@ -705,7 +725,7 @@ export default function AiAssistantPage() {
       return;
     }
 
-    if (nextSearch.priority === "nearby" && !nextSearch.lat && !nextSearch.lng) {
+    if (nextSearch.priority !== "price" && !nextSearch.lat && !nextSearch.lng) {
       if (!nextSearch.address) {
         try {
           addPharmacyBotMessage(
