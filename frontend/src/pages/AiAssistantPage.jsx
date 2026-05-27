@@ -10,60 +10,51 @@ const MODES = {
 
 const modeInfo = {
   [MODES.MEDICAL]: {
-    title: "Мед совет",
-    subtitle: "Задавайте вопросы по здоровью, симптомам и первой помощи",
-    placeholder: "Например: красное горло и температура, что делать?",
+    subtitle: "Медицинский помощник для справочной информации",
+    placeholder: "Напишите вопрос ИИ помощнику...",
     greeting:
-      "Здравствуйте! Я ИИ помощник по медицинским вопросам. Могу дать справочную информацию по симптомам, препаратам и первой помощи. Если состояние ухудшается, лучше обратиться к врачу.",
+      "Здравствуйте! Я ИИ помощник. Могу помочь с вопросами по здоровью, симптомам и препаратам.",
   },
+
   [MODES.PHARMACY]: {
-    title: "Поиск лекарств",
-    subtitle: "Помогу подобрать параметры для поиска лекарств в аптеках",
+    subtitle: "Помощник для поиска лекарств в аптеках",
     placeholder: "Например: хочу купить парацетамол",
     greeting:
       "Здравствуйте! Я помогу найти лекарство. Напишите название препарата, а потом я уточню город, форму выпуска, дозировку и что важнее: ближайшая аптека или лучшая цена.",
   },
 };
 
-function cleanMedicineName(text) {
-  return text
-    .replace(/привет/gi, "")
-    .replace(/здравствуйте/gi, "")
-    .replace(/хочу купить/gi, "")
-    .replace(/купить/gi, "")
-    .replace(/найди/gi, "")
-    .replace(/найти/gi, "")
-    .replace(/лекарство/gi, "")
-    .replace(/препарат/gi, "")
-    .replace(/мне нужно/gi, "")
-    .replace(/мне надо/gi, "")
-    .trim();
+const kazakhstanCities = [
+  "алматы",
+  "астана",
+  "шымкент",
+  "караганда",
+  "актобе",
+  "тараз",
+  "павлодар",
+  "усть-каменогорск",
+  "семей",
+  "атырау",
+  "костанай",
+  "кызылорда",
+  "актау",
+  "кокшетау",
+  "петропавловск",
+  "уральск",
+  "туркестан",
+];
+
+function capitalizeText(text) {
+  if (!text) return "";
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function detectCity(text) {
-  const cities = [
-    "алматы",
-    "астана",
-    "шымкент",
-    "караганда",
-    "актобе",
-    "тараз",
-    "павлодар",
-    "усть-каменогорск",
-    "семей",
-    "атырау",
-    "костанай",
-    "кызылорда",
-    "актау",
-    "кокшетау",
-    "петропавловск",
-    "уральск",
-    "туркестан",
-  ];
-
   const lower = text.toLowerCase();
 
-  return cities.find((city) => lower.includes(city)) || "";
+  const foundCity = kazakhstanCities.find((city) => lower.includes(city));
+
+  return foundCity ? capitalizeText(foundCity) : "";
 }
 
 function detectPriority(text) {
@@ -74,7 +65,8 @@ function detectPriority(text) {
     lower.includes("цена") ||
     lower.includes("по цене") ||
     lower.includes("лучшая цена") ||
-    lower.includes("дешево")
+    lower.includes("дешево") ||
+    lower.includes("подешевле")
   ) {
     return "price";
   }
@@ -83,7 +75,8 @@ function detectPriority(text) {
     lower.includes("ближай") ||
     lower.includes("рядом") ||
     lower.includes("поближе") ||
-    lower.includes("возле")
+    lower.includes("возле") ||
+    lower.includes("недалеко")
   ) {
     return "nearby";
   }
@@ -94,7 +87,57 @@ function detectPriority(text) {
 function priorityLabel(priority) {
   if (priority === "price") return "лучшая цена";
   if (priority === "nearby") return "ближайшая аптека";
-  return "не выбрано";
+  return "";
+}
+
+function cleanMedicineName(text) {
+  let value = text.toLowerCase();
+
+  const phrasesToRemove = [
+    "привет",
+    "здравствуйте",
+    "здравствуй",
+    "добрый день",
+    "добрый вечер",
+    "хочу купить",
+    "мне нужно купить",
+    "мне надо купить",
+    "мне нужно",
+    "мне надо",
+    "купить",
+    "найди",
+    "найти",
+    "лекарство",
+    "препарат",
+    "в городе",
+    "город",
+    "по лучшей цене",
+    "лучшая цена",
+    "по цене",
+    "дешевле",
+    "дешево",
+    "подешевле",
+    "ближайшая аптека",
+    "ближайшую аптеку",
+    "рядом",
+    "поближе",
+    "возле",
+  ];
+
+  phrasesToRemove.forEach((phrase) => {
+    value = value.replaceAll(phrase, "");
+  });
+
+  kazakhstanCities.forEach((city) => {
+    value = value.replaceAll(city, "");
+  });
+
+  value = value
+    .replace(/[.,!?;:()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return value;
 }
 
 export default function AiAssistantPage() {
@@ -118,7 +161,6 @@ export default function AiAssistantPage() {
     medicine: "",
     city: "",
     priority: "",
-    dosage: "",
   });
 
   const [input, setInput] = useState("");
@@ -126,9 +168,6 @@ export default function AiAssistantPage() {
 
   const messages =
     mode === MODES.MEDICAL ? medicalMessages : pharmacyMessages;
-
-  const setCurrentMessages =
-    mode === MODES.MEDICAL ? setMedicalMessages : setPharmacyMessages;
 
   const switchMode = (nextMode) => {
     setMode(nextMode);
@@ -144,6 +183,7 @@ export default function AiAssistantPage() {
         headers: {
           "Content-Type": "application/json",
         },
+
         body: JSON.stringify({
           messages: [...medicalMessages, userMessage],
         }),
@@ -174,6 +214,7 @@ export default function AiAssistantPage() {
 
   const sendPharmacyMessage = async (userMessage) => {
     const text = userMessage.text;
+
     const detectedCity = detectCity(text);
     const detectedPriority = detectPriority(text);
     const cleanedMedicine = cleanMedicineName(text);
@@ -182,7 +223,7 @@ export default function AiAssistantPage() {
       ...pharmacySearch,
     };
 
-    if (!nextSearch.medicine && cleanedMedicine && !detectedCity) {
+    if (!nextSearch.medicine && cleanedMedicine) {
       nextSearch.medicine = cleanedMedicine;
     }
 
@@ -200,13 +241,13 @@ export default function AiAssistantPage() {
 
     if (!nextSearch.medicine) {
       answer =
-        "Хорошо, напишите название лекарства, которое хотите купить. Например: парацетамол, нурофен, фурацилин.";
+        "Хорошо. Напишите название лекарства, которое хотите купить.\n\nНапример: парацетамол, нурофен, фурацилин.";
     } else if (!nextSearch.city) {
-      answer = `Понял, вы хотите купить: ${nextSearch.medicine}.\n\nСкажите, пожалуйста, в каком городе хотите купить лекарство?\n\nТакже напишите, что вам важнее:\n— ближайшая аптека;\n— лучшая цена.`;
+      answer = `Понял, вы хотите купить: ${nextSearch.medicine}.\n\nСкажите, пожалуйста, в каком городе хотите купить лекарство?\n\nТакже напишите, что вам будет удобнее:\n— ближайшая аптека;\n— лучшая цена.`;
     } else if (!nextSearch.priority) {
-      answer = `Город: ${nextSearch.city}.\nЛекарство: ${nextSearch.medicine}.\n\nЧто вам важнее: ближайшая аптека или лучшая цена?`;
+      answer = `Хорошо.\n\nЛекарство: ${nextSearch.medicine}\nГород: ${nextSearch.city}\n\nЧто вам важнее: ближайшая аптека или лучшая цена?`;
     } else {
-      answer = `Отлично, данные для поиска готовы:\n\nЛекарство: ${nextSearch.medicine}\nГород: ${nextSearch.city}\nПриоритет: ${priorityLabel(nextSearch.priority)}\n\nСледующий шаг — подключить backend к поиску через i-teka. После этого я смогу показать варианты аптек, цены, наличие и ссылки.\n\nПеред покупкой обязательно уточняйте наличие в аптеке и проверяйте инструкцию препарата.`;
+      answer = `Отлично, я понял запрос.\n\nЛекарство: ${nextSearch.medicine}\nГород: ${nextSearch.city}\nПриоритет: ${priorityLabel(nextSearch.priority)}\n\nСледующий шаг — подключить backend к поиску через i-teka. После этого я смогу показать аптеки, цены, наличие и ссылки.\n\nПеред покупкой лучше уточнить наличие в аптеке и проверить инструкцию препарата.`;
     }
 
     const botMessage = {
@@ -225,7 +266,11 @@ export default function AiAssistantPage() {
       text: input.trim(),
     };
 
-    setCurrentMessages((prev) => [...prev, userMessage]);
+    if (mode === MODES.MEDICAL) {
+      setMedicalMessages((prev) => [...prev, userMessage]);
+    } else {
+      setPharmacyMessages((prev) => [...prev, userMessage]);
+    }
 
     setInput("");
 
@@ -254,9 +299,7 @@ export default function AiAssistantPage() {
         <div className="aiModeSwitch">
           <button
             type="button"
-            className={`aiModeBtn ${
-              mode === MODES.MEDICAL ? "active" : ""
-            }`}
+            className={`aiModeBtn ${mode === MODES.MEDICAL ? "active" : ""}`}
             onClick={() => switchMode(MODES.MEDICAL)}
           >
             Мед совет
@@ -264,34 +307,13 @@ export default function AiAssistantPage() {
 
           <button
             type="button"
-            className={`aiModeBtn ${
-              mode === MODES.PHARMACY ? "active" : ""
-            }`}
+            className={`aiModeBtn ${mode === MODES.PHARMACY ? "active" : ""}`}
             onClick={() => switchMode(MODES.PHARMACY)}
           >
             Поиск лекарств
           </button>
         </div>
       </div>
-
-      {mode === MODES.PHARMACY && (
-        <div className="aiSearchInfo">
-          <div>
-            <span>Лекарство</span>
-            <b>{pharmacySearch.medicine || "не указано"}</b>
-          </div>
-
-          <div>
-            <span>Город</span>
-            <b>{pharmacySearch.city || "не указан"}</b>
-          </div>
-
-          <div>
-            <span>Приоритет</span>
-            <b>{priorityLabel(pharmacySearch.priority)}</b>
-          </div>
-        </div>
-      )}
 
       <div className="aiChat">
         {messages.map((msg, index) => (
