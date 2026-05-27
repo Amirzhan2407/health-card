@@ -20,41 +20,105 @@ const modeInfo = {
     subtitle: "Помощник для поиска лекарств в аптеках",
     placeholder: "Например: хочу купить парацетамол",
     greeting:
-      "Здравствуйте! Я помогу найти лекарство. Напишите название препарата, а потом я уточню город и что важнее: ближайшая аптека или лучшая цена.",
+      "Здравствуйте! Я помогу найти лекарство. Напишите название препарата, а потом я уточню город, форму, дозировку и что важнее: ближайшая аптека или лучшая цена.",
   },
 };
 
-const kazakhstanCities = [
-  "алматы",
-  "астана",
-  "шымкент",
-  "караганда",
-  "актобе",
-  "тараз",
-  "павлодар",
-  "усть-каменогорск",
-  "семей",
-  "атырау",
-  "костанай",
-  "кызылорда",
-  "актау",
-  "кокшетау",
-  "петропавловск",
-  "уральск",
-  "туркестан",
+const cityAliases = [
+  {
+    name: "Астана",
+    variants: ["астана", "астане", "нур-султан", "нурсултан"],
+  },
+  {
+    name: "Алматы",
+    variants: ["алматы", "алмате"],
+  },
+  {
+    name: "Шымкент",
+    variants: ["шымкент", "шымкенте"],
+  },
+  {
+    name: "Караганда",
+    variants: ["караганда", "караганде"],
+  },
+  {
+    name: "Актобе",
+    variants: ["актобе"],
+  },
+  {
+    name: "Тараз",
+    variants: ["тараз", "таразе"],
+  },
+  {
+    name: "Павлодар",
+    variants: ["павлодар", "павлодаре"],
+  },
+  {
+    name: "Усть-Каменогорск",
+    variants: ["усть-каменогорск", "усть каменогорск"],
+  },
+  {
+    name: "Семей",
+    variants: ["семей", "семее"],
+  },
+  {
+    name: "Атырау",
+    variants: ["атырау"],
+  },
+  {
+    name: "Костанай",
+    variants: ["костанай", "костанае"],
+  },
+  {
+    name: "Кызылорда",
+    variants: ["кызылорда", "кызылорде"],
+  },
+  {
+    name: "Актау",
+    variants: ["актау"],
+  },
+  {
+    name: "Кокшетау",
+    variants: ["кокшетау"],
+  },
+  {
+    name: "Петропавловск",
+    variants: ["петропавловск", "петропавловске"],
+  },
+  {
+    name: "Уральск",
+    variants: ["уральск", "уральске"],
+  },
+  {
+    name: "Туркестан",
+    variants: ["туркестан", "туркестане"],
+  },
 ];
 
-function capitalizeText(text) {
-  if (!text) return "";
-  return text.charAt(0).toUpperCase() + text.slice(1);
+const allCityVariants = cityAliases.flatMap((city) => city.variants);
+
+function createEmptyPharmacySearch() {
+  return {
+    medicine: "",
+    city: "",
+    priority: "",
+    dosage: "",
+    form: "",
+    address: "",
+    lat: "",
+    lng: "",
+    detailsConfirmed: false,
+  };
 }
 
 function detectCity(text) {
   const lower = text.toLowerCase();
 
-  const foundCity = kazakhstanCities.find((city) => lower.includes(city));
+  const foundCity = cityAliases.find((city) =>
+    city.variants.some((variant) => lower.includes(variant))
+  );
 
-  return foundCity ? capitalizeText(foundCity) : "";
+  return foundCity ? foundCity.name : "";
 }
 
 function detectPriority(text) {
@@ -90,6 +154,104 @@ function priorityLabel(priority) {
   return "";
 }
 
+function detectDosage(text) {
+  const lower = text.toLowerCase();
+
+  const normalMatch = lower.match(/(\d+(?:[.,]\d+)?)\s*(мг|г|мл|мкг|%)/i);
+
+  if (normalMatch) {
+    return `${normalMatch[1]} ${normalMatch[2]}`;
+  }
+
+  const shortMgMatch = lower.match(/(\d+)\s*м(?=\s|$)/i);
+
+  if (shortMgMatch) {
+    return `${shortMgMatch[1]} мг`;
+  }
+
+  return "";
+}
+
+function detectForm(text) {
+  const lower = text.toLowerCase();
+
+  if (lower.includes("таблет")) return "таблетки";
+  if (lower.includes("капсул")) return "капсулы";
+  if (lower.includes("сироп")) return "сироп";
+  if (lower.includes("суспенз")) return "суспензия";
+  if (lower.includes("спрей")) return "спрей";
+  if (lower.includes("капли")) return "капли";
+  if (lower.includes("мазь")) return "мазь";
+  if (lower.includes("гель")) return "гель";
+  if (lower.includes("порош")) return "порошок";
+  if (lower.includes("свеч")) return "свечи";
+
+  return "";
+}
+
+function cleanAddressText(text) {
+  return text
+    .replace(/^[,.:;-\s]+/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function detectAddress(text) {
+  const original = text.trim();
+  const lower = original.toLowerCase();
+
+  const markers = [
+    "я нахожусь рядом с",
+    "я нахожусь около",
+    "я нахожусь возле",
+    "я нахожусь",
+    "мой адрес",
+    "адрес",
+    "рядом с",
+    "возле",
+    "около",
+  ];
+
+  for (const marker of markers) {
+    const index = lower.indexOf(marker);
+
+    if (index !== -1) {
+      const address = original.slice(index + marker.length);
+
+      return cleanAddressText(address);
+    }
+  }
+
+  return "";
+}
+
+function isLikelyAddress(text) {
+  const lower = text.toLowerCase();
+
+  const hasNumber = /\d+/.test(lower);
+
+  const addressWords = [
+    "улица",
+    "ул",
+    "проспект",
+    "пр",
+    "микрорайон",
+    "мкр",
+    "район",
+    "дом",
+    "жк",
+    "кабанбай",
+    "абая",
+    "сатпаева",
+    "сефуллина",
+    "байтурсынова",
+    "достык",
+    "республика",
+  ];
+
+  return hasNumber || addressWords.some((word) => lower.includes(word));
+}
+
 function hasMedicineBuyIntent(text) {
   const lower = text.toLowerCase();
 
@@ -100,13 +262,92 @@ function hasMedicineBuyIntent(text) {
     lower.includes("хочу") ||
     lower.includes("лекарство") ||
     lower.includes("препарат") ||
-    lower.includes("теперь") ||
+    lower.includes("новый поиск") ||
     lower.includes("другое")
   );
 }
 
+function userAcceptsAnyForm(text) {
+  const lower = text.toLowerCase();
+
+  return (
+    lower.includes("любая") ||
+    lower.includes("любой") ||
+    lower.includes("без разницы") ||
+    lower.includes("не важно") ||
+    lower.includes("неважно") ||
+    lower.includes("какая есть")
+  );
+}
+
+function cutBeforeExtraInfo(value) {
+  const stopMarkers = [
+    " город ",
+    " в городе ",
+    " нужна ",
+    " нужен ",
+    " нужно ",
+    " лучше ",
+    " по лучшей",
+    " по цене",
+    " ближай",
+    " я нахожусь",
+    " нахожусь",
+    " мой адрес",
+    " адрес",
+    " рядом с",
+    " возле",
+    " около",
+  ];
+
+  for (const cityVariant of allCityVariants) {
+    stopMarkers.push(` в ${cityVariant}`);
+    stopMarkers.push(` ${cityVariant},`);
+    stopMarkers.push(` ${cityVariant}.`);
+  }
+
+  let result = value;
+  let cutIndex = -1;
+
+  for (const marker of stopMarkers) {
+    const index = result.indexOf(marker);
+
+    if (index !== -1 && (cutIndex === -1 || index < cutIndex)) {
+      cutIndex = index;
+    }
+  }
+
+  if (cutIndex !== -1) {
+    result = result.slice(0, cutIndex);
+  }
+
+  return result;
+}
+
 function cleanMedicineName(text) {
   let value = text.toLowerCase();
+
+  const buyPhrases = [
+    "хочу купить",
+    "мне нужно купить",
+    "мне надо купить",
+    "нужно купить",
+    "надо купить",
+    "купить",
+    "найди",
+    "найти",
+  ];
+
+  for (const phrase of buyPhrases) {
+    const index = value.indexOf(phrase);
+
+    if (index !== -1) {
+      value = value.slice(index + phrase.length);
+      break;
+    }
+  }
+
+  value = cutBeforeExtraInfo(value);
 
   const phrasesToRemove = [
     "привет",
@@ -114,40 +355,20 @@ function cleanMedicineName(text) {
     "здравствуй",
     "добрый день",
     "добрый вечер",
-    "хочу купить",
-    "мне нужно купить",
-    "мне надо купить",
     "мне нужно",
     "мне надо",
-    "купить",
-    "найди",
-    "найти",
     "лекарство",
     "препарат",
-    "теперь",
+    "новый поиск",
     "другое",
     "другой",
-    "в городе",
-    "город",
-    "по лучшей цене",
-    "лучшая цена",
-    "по цене",
-    "дешевле",
-    "дешево",
-    "подешевле",
-    "ближайшая аптека",
-    "ближайшую аптеку",
-    "рядом",
-    "поближе",
-    "возле",
-    "недалеко",
   ];
 
   phrasesToRemove.forEach((phrase) => {
     value = value.replaceAll(phrase, "");
   });
 
-  kazakhstanCities.forEach((city) => {
+  allCityVariants.forEach((city) => {
     value = value.replaceAll(city, "");
   });
 
@@ -159,27 +380,117 @@ function cleanMedicineName(text) {
   return value;
 }
 
+function buildMedicineSearchQuery(search) {
+  const parts = [search.medicine];
+
+  if (search.dosage && !search.medicine.includes(search.dosage)) {
+    parts.push(search.dosage);
+  }
+
+  if (search.form && !search.medicine.includes(search.form)) {
+    parts.push(search.form);
+  }
+
+  return parts.filter(Boolean).join(" ");
+}
+
+function getBrowserLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Геолокация не поддерживается браузером"));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          lat: String(position.coords.latitude),
+          lng: String(position.coords.longitude),
+        });
+      },
+      (error) => {
+        reject(error);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    );
+  });
+}
+
+async function fetchPharmacySearch(search) {
+  const params = new URLSearchParams({
+    medicine: buildMedicineSearchQuery(search),
+    city: search.city.toLowerCase(),
+    priority: search.priority,
+  });
+
+  if (search.address) {
+    params.set("address", search.address);
+  }
+
+  if (search.lat && search.lng) {
+    params.set("lat", search.lat);
+    params.set("lng", search.lng);
+  }
+
+  const response = await fetch(`${API_URL}/api/pharmacy/search?${params}`);
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Ошибка запроса");
+  }
+
+  return data;
+}
+
 function formatPharmacyResults(data, search) {
   const pharmaciesText = data.pharmacies
     .slice(0, 6)
     .map((item, index) => {
+      const distanceText =
+        item.distanceKm !== null && item.distanceKm !== undefined
+          ? `\nРасстояние: примерно ${item.distanceKm} км`
+          : "";
+
       return `${index + 1}. ${item.pharmacy || "Аптека"}
 
 Цена: ${item.price || "не указана"}
-Адрес: ${item.address || "адрес не указан"}${
+Адрес: ${item.address || "адрес не указан"}${distanceText}${
         item.status ? `\nСтатус: ${item.status}` : ""
       }${item.updated ? `\n${item.updated}` : ""}
 Ссылка: ${item.url}`;
     })
     .join("\n\n");
 
+  const details = [
+    search.dosage ? `Дозировка: ${search.dosage}` : "",
+    search.form ? `Форма: ${search.form}` : "",
+    search.priority === "nearby" && search.address
+      ? `Ваш адрес/ориентир: ${search.address}`
+      : "",
+    search.priority === "nearby" && search.lat && search.lng
+      ? "Поиск выполнен по вашей геолокации"
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
   return `Нашёл варианты покупки:
 
 ${data.title || data.selectedProduct?.title || search.medicine}
 
+${details ? `${details}\n\n` : ""}Важно: "№10" в названии означает количество таблеток в упаковке, а не количество найденных аптек.
+
+Показываю первые ${Math.min(data.pharmacies.length, 6)} вариантов аптек:
+
 ${pharmaciesText}
 
-Перед покупкой лучше позвонить в аптеку и уточнить наличие. Также проверьте инструкцию и противопоказания препарата.`;
+Перед покупкой лучше позвонить в аптеку и уточнить наличие. Также проверьте инструкцию и противопоказания препарата.
+
+Поиск завершён. Для нового лекарства просто напишите новое название.`;
 }
 
 export default function AiAssistantPage() {
@@ -199,17 +510,19 @@ export default function AiAssistantPage() {
     },
   ]);
 
-  const [pharmacySearch, setPharmacySearch] = useState({
-    medicine: "",
-    city: "",
-    priority: "",
-  });
+  const [pharmacySearch, setPharmacySearch] = useState(
+    createEmptyPharmacySearch()
+  );
 
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
   const messages =
     mode === MODES.MEDICAL ? medicalMessages : pharmacyMessages;
+
+  const resetPharmacySearch = () => {
+    setPharmacySearch(createEmptyPharmacySearch());
+  };
 
   const switchMode = (nextMode) => {
     setMode(nextMode);
@@ -254,21 +567,60 @@ export default function AiAssistantPage() {
     }
   };
 
+  const addPharmacyBotMessage = (text) => {
+    setPharmacyMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        text,
+      },
+    ]);
+  };
+
   const sendPharmacyMessage = async (userMessage) => {
     const text = userMessage.text;
+    const lower = text.toLowerCase();
+
+    if (lower.includes("новый поиск")) {
+      resetPharmacySearch();
+
+      addPharmacyBotMessage(
+        "Хорошо, начинаем новый поиск. Напишите название лекарства, которое хотите купить."
+      );
+
+      return;
+    }
 
     const detectedCity = detectCity(text);
     const detectedPriority = detectPriority(text);
+    const detectedDosage = detectDosage(text);
+    const detectedForm = detectForm(text);
     const cleanedMedicine = cleanMedicineName(text);
+
+    let detectedAddress = detectAddress(text);
+
+    if (
+      !detectedAddress &&
+      pharmacySearch.priority === "nearby" &&
+      pharmacySearch.city &&
+      isLikelyAddress(text)
+    ) {
+      detectedAddress = cleanAddressText(text);
+    }
 
     let nextSearch = {
       ...pharmacySearch,
     };
 
-    if (
+    const isChangingMedicine =
       cleanedMedicine &&
-      (!nextSearch.medicine || hasMedicineBuyIntent(text))
-    ) {
+      hasMedicineBuyIntent(text) &&
+      cleanedMedicine !== pharmacySearch.medicine;
+
+    if (isChangingMedicine) {
+      nextSearch = createEmptyPharmacySearch();
+      nextSearch.medicine = cleanedMedicine;
+    } else if (!nextSearch.medicine && cleanedMedicine) {
       nextSearch.medicine = cleanedMedicine;
     }
 
@@ -280,96 +632,130 @@ export default function AiAssistantPage() {
       nextSearch.priority = detectedPriority;
     }
 
+    if (detectedDosage) {
+      nextSearch.dosage = detectedDosage;
+      nextSearch.detailsConfirmed = true;
+    }
+
+    if (detectedForm) {
+      nextSearch.form = detectedForm;
+      nextSearch.detailsConfirmed = true;
+    }
+
+    if (userAcceptsAnyForm(text)) {
+      nextSearch.detailsConfirmed = true;
+    }
+
+    if (detectedAddress) {
+      nextSearch.address = detectedAddress;
+    }
+
     setPharmacySearch(nextSearch);
 
     if (!nextSearch.medicine) {
-      setPharmacyMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          text:
-            "Хорошо. Напишите название лекарства, которое хотите купить.\n\nНапример: парацетамол, нурофен, фурацилин.",
-        },
-      ]);
+      addPharmacyBotMessage(
+        "Хорошо. Напишите название лекарства, которое хотите купить.\n\nНапример: парацетамол, нурофен, фурацилин."
+      );
 
       return;
     }
 
     if (!nextSearch.city) {
-      setPharmacyMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          text: `Понял, вы хотите купить: ${nextSearch.medicine}.
+      addPharmacyBotMessage(`Понял, вы хотите купить: ${nextSearch.medicine}.
 
 Скажите, пожалуйста, в каком городе хотите купить лекарство?
 
 Также напишите, что вам будет удобнее:
 — ближайшая аптека;
-— лучшая цена.`,
-        },
-      ]);
+— лучшая цена.`);
 
       return;
     }
 
     if (!nextSearch.priority) {
-      setPharmacyMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          text: `Хорошо.
+      addPharmacyBotMessage(`Хорошо.
 
 Лекарство: ${nextSearch.medicine}
 Город: ${nextSearch.city}
 
-Что вам важнее: ближайшая аптека или лучшая цена?`,
-        },
-      ]);
+Что вам важнее:
+— ближайшая аптека;
+— лучшая цена?`);
 
       return;
+    }
+
+    if (
+      !nextSearch.detailsConfirmed &&
+      !nextSearch.dosage &&
+      !nextSearch.form
+    ) {
+      addPharmacyBotMessage(`Уточните, пожалуйста, форму и дозировку, если знаете.
+
+Например:
+— 500 мг таблетки;
+— сироп 100 мл;
+— капсулы;
+— любая форма.
+
+Лекарство: ${nextSearch.medicine}
+Город: ${nextSearch.city}
+Приоритет: ${priorityLabel(nextSearch.priority)}`);
+
+      return;
+    }
+
+    if (nextSearch.priority === "nearby" && !nextSearch.lat && !nextSearch.lng) {
+      if (!nextSearch.address) {
+        try {
+          addPharmacyBotMessage(
+            "Чтобы найти ближайшую аптеку, сейчас попробую определить вашу геолокацию. Браузер может попросить разрешение."
+          );
+
+          const coords = await getBrowserLocation();
+
+          nextSearch = {
+            ...nextSearch,
+            lat: coords.lat,
+            lng: coords.lng,
+          };
+
+          setPharmacySearch(nextSearch);
+        } catch (error) {
+          console.error(error);
+
+          addPharmacyBotMessage(`Не удалось получить геолокацию.
+
+Напишите ваш адрес или ориентир в городе ${nextSearch.city}.
+
+Например:
+Я нахожусь рядом с проспектом Кабанбай батыра 46`);
+
+          return;
+        }
+      }
     }
 
     try {
       setLoading(true);
 
-      setPharmacyMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          text: `Отлично, ищу варианты на i-teka...
+      addPharmacyBotMessage(`Отлично, ищу варианты на i-teka...
 
-Лекарство: ${nextSearch.medicine}
+Лекарство: ${buildMedicineSearchQuery(nextSearch)}
 Город: ${nextSearch.city}
-Приоритет: ${priorityLabel(nextSearch.priority)}`,
-        },
-      ]);
+Приоритет: ${priorityLabel(nextSearch.priority)}${
+        nextSearch.address ? `\nАдрес/ориентир: ${nextSearch.address}` : ""
+      }${nextSearch.lat && nextSearch.lng ? "\nГеолокация: получена" : ""}`);
 
-      const params = new URLSearchParams({
-        medicine: nextSearch.medicine,
-        city: nextSearch.city.toLowerCase(),
-        priority: nextSearch.priority,
-      });
-
-      const response = await fetch(`${API_URL}/api/pharmacy/search?${params}`);
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Ошибка запроса");
-      }
+      const data = await fetchPharmacySearch(nextSearch);
 
       if (!data.success || !data.pharmacies || data.pharmacies.length === 0) {
-        setPharmacyMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            text:
-              data.message ||
-              "Не удалось найти лекарство. Попробуйте написать название точнее.",
-          },
-        ]);
+        addPharmacyBotMessage(
+          data.message ||
+            "Не удалось найти лекарство. Попробуйте написать название точнее."
+        );
 
+        resetPharmacySearch();
         return;
       }
 
@@ -379,16 +765,16 @@ export default function AiAssistantPage() {
       };
 
       setPharmacyMessages((prev) => [...prev, botMessage]);
+
+      resetPharmacySearch();
     } catch (error) {
       console.error(error);
 
-      setPharmacyMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          text: "Ошибка поиска лекарства. Проверьте backend или попробуйте позже.",
-        },
-      ]);
+      addPharmacyBotMessage(
+        "Ошибка поиска лекарства. Проверьте backend или попробуйте позже."
+      );
+
+      resetPharmacySearch();
     } finally {
       setLoading(false);
     }

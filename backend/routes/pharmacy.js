@@ -5,7 +5,7 @@ const router = express.Router();
 
 router.get("/search", async (req, res) => {
   try {
-    const { medicine, city, priority } = req.query;
+    const { medicine, city, priority, lat, lng, address } = req.query;
 
     if (!medicine || !city) {
       return res.status(400).json({
@@ -14,11 +14,12 @@ router.get("/search", async (req, res) => {
       });
     }
 
-    const data = await searchMedicine(
-      medicine,
-      city,
-      priority || "price"
-    );
+    const data = await searchMedicine(medicine, city, {
+      priority: priority || "price",
+      lat: lat || "",
+      lng: lng || "",
+      address: address || "",
+    });
 
     res.json(data);
   } catch (error) {
