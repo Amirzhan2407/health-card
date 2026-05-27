@@ -37,8 +37,7 @@
   color: #64748b;
 }
 
-.layoutRoot.light .healthCardValue,
-.layoutRoot.light .healthHistoryItem span:last-child {
+.layoutRoot.light .healthCardValue {
   color: #008f58;
 }
 
@@ -61,8 +60,14 @@
 
 .layoutRoot.dark .healthCard,
 .layoutRoot.dark .healthEmpty {
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(17, 24, 39, 0.98));
+  background: linear-gradient(
+    135deg,
+    rgba(15, 23, 42, 0.94),
+    rgba(17, 24, 39, 0.98)
+  );
+
   border: 1px solid rgba(255, 255, 255, 0.06);
+
   box-shadow: 0 20px 42px rgba(0, 0, 0, 0.24);
 }
 
@@ -76,8 +81,7 @@
   color: #94a3b8;
 }
 
-.layoutRoot.dark .healthCardValue,
-.layoutRoot.dark .healthHistoryItem span:last-child {
+.layoutRoot.dark .healthCardValue {
   color: #00c46a;
 }
 
@@ -123,6 +127,14 @@
   font-weight: 900;
 
   box-shadow: 0 14px 30px rgba(0, 165, 80, 0.22);
+
+  transition: 0.2s;
+}
+
+.addButton:hover {
+  transform: translateY(-2px);
+
+  box-shadow: 0 18px 34px rgba(0, 165, 80, 0.28);
 }
 
 .healthCards {
@@ -181,7 +193,8 @@
   font-weight: 950;
 }
 
-.healthExtra {
+.healthExtra,
+.bmiBox {
   display: flex;
   justify-content: space-between;
 
@@ -210,8 +223,9 @@
 }
 
 .healthHistoryItem {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 160px 1fr auto;
+  align-items: center;
 
   gap: 12px;
 
@@ -223,8 +237,29 @@
   font-weight: 700;
 }
 
-.healthHistoryItem span:last-child {
+.healthHistoryItem span:first-child {
   font-weight: 900;
+}
+
+.healthHistoryItem span:last-child {
+  justify-self: end;
+
+  font-weight: 900;
+}
+
+.fluoroComment {
+  grid-column: 1 / -1;
+
+  margin-top: 4px;
+
+  font-size: 14px;
+  font-weight: 800;
+
+  color: #0f172a;
+}
+
+.layoutRoot.dark .fluoroComment {
+  color: #e2e8f0;
 }
 
 .healthCardActions {
@@ -244,6 +279,13 @@
   cursor: pointer;
 
   font-weight: 900;
+
+  transition: 0.2s;
+}
+
+.actionButton:hover,
+.smallActionBtn:hover {
+  transform: translateY(-2px);
 }
 
 .layoutRoot.light .actionButton,
@@ -361,6 +403,19 @@
   gap: 14px;
 }
 
+.modalGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  gap: 14px;
+}
+
+.modalSection {
+  display: grid;
+
+  gap: 8px;
+}
+
 .modalLabel {
   font-size: 14px;
   font-weight: 900;
@@ -383,6 +438,11 @@
   border-radius: 14px;
 
   outline: none;
+
+  box-sizing: border-box;
+
+  font-family: inherit;
+  font-size: 15px;
 }
 
 .layoutRoot.light .modalInput {
@@ -443,6 +503,8 @@
 
   font-weight: 900;
 }
+
+/* ================= CHART ================= */
 
 .chartControls {
   display: flex;
@@ -510,47 +572,93 @@
   box-sizing: border-box;
 }
 
+/* ================= FLUOROGRAPHY STATUS ================= */
+
 .fluoroGreen,
 .fluoroBlue,
 .fluoroYellow,
 .fluoroRed,
 .fluoroGray {
-  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: fit-content;
+
+  padding: 6px 12px;
 
   border-radius: 999px;
 
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 950;
+
+  line-height: 1.2;
 }
 
+/* Без патологий */
 .fluoroGreen {
-  color: #047857;
-
-  background: rgba(0, 165, 80, 0.12);
+  color: #047857 !important;
+  background: rgba(0, 165, 80, 0.14);
 }
 
+/* Норма */
 .fluoroBlue {
-  color: #0369a1;
-
-  background: #e0f2fe;
+  color: #047857 !important;
+  background: rgba(0, 165, 80, 0.14);
 }
 
+/* Требуется повтор */
 .fluoroYellow {
-  color: #92400e;
-
-  background: #fef3c7;
-}
-
-.fluoroRed {
-  color: #991b1b;
-
+  color: #dc2626 !important;
   background: #fee2e2;
 }
 
-.fluoroGray {
-  color: #374151;
+/* Обнаружены изменения */
+.fluoroRed {
+  color: #dc2626 !important;
+  background: #fee2e2;
+}
 
+/* Другое */
+.fluoroGray {
+  color: #374151 !important;
   background: #e5e7eb;
 }
+
+/* защита от перебивания цвета в светлой теме */
+.layoutRoot.light .healthHistoryItem span.fluoroGreen,
+.layoutRoot.light .healthHistoryItem span.fluoroBlue {
+  color: #047857 !important;
+}
+
+.layoutRoot.light .healthHistoryItem span.fluoroYellow,
+.layoutRoot.light .healthHistoryItem span.fluoroRed {
+  color: #dc2626 !important;
+}
+
+.layoutRoot.light .healthHistoryItem span.fluoroGray {
+  color: #374151 !important;
+}
+
+/* защита от перебивания цвета в темной теме */
+.layoutRoot.dark .healthHistoryItem span.fluoroGreen,
+.layoutRoot.dark .healthHistoryItem span.fluoroBlue {
+  color: #22c55e !important;
+  background: rgba(34, 197, 94, 0.14);
+}
+
+.layoutRoot.dark .healthHistoryItem span.fluoroYellow,
+.layoutRoot.dark .healthHistoryItem span.fluoroRed {
+  color: #f87171 !important;
+  background: rgba(239, 68, 68, 0.16);
+}
+
+.layoutRoot.dark .healthHistoryItem span.fluoroGray {
+  color: #cbd5e1 !important;
+  background: rgba(148, 163, 184, 0.16);
+}
+
+/* ================= SUGAR STATUS ================= */
 
 .sugarGreen {
   border-left: 5px solid #22c55e;
@@ -567,6 +675,8 @@
 .sugarBlue {
   border-left: 5px solid #3b82f6;
 }
+
+/* ================= INPUT NUMBER FIX ================= */
 
 .noSpin::-webkit-outer-spin-button,
 .noSpin::-webkit-inner-spin-button {
@@ -626,7 +736,6 @@
 
   .healthCardTop,
   .bmiBox,
-  .healthHistoryItem,
   .healthExtra {
     flex-direction: column;
     align-items: flex-start;
@@ -638,6 +747,26 @@
 
   .healthCardValue {
     font-size: 32px;
+  }
+
+  .healthHistoryItem {
+    grid-template-columns: 1fr;
+
+    align-items: flex-start;
+  }
+
+  .healthHistoryItem span:last-child {
+    justify-self: start;
+  }
+
+  .fluoroGreen,
+  .fluoroBlue,
+  .fluoroYellow,
+  .fluoroRed,
+  .fluoroGray {
+    justify-content: flex-start;
+
+    max-width: 100%;
   }
 
   .modalOverlay {
@@ -655,6 +784,10 @@
 
     overflow-x: hidden;
     overflow-y: auto;
+  }
+
+  .modalGrid {
+    grid-template-columns: 1fr;
   }
 
   .modalButtons {
