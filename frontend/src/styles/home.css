@@ -30,6 +30,15 @@
 
   padding: 28px;
 
+  backdrop-filter: blur(18px);
+
+  transition: 0.25s;
+}
+
+/* ================= DARK ================= */
+
+.layoutRoot.dark .card,
+.layoutRoot.dark .cardWide {
   background:
     linear-gradient(
       135deg,
@@ -41,16 +50,28 @@
 
   box-shadow:
     0 20px 40px rgba(0,0,0,0.22);
+}
 
-  transition: 0.25s;
+/* ================= LIGHT ================= */
+
+.layoutRoot.light .card,
+.layoutRoot.light .cardWide {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(242,248,249,0.88),
+      rgba(232,241,243,0.94)
+    );
+
+  border: 1px solid rgba(255,255,255,0.55);
+
+  box-shadow:
+    0 18px 34px rgba(15,23,42,0.05);
 }
 
 .card:hover,
 .cardWide:hover {
   transform: translateY(-4px);
-
-  box-shadow:
-    0 24px 44px rgba(0,0,0,0.28);
 }
 
 /* ======================================================
@@ -67,8 +88,6 @@
   min-height: 160px;
 }
 
-/* декоративный круг */
-
 .cardWide::after {
   content: "";
 
@@ -79,11 +98,22 @@
 
   border-radius: 50%;
 
-  background:
-    rgba(0,255,255,0.08);
-
   top: -80px;
   right: -60px;
+}
+
+/* ================= DARK ================= */
+
+.layoutRoot.dark .cardWide::after {
+  background:
+    rgba(0,255,255,0.08);
+}
+
+/* ================= LIGHT ================= */
+
+.layoutRoot.light .cardWide::after {
+  background:
+    rgba(0,165,80,0.08);
 }
 
 /* ======================================================
@@ -94,27 +124,34 @@
   font-size: 24px;
   font-weight: 900;
 
-  color: #ffffff;
-
   margin-bottom: 12px;
+}
+
+.layoutRoot.dark .cardTitle {
+  color: #ffffff;
+}
+
+.layoutRoot.light .cardTitle {
+  color: #0f172a;
 }
 
 .cardText {
   font-size: 15px;
 
-  color: #94a3b8;
-
   line-height: 1.5;
+}
+
+.layoutRoot.dark .cardText {
+  color: #94a3b8;
+}
+
+.layoutRoot.light .cardText {
+  color: #64748b;
 }
 
 .cardWide .cardTitle {
   font-size: 28px;
   margin: 0;
-}
-
-.cardWide .cardText {
-  color: #cbd5e1;
-  margin-top: 6px;
 }
 
 /* ======================================================
@@ -133,6 +170,16 @@
 
   border-radius: 20px;
 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex-shrink: 0;
+}
+
+/* ================= DARK ================= */
+
+.layoutRoot.dark .emergencyIcon {
   background:
     linear-gradient(
       135deg,
@@ -141,12 +188,19 @@
     );
 
   border: 1px solid rgba(255,255,255,0.08);
+}
 
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* ================= LIGHT ================= */
 
-  flex-shrink: 0;
+.layoutRoot.light .emergencyIcon {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(0,165,80,0.12),
+      rgba(0,255,255,0.08)
+    );
+
+  border: 1px solid rgba(0,165,80,0.10);
 }
 
 .emergencyIconPlus {
@@ -188,13 +242,6 @@
 
   border-radius: 50%;
 
-  border: 1px solid rgba(255,255,255,0.08);
-
-  background:
-    rgba(255,255,255,0.04);
-
-  color: white;
-
   display: flex;
   align-items: center;
   justify-content: center;
@@ -206,8 +253,26 @@
   transition: 0.2s;
 }
 
-.emergencyRight:hover {
-  background: rgba(0,255,255,0.12);
+/* ================= DARK ================= */
+
+.layoutRoot.dark .emergencyRight {
+  border: 1px solid rgba(255,255,255,0.08);
+
+  background:
+    rgba(255,255,255,0.04);
+
+  color: white;
+}
+
+/* ================= LIGHT ================= */
+
+.layoutRoot.light .emergencyRight {
+  border: 1px solid rgba(0,165,80,0.08);
+
+  background:
+    rgba(255,255,255,0.6);
+
+  color: #0f172a;
 }
 
 /* ======================================================
@@ -228,15 +293,30 @@
 
   border-radius: 999px;
 
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* ================= DARK ================= */
+
+.layoutRoot.dark .chip {
   background:
     rgba(255,255,255,0.06);
 
   border: 1px solid rgba(255,255,255,0.06);
 
   color: #f8fafc;
+}
 
-  font-size: 13px;
-  font-weight: 800;
+/* ================= LIGHT ================= */
+
+.layoutRoot.light .chip {
+  background:
+    rgba(255,255,255,0.6);
+
+  border: 1px solid rgba(0,165,80,0.08);
+
+  color: #0f172a;
 }
 
 /* ======================================================
@@ -260,15 +340,6 @@
 
   border: none;
 
-  background:
-    linear-gradient(
-      135deg,
-      rgba(255,255,255,0.06),
-      rgba(255,255,255,0.03)
-    );
-
-  color: white;
-
   font-size: 14px;
   font-weight: 900;
 
@@ -277,33 +348,36 @@
   transition: 0.2s;
 }
 
-.actionBtn:hover {
-  transform: translateY(-2px);
+/* ================= DARK ================= */
 
+.layoutRoot.dark .actionBtn {
   background:
     linear-gradient(
       135deg,
-      rgba(0,255,255,0.14),
-      rgba(255,255,255,0.04)
-    );
-}
-
-.actionBtn.green {
-  background:
-    linear-gradient(
-      135deg,
-      rgba(0,165,80,0.28),
-      rgba(0,191,99,0.18)
-    );
-}
-
-.actionBtn.yellow {
-  background:
-    linear-gradient(
-      135deg,
-      rgba(255,196,0,0.18),
+      rgba(255,255,255,0.06),
       rgba(255,255,255,0.03)
     );
+
+  color: white;
+}
+
+/* ================= LIGHT ================= */
+
+.layoutRoot.light .actionBtn {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255,255,255,0.75),
+      rgba(255,255,255,0.5)
+    );
+
+  color: #0f172a;
+
+  border: 1px solid rgba(0,165,80,0.08);
+}
+
+.actionBtn:hover {
+  transform: translateY(-2px);
 }
 
 /* ======================================================
@@ -324,11 +398,6 @@
 
   border-radius: 18px;
 
-  background:
-    rgba(255,255,255,0.04);
-
-  border: 1px solid rgba(255,255,255,0.05);
-
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -336,131 +405,49 @@
   gap: 16px;
 }
 
+/* ================= DARK ================= */
+
+.layoutRoot.dark .docItem {
+  background:
+    rgba(255,255,255,0.04);
+
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+/* ================= LIGHT ================= */
+
+.layoutRoot.light .docItem {
+  background:
+    rgba(255,255,255,0.58);
+
+  border: 1px solid rgba(0,165,80,0.08);
+}
+
 .docName {
   font-size: 15px;
   font-weight: 900;
+}
 
+.layoutRoot.dark .docName {
   color: white;
+}
+
+.layoutRoot.light .docName {
+  color: #0f172a;
 }
 
 .docMeta {
   font-size: 13px;
 
-  color: #94a3b8;
-
   margin-top: 4px;
 }
 
-.docTag {
-  padding: 8px 14px;
-
-  border-radius: 999px;
-
-  background:
-    rgba(0,255,255,0.12);
-
-  border: 1px solid rgba(0,255,255,0.16);
-
-  color: #00ffff;
-
-  font-size: 12px;
-  font-weight: 900;
-}
-
-/* ======================================================
-   VITALS
-====================================================== */
-
-.vitalsTop {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  gap: 12px;
-}
-
-.vitalsHint {
-  font-size: 13px;
+.layoutRoot.dark .docMeta {
   color: #94a3b8;
 }
 
-.sparkline {
-  margin-top: 18px;
-
-  height: 70px;
-
-  border-radius: 18px;
-
-  background:
-    rgba(255,255,255,0.04);
-
-  border: 1px solid rgba(255,255,255,0.05);
-
-  position: relative;
-
-  overflow: hidden;
-}
-
-.sparkline::before {
-  content: "";
-
-  position: absolute;
-
-  left: -10%;
-  top: 50%;
-
-  width: 130%;
-  height: 4px;
-
-  background: #00ffff;
-
-  transform:
-    translateY(-50%)
-    rotate(-5deg);
-
-  border-radius: 999px;
-}
-
-.sparkDot {
-  position: absolute;
-
-  width: 10px;
-  height: 10px;
-
-  border-radius: 50%;
-
-  background: #00ffff;
-}
-
-.sparkDot.d1 { left: 14%; top: 34px; }
-.sparkDot.d2 { left: 34%; top: 30px; }
-.sparkDot.d3 { left: 54%; top: 22px; }
-.sparkDot.d4 { left: 74%; top: 36px; }
-.sparkDot.d5 { left: 90%; top: 18px; }
-
-.vitalsRow {
-  display: flex;
-  flex-wrap: wrap;
-
-  gap: 12px;
-
-  margin-top: 16px;
-}
-
-.vitalPill {
-  padding: 10px 14px;
-
-  border-radius: 999px;
-
-  background:
-    rgba(255,255,255,0.05);
-
-  border: 1px solid rgba(255,255,255,0.05);
-
-  color: white;
-
-  font-size: 13px;
-  font-weight: 900;
+.layoutRoot.light .docMeta {
+  color: #64748b;
 }
 
 /* ======================================================
