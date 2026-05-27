@@ -3,10 +3,17 @@
 ====================================================== */
 
 .documentsPage {
-  padding: 34px;
+  width: 100%;
   max-width: 1500px;
+
   margin: 0 auto;
+
+  padding: 34px;
+
   color: #f8fafc;
+
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 
 /* ======================================================
@@ -17,16 +24,25 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+
   gap: 18px;
+
   margin-bottom: 28px;
 }
 
 .documentsHeader h2 {
   margin: 0;
+
   font-size: 42px;
   font-weight: 900;
+
   color: #f8fafc;
+
   letter-spacing: -0.4px;
+}
+
+.layoutRoot.light .documentsHeader h2 {
+  color: #0f172a;
 }
 
 /* ======================================================
@@ -35,6 +51,7 @@
 
 .addButton {
   height: 56px;
+
   padding: 0 22px;
 
   border: none;
@@ -96,11 +113,25 @@
   gap: 8px;
 }
 
+.layoutRoot.light .actionButton {
+  border: 1px solid rgba(0,165,80,0.18);
+
+  background:
+    rgba(255,255,255,0.72);
+
+  color: #008f58;
+}
+
 .actionButton:hover {
   transform: translateY(-2px);
 
   background:
     rgba(255,255,255,0.08);
+}
+
+.layoutRoot.light .actionButton:hover {
+  background:
+    rgba(255,255,255,0.9);
 }
 
 .deleteButton {
@@ -111,6 +142,16 @@
     rgba(239,68,68,0.26);
 
   color: #fecaca;
+}
+
+.layoutRoot.light .deleteButton {
+  background:
+    rgba(239,68,68,0.12);
+
+  border-color:
+    rgba(239,68,68,0.24);
+
+  color: #991b1b;
 }
 
 .deleteButton:hover {
@@ -161,17 +202,41 @@
     0 20px 42px rgba(0,0,0,0.24);
 }
 
+.layoutRoot.light .documentsEmpty {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(242,248,249,0.88),
+      rgba(232,241,243,0.94)
+    );
+
+  border: 1px solid rgba(255,255,255,0.55);
+
+  color: #64748b;
+
+  box-shadow:
+    0 18px 34px rgba(15,23,42,0.05);
+}
+
 /* ======================================================
    LIST
 ====================================================== */
 
 .documentsList {
+  width: 100%;
+
   display: grid;
+
   gap: 18px;
+
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 
 .documentItem {
   position: relative;
+
+  max-width: 100%;
 
   overflow: hidden;
 
@@ -194,11 +259,30 @@
   transition: 0.22s;
 }
 
+.layoutRoot.light .documentItem {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(242,248,249,0.88),
+      rgba(232,241,243,0.94)
+    );
+
+  border: 1px solid rgba(255,255,255,0.55);
+
+  box-shadow:
+    0 18px 34px rgba(15,23,42,0.05);
+}
+
 .documentItem:hover {
   transform: translateY(-3px);
 
   box-shadow:
     0 22px 42px rgba(0,0,0,0.28);
+}
+
+.layoutRoot.light .documentItem:hover {
+  box-shadow:
+    0 22px 42px rgba(15,23,42,0.08);
 }
 
 /* декоративный круг */
@@ -218,6 +302,13 @@
 
   top: -70px;
   right: -60px;
+
+  pointer-events: none;
+}
+
+.layoutRoot.light .documentItem::after {
+  background:
+    rgba(0,165,80,0.07);
 }
 
 .documentTitle {
@@ -231,6 +322,10 @@
   margin-bottom: 12px;
 
   color: #ffffff;
+}
+
+.layoutRoot.light .documentTitle {
+  color: #0f172a;
 }
 
 .documentMeta {
@@ -248,6 +343,10 @@
   gap: 14px;
 
   margin-bottom: 16px;
+}
+
+.layoutRoot.light .documentMeta {
+  color: #64748b;
 }
 
 .documentActions {
@@ -275,6 +374,17 @@
     );
 }
 
+.layoutRoot.light .documentItem.expired {
+  border: 1px solid rgba(239,68,68,0.24);
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(254,242,242,0.9),
+      rgba(255,247,247,0.95)
+    );
+}
+
 .expiredText {
   color: #fecaca;
 
@@ -285,29 +395,39 @@
   margin-top: 8px;
 }
 
+.layoutRoot.light .expiredText {
+  color: #991b1b;
+}
+
 /* ======================================================
    MODAL
 ====================================================== */
 
 .modalOverlay {
   position: fixed;
+
   inset: 0;
 
   background: rgba(0,0,0,0.62);
 
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
 
   padding: 20px;
 
   z-index: 1000;
+
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  -webkit-overflow-scrolling: touch;
 }
 
 .modalBox {
   width: min(760px, 100%);
 
-  max-height: 90vh;
+  max-height: calc(100vh - 40px);
 
   background: #0f172a;
 
@@ -318,13 +438,27 @@
   box-shadow:
     0 24px 80px rgba(0,0,0,0.42);
 
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 
   display: flex;
   flex-direction: column;
+
+  -webkit-overflow-scrolling: touch;
+}
+
+.layoutRoot.light .modalBox {
+  background: #f5fbfa;
+
+  border: 1px solid rgba(255,255,255,0.75);
+
+  box-shadow:
+    0 24px 80px rgba(15,23,42,0.2);
 }
 
 .modalTitle {
+  flex-shrink: 0;
+
   padding: 22px 24px;
 
   font-size: 24px;
@@ -336,17 +470,27 @@
     1px solid rgba(255,255,255,0.08);
 }
 
+.layoutRoot.light .modalTitle {
+  color: #0f172a;
+
+  border-bottom:
+    1px solid rgba(0,165,80,0.1);
+}
+
 .modalContent {
   padding: 24px;
 
   display: grid;
+
   gap: 18px;
 
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
 .modalSection {
   display: grid;
+
   gap: 10px;
 }
 
@@ -355,6 +499,10 @@
   font-weight: 900;
 
   color: #cbd5e1;
+}
+
+.layoutRoot.light .modalLabel {
+  color: #334155;
 }
 
 .modalInput {
@@ -379,6 +527,14 @@
   color: #f8fafc;
 }
 
+.layoutRoot.light .modalInput {
+  border: 1px solid #cfe4df;
+
+  background: rgba(255,255,255,0.86);
+
+  color: #0f172a;
+}
+
 .modalInput::placeholder {
   color: #94a3b8;
 }
@@ -400,15 +556,23 @@
   color: #94a3b8;
 }
 
+.layoutRoot.light .fileHint {
+  color: #64748b;
+}
+
 .quickButtons {
   display: flex;
+
   gap: 10px;
+
   flex-wrap: wrap;
 
   margin-top: 4px;
 }
 
 .modalButtons {
+  flex-shrink: 0;
+
   padding: 18px 24px;
 
   border-top:
@@ -419,6 +583,11 @@
 
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.layoutRoot.light .modalButtons {
+  border-top:
+    1px solid rgba(0,165,80,0.1);
 }
 
 .errorText {
@@ -444,7 +613,12 @@
 @media (max-width: 700px) {
 
   .documentsPage {
+    width: 100%;
+
     padding: 18px;
+
+    overflow-x: hidden;
+    overflow-y: visible;
   }
 
   .documentsHeader {
@@ -467,9 +641,14 @@
 
   .documentsList {
     gap: 16px;
+
+    overflow-x: hidden;
+    overflow-y: visible;
   }
 
   .documentItem {
+    max-width: 100%;
+
     padding: 18px;
 
     border-radius: 24px;
@@ -489,6 +668,7 @@
 
   .documentMeta {
     font-size: 13px;
+
     gap: 10px;
   }
 
@@ -503,15 +683,23 @@
   }
 
   .modalOverlay {
+    align-items: flex-start;
+
     padding: 12px;
+
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .modalBox {
     width: 100%;
 
-    max-height: 92vh;
+    max-height: calc(100vh - 24px);
 
     border-radius: 22px;
+
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .modalTitle {
@@ -522,6 +710,9 @@
 
   .modalContent {
     padding: 18px;
+
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .modalButtons {

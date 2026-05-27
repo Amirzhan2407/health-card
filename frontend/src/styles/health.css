@@ -1,7 +1,13 @@
 .healthPage {
-  padding: 42px 34px;
+  width: 100%;
   max-width: 1350px;
+
   margin: 0 auto;
+
+  padding: 42px 34px;
+
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 
 /* ================= LIGHT ================= */
@@ -89,34 +95,51 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+
   margin-bottom: 32px;
 }
 
 .healthHeader h2 {
   margin: 0;
+
   font-size: 42px;
   font-weight: 950;
 }
 
 .addButton {
   height: 56px;
+
   padding: 0 24px;
+
   border: none;
   border-radius: 16px;
+
   background: linear-gradient(135deg, #00a550, #00bf63);
+
   color: white;
+
   cursor: pointer;
+
   font-weight: 900;
+
   box-shadow: 0 14px 30px rgba(0, 165, 80, 0.22);
 }
 
 .healthCards {
+  width: 100%;
+
   display: grid;
+
   gap: 28px;
+
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 
 .healthCard,
 .healthEmpty {
+  max-width: 100%;
+
   border-radius: 28px;
 }
 
@@ -126,6 +149,7 @@
 
 .healthEmpty {
   padding: 28px;
+
   font-weight: 800;
 }
 
@@ -133,7 +157,9 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+
   gap: 18px;
+
   margin-bottom: 18px;
 }
 
@@ -144,42 +170,55 @@
 
 .healthCardDate {
   margin-top: 6px;
+
   font-size: 14px;
 }
 
 .healthCardValue {
+  margin-bottom: 18px;
+
   font-size: 42px;
   font-weight: 950;
-  margin-bottom: 18px;
 }
 
 .healthExtra {
   display: flex;
   justify-content: space-between;
+
   gap: 12px;
+
   border-radius: 16px;
+
   padding: 14px 16px;
+
   font-weight: 800;
+
   margin-bottom: 22px;
 }
 
 .healthHistoryTitle {
   font-size: 18px;
   font-weight: 950;
+
   margin-bottom: 14px;
 }
 
 .healthHistory {
   display: grid;
+
   gap: 10px;
 }
 
 .healthHistoryItem {
   display: flex;
   justify-content: space-between;
+
   gap: 12px;
+
   padding: 13px 16px;
+
   border-radius: 14px;
+
   font-size: 15px;
   font-weight: 700;
 }
@@ -197,30 +236,40 @@
 .actionButton,
 .smallActionBtn {
   min-height: 46px;
+
   padding: 0 16px;
+
   border-radius: 14px;
+
   cursor: pointer;
+
   font-weight: 900;
 }
 
 .layoutRoot.light .actionButton,
 .layoutRoot.light .smallActionBtn {
   border: 1px solid rgba(0, 165, 80, 0.18);
+
   background: rgba(255, 255, 255, 0.72);
+
   color: #008f58;
 }
 
 .layoutRoot.dark .actionButton,
 .layoutRoot.dark .smallActionBtn {
   border: 1px solid rgba(255, 255, 255, 0.08);
+
   background: rgba(255, 255, 255, 0.06);
+
   color: #ffffff;
 }
 
 .primaryBtn,
 .smallActionBtn.dark {
   background: #00a550 !important;
+
   color: white !important;
+
   border-color: #00a550 !important;
 }
 
@@ -228,32 +277,52 @@
 
 .modalOverlay {
   position: fixed;
+
   inset: 0;
+
   background: rgba(15, 23, 42, 0.5);
+
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+
   padding: 20px;
+
   z-index: 1000;
+
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  -webkit-overflow-scrolling: touch;
 }
 
 .modalBox,
 .chartModal {
   border-radius: 26px;
-  overflow: hidden;
+
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  max-height: calc(100vh - 40px);
+
+  -webkit-overflow-scrolling: touch;
 }
 
 .layoutRoot.light .modalBox,
 .layoutRoot.light .chartModal {
   background: #f5fbfa;
+
   border: 1px solid rgba(255, 255, 255, 0.75);
+
   box-shadow: 0 24px 80px rgba(15, 23, 42, 0.2);
 }
 
 .layoutRoot.dark .modalBox,
 .layoutRoot.dark .chartModal {
   background: #0f172a;
+
   border: 1px solid rgba(255, 255, 255, 0.08);
+
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
 }
 
@@ -263,28 +332,32 @@
 
 .chartModal {
   width: min(900px, 100%);
-  max-height: 90vh;
 }
 
 .modalTitle {
   padding: 20px 24px;
+
   font-size: 22px;
   font-weight: 950;
 }
 
 .layoutRoot.light .modalTitle {
   color: #0f172a;
+
   border-bottom: 1px solid rgba(0, 165, 80, 0.1);
 }
 
 .layoutRoot.dark .modalTitle {
   color: #f8fafc;
+
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .modalContent {
   padding: 24px;
+
   display: grid;
+
   gap: 14px;
 }
 
@@ -304,37 +377,48 @@
 .modalInput {
   width: 100%;
   min-height: 50px;
+
   padding: 12px 14px;
+
   border-radius: 14px;
+
   outline: none;
 }
 
 .layoutRoot.light .modalInput {
   border: 1px solid #cfe4df;
+
   background: rgba(255, 255, 255, 0.86);
+
   color: #0f172a;
 }
 
 .layoutRoot.dark .modalInput {
   border: 1px solid #334155;
+
   background: #111827;
+
   color: #f8fafc;
 }
 
 .modalInput:focus {
   border-color: #00a550;
+
   box-shadow: 0 0 0 4px rgba(0, 165, 80, 0.12);
 }
 
 .textareaInput {
   min-height: 90px;
+
   resize: vertical;
 }
 
 .modalButtons {
   padding: 18px 24px;
+
   display: flex;
   justify-content: flex-end;
+
   gap: 12px;
 }
 
@@ -348,47 +432,64 @@
 
 .errorText {
   background: #fef2f2;
+
   border: 1px solid #fecaca;
+
   color: #991b1b;
+
   padding: 12px 14px;
+
   border-radius: 14px;
+
   font-weight: 900;
 }
 
 .chartControls {
   display: flex;
   flex-wrap: wrap;
+
   gap: 10px;
+
   padding: 20px 24px;
 }
 
 .periodBtn {
   padding: 9px 14px;
+
   border-radius: 14px;
+
   cursor: pointer;
+
   font-weight: 900;
 }
 
 .layoutRoot.light .periodBtn {
   border: 1px solid rgba(0, 165, 80, 0.18);
+
   background: rgba(255, 255, 255, 0.72);
+
   color: #0f172a;
 }
 
 .layoutRoot.dark .periodBtn {
   border: 1px solid rgba(255, 255, 255, 0.08);
+
   background: rgba(255, 255, 255, 0.06);
+
   color: #ffffff;
 }
 
 .periodBtn.active {
   background: #00a550 !important;
+
   color: white !important;
+
   border-color: #00a550 !important;
 }
 
 .chartSummary {
   padding: 16px 24px 0;
+
   font-weight: 800;
 }
 
@@ -401,9 +502,11 @@
 }
 
 .chartBox {
-  padding: 20px 24px 24px;
   width: 100%;
   height: 360px;
+
+  padding: 20px 24px 24px;
+
   box-sizing: border-box;
 }
 
@@ -413,43 +516,62 @@
 .fluoroRed,
 .fluoroGray {
   padding: 6px 10px;
+
   border-radius: 999px;
+
   font-weight: 800;
 }
 
 .fluoroGreen {
   color: #047857;
+
   background: rgba(0, 165, 80, 0.12);
 }
 
 .fluoroBlue {
   color: #0369a1;
+
   background: #e0f2fe;
 }
 
 .fluoroYellow {
   color: #92400e;
+
   background: #fef3c7;
 }
 
 .fluoroRed {
   color: #991b1b;
+
   background: #fee2e2;
 }
 
 .fluoroGray {
   color: #374151;
+
   background: #e5e7eb;
 }
 
-.sugarGreen { border-left: 5px solid #22c55e; }
-.sugarYellow { border-left: 5px solid #eab308; }
-.sugarRed { border-left: 5px solid #ef4444; }
-.sugarBlue { border-left: 5px solid #3b82f6; }
+.sugarGreen {
+  border-left: 5px solid #22c55e;
+}
+
+.sugarYellow {
+  border-left: 5px solid #eab308;
+}
+
+.sugarRed {
+  border-left: 5px solid #ef4444;
+}
+
+.sugarBlue {
+  border-left: 5px solid #3b82f6;
+}
 
 .noSpin::-webkit-outer-spin-button,
 .noSpin::-webkit-inner-spin-button {
   -webkit-appearance: none;
+
   margin: 0;
 }
 
@@ -462,12 +584,18 @@
 
 @media (max-width: 700px) {
   .healthPage {
+    width: 100%;
+
     padding: 22px 18px;
+
+    overflow-x: hidden;
+    overflow-y: visible;
   }
 
   .healthHeader {
     flex-direction: column;
     align-items: flex-start;
+
     gap: 16px;
   }
 
@@ -480,8 +608,19 @@
     height: 52px;
   }
 
+  .healthCards {
+    overflow-x: hidden;
+    overflow-y: visible;
+  }
+
+  .healthCard,
+  .healthEmpty {
+    max-width: 100%;
+  }
+
   .healthCard {
     padding: 22px;
+
     border-radius: 24px;
   }
 
@@ -501,6 +640,23 @@
     font-size: 32px;
   }
 
+  .modalOverlay {
+    align-items: flex-start;
+
+    padding: 14px;
+
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .modalBox,
+  .chartModal {
+    max-height: calc(100vh - 28px);
+
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
   .modalButtons {
     flex-direction: column;
   }
@@ -512,6 +668,7 @@
 
   .chartBox {
     height: 300px;
+
     padding: 16px;
   }
 }

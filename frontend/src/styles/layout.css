@@ -2,14 +2,24 @@
   box-sizing: border-box;
 }
 
-html,
-body,
-#root {
+html {
   margin: 0;
   padding: 0;
   width: 100%;
   min-height: 100%;
+
   overflow-x: hidden;
+  overflow-y: auto;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+
+  overflow-x: hidden;
+  overflow-y: auto;
 
   font-family: Inter, system-ui, sans-serif;
 
@@ -23,7 +33,24 @@ body,
 
   color: #0f172a;
 
-  overscroll-behavior: none;
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: auto;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+
+  overflow-x: hidden;
+  overflow-y: visible;
+}
+
+.layoutRoot {
+  width: 100%;
+  min-height: 100vh;
+
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 
 /* =========================================
@@ -202,8 +229,12 @@ body,
 
 .layoutContent {
   min-height: calc(100vh - 86px);
+  height: auto;
 
   background: transparent;
+
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 
 /* =========================================
@@ -228,11 +259,17 @@ body,
 ===================================================== */
 
 @media (max-width: 700px) {
-
   html,
-  body,
-  #root {
+  body {
     overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  #root,
+  .layoutRoot,
+  .layoutContent {
+    overflow-x: hidden;
+    overflow-y: visible;
   }
 
   .topbar {
@@ -346,6 +383,12 @@ body,
     transition: 0.25s;
 
     box-shadow: 18px 0 45px rgba(0, 0, 0, 0.3);
+
+    overflow-x: hidden;
+    overflow-y: auto;
+
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   .mobileSidebar.open {
@@ -427,7 +470,11 @@ body,
 
   .layoutContent {
     min-height: calc(100vh - 78px);
+    height: auto;
 
     background: transparent;
+
+    overflow-x: hidden;
+    overflow-y: visible;
   }
 }

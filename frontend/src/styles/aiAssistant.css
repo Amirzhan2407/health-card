@@ -3,7 +3,8 @@
 ====================================================== */
 
 .aiPage {
-  height: calc(100vh - 86px);
+  min-height: calc(100vh - 86px);
+  height: auto;
 
   display: flex;
   flex-direction: column;
@@ -17,6 +18,24 @@
   box-sizing: border-box;
 
   color: #f8fafc;
+
+  overflow-x: hidden;
+  overflow-y: visible;
+}
+
+/* ================= LIGHT ================= */
+
+.layoutRoot.light .aiPage {
+  background:
+    radial-gradient(circle at 10% 10%, rgba(0,165,80,0.08), transparent 28%),
+    linear-gradient(
+      135deg,
+      #d9e5e7 0%,
+      #e4eef0 45%,
+      #d7e4e6 100%
+    );
+
+  color: #0f172a;
 }
 
 /* ======================================================
@@ -50,6 +69,20 @@
   overflow: hidden;
 }
 
+.layoutRoot.light .aiHeader {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(242,248,249,0.88),
+      rgba(232,241,243,0.94)
+    );
+
+  border: 1px solid rgba(255,255,255,0.55);
+
+  box-shadow:
+    0 18px 34px rgba(15,23,42,0.05);
+}
+
 /* декоративный круг */
 
 .aiHeader::after {
@@ -67,6 +100,13 @@
 
   top: -90px;
   right: -70px;
+
+  pointer-events: none;
+}
+
+.layoutRoot.light .aiHeader::after {
+  background:
+    rgba(0,165,80,0.07);
 }
 
 .aiHeader h1 {
@@ -80,6 +120,10 @@
   font-weight: 900;
 
   color: #ffffff;
+}
+
+.layoutRoot.light .aiHeader h1 {
+  color: #0f172a;
 }
 
 .aiHeader p {
@@ -96,23 +140,26 @@
   line-height: 1.6;
 }
 
+.layoutRoot.light .aiHeader p {
+  color: #64748b;
+}
+
 /* ======================================================
    CHAT
 ====================================================== */
 
 .aiChat {
-  flex: 1;
-
   max-width: 1100px;
   width: 100%;
 
   margin: 0 auto;
 
-  overflow-y: auto;
-
-  padding: 10px 4px 150px;
+  padding: 10px 4px 40px;
 
   box-sizing: border-box;
+
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 
 /* ======================================================
@@ -177,6 +224,22 @@
   border-bottom-left-radius: 10px;
 }
 
+.layoutRoot.light .aiMessageRow.assistant .aiMessage {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255,255,255,0.86),
+      rgba(248,252,252,0.94)
+    );
+
+  color: #0f172a;
+
+  border: 1px solid rgba(0,165,80,0.08);
+
+  box-shadow:
+    0 14px 28px rgba(15,23,42,0.06);
+}
+
 /* user */
 
 .aiMessageRow.user .aiMessage {
@@ -198,7 +261,7 @@
 
 .aiInputBox {
   position: sticky;
-  bottom: 0;
+  bottom: 18px;
 
   max-width: 1100px;
   width: 100%;
@@ -221,6 +284,18 @@
 
   box-shadow:
     0 24px 48px rgba(0,0,0,0.28);
+
+  z-index: 50;
+}
+
+.layoutRoot.light .aiInputBox {
+  background:
+    rgba(248,252,252,0.94);
+
+  border: 1px solid rgba(0,165,80,0.12);
+
+  box-shadow:
+    0 18px 34px rgba(15,23,42,0.08);
 }
 
 .aiInputBox textarea {
@@ -243,10 +318,21 @@
   max-height: 180px;
 
   line-height: 1.6;
+
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.layoutRoot.light .aiInputBox textarea {
+  color: #0f172a;
 }
 
 .aiInputBox textarea::placeholder {
   color: #94a3b8;
+}
+
+.layoutRoot.light .aiInputBox textarea::placeholder {
+  color: #64748b;
 }
 
 .aiInputBox button {
@@ -287,17 +373,21 @@
    SCROLLBAR
 ====================================================== */
 
-.aiChat::-webkit-scrollbar {
-  width: 10px;
+.aiInputBox textarea::-webkit-scrollbar {
+  width: 8px;
 }
 
-.aiChat::-webkit-scrollbar-track {
+.aiInputBox textarea::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.aiChat::-webkit-scrollbar-thumb {
+.aiInputBox textarea::-webkit-scrollbar-thumb {
   background: rgba(255,255,255,0.12);
   border-radius: 999px;
+}
+
+.layoutRoot.light .aiInputBox textarea::-webkit-scrollbar-thumb {
+  background: rgba(15,23,42,0.16);
 }
 
 /* ======================================================
@@ -307,9 +397,13 @@
 @media (max-width: 768px) {
 
   .aiPage {
-    height: calc(100vh - 78px);
+    min-height: calc(100vh - 78px);
+    height: auto;
 
     padding: 18px;
+
+    overflow-x: hidden;
+    overflow-y: visible;
   }
 
   .aiHeader {
@@ -337,7 +431,10 @@
   }
 
   .aiChat {
-    padding-bottom: 130px;
+    padding-bottom: 30px;
+
+    overflow-x: hidden;
+    overflow-y: visible;
   }
 
   .aiMessage {
@@ -351,6 +448,8 @@
   }
 
   .aiInputBox {
+    bottom: 12px;
+
     border-radius: 22px;
 
     padding: 10px;
