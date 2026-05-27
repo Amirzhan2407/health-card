@@ -2,19 +2,49 @@
   box-sizing: border-box;
 }
 
-body {
+html,
+body,
+#root {
   margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+  background: #07111f;
+  color: #f8fafc;
+  overscroll-behavior: none;
+}
+
+body {
+  overflow-x: hidden;
   font-family: Inter, system-ui, sans-serif;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
 }
 
 .layoutRoot {
   min-height: 100vh;
-  background: #cbc7bd;
-  color: #111827;
+  background:
+    radial-gradient(circle at 10% 10%, rgba(0, 165, 80, 0.12), transparent 28%),
+    linear-gradient(135deg, #07111f 0%, #0b1728 45%, #07111f 100%);
+  color: #f8fafc;
+}
+
+.layoutRoot.light {
+  background:
+    radial-gradient(circle at 10% 10%, rgba(0, 165, 80, 0.12), transparent 28%),
+    linear-gradient(135deg, #07111f 0%, #0b1728 45%, #07111f 100%);
+  color: #f8fafc;
 }
 
 .layoutRoot.dark {
-  background: #1f2933;
+  background:
+    radial-gradient(circle at 10% 10%, rgba(0, 165, 80, 0.12), transparent 28%),
+    linear-gradient(135deg, #07111f 0%, #0b1728 45%, #07111f 100%);
   color: #f8fafc;
 }
 
@@ -25,7 +55,7 @@ body {
   justify-content: space-between;
   padding: 0 34px;
   background: #00a550;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
 }
 
 .topbarLogo {
@@ -109,14 +139,13 @@ body {
 .layoutContent {
   padding: 0;
   min-height: calc(100vh - 86px);
+  background: transparent;
 }
 
-/* мобильная кнопка скрыта на компьютере */
 .mobileMenuBtn {
   display: none;
 }
 
-/* боковое меню скрыто на компьютере */
 .mobileBackdrop,
 .mobileSidebar {
   display: none;
@@ -154,39 +183,28 @@ body {
   .mobileMenuBtn {
     display: flex;
     position: static;
-
     width: 46px;
     height: 46px;
-
     border: none;
     border-radius: 15px;
-
     background: white;
     color: #111827;
-
     font-size: 26px;
     font-weight: 900;
-
     align-items: center;
     justify-content: center;
-
     cursor: pointer;
-
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
   }
 
   .mobileBackdrop {
     display: block;
     position: fixed;
     inset: 0;
-
-    background: rgba(0, 0, 0, 0.45);
-
+    background: rgba(0, 0, 0, 0.52);
     opacity: 0;
     pointer-events: none;
-
     z-index: 2500;
-
     transition: 0.2s;
   }
 
@@ -197,22 +215,15 @@ body {
 
   .mobileSidebar {
     display: block;
-
     position: fixed;
     top: 0;
     left: -320px;
-
     width: 300px;
     height: 100vh;
-
     background: #00a550;
-
     z-index: 3001;
-
     padding: 22px;
-
     transition: 0.25s;
-
     box-shadow: 18px 0 45px rgba(0, 0, 0, 0.35);
   }
 
@@ -224,44 +235,31 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-
     margin-bottom: 24px;
   }
 
   .mobileSidebarTop button {
     width: 42px;
     height: 42px;
-
     border: none;
     border-radius: 14px;
-
     background: #ffffff;
-
     font-weight: 900;
-
     cursor: pointer;
   }
 
   .mobileNavItem {
     width: 100%;
     height: 52px;
-
     margin-bottom: 12px;
-
     border: none;
     border-radius: 16px;
-
     background: transparent;
-
     color: #ffffff;
-
     font-size: 16px;
     font-weight: 900;
-
     text-align: left;
-
     padding: 0 16px;
-
     cursor: pointer;
   }
 
@@ -273,11 +271,11 @@ body {
   .mobileNavItem.danger {
     background: #ef4444;
     color: #ffffff;
-
     margin-top: 18px;
   }
 
   .layoutContent {
     min-height: calc(100vh - 78px);
+    background: transparent;
   }
 }

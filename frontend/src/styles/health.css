@@ -1,129 +1,181 @@
 .healthPage {
-  padding: 24px;
-  max-width: 1100px;
+  padding: 34px;
+  max-width: 1500px;
   margin: 0 auto;
+  color: #f8fafc;
 }
 
 .healthHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  gap: 22px;
+  margin-bottom: 30px;
 }
 
 .healthHeader h2 {
   margin: 0;
-  font-size: 28px;
-  font-weight: 800;
+  font-size: 42px;
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.healthEmpty,
+.healthCard {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(17, 24, 39, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 30px;
+  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.24);
 }
 
 .healthEmpty {
-  background: #fff;
-  border: 1px solid #e6e9ef;
-  border-radius: 16px;
-  padding: 20px;
-  color: #5b6475;
+  padding: 34px;
+  color: #94a3b8;
+  font-weight: 800;
 }
 
 .healthCards {
   display: grid;
-  gap: 14px;
+  gap: 24px;
 }
 
 .healthCard {
-  background: #fff;
-  border: 1px solid #e6e9ef;
-  border-radius: 18px;
-  padding: 18px;
-  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.06);
+  padding: 28px;
 }
 
 .healthCardTop {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 10px;
+  gap: 18px;
+  margin-bottom: 18px;
 }
 
 .healthCardTitle {
-  font-size: 18px;
+  font-size: 24px;
   font-weight: 900;
-  color: #111827;
+  color: #ffffff;
 }
 
 .healthCardDate {
-  font-size: 13px;
-  color: #667085;
+  margin-top: 6px;
+  font-size: 14px;
+  color: #94a3b8;
 }
 
 .healthCardValue {
-  font-size: 24px;
+  font-size: 34px;
   font-weight: 900;
-  color: #111827;
-  margin-bottom: 8px;
+  color: #ffffff;
+  margin-bottom: 12px;
+}
+
+.healthExtra,
+.healthHistoryTitle {
+  color: #cbd5e1;
+  font-weight: 800;
 }
 
 .healthExtra {
-  font-size: 14px;
-  font-weight: 700;
-  color: #475467;
-  margin-bottom: 14px;
+  font-size: 15px;
+  margin-bottom: 18px;
 }
 
 .healthHistoryTitle {
-  font-size: 14px;
-  font-weight: 800;
-  margin-bottom: 8px;
-  color: #111827;
+  font-size: 15px;
+  margin-bottom: 12px;
 }
 
 .healthHistory {
   display: grid;
-  gap: 8px;
+  gap: 10px;
+}
+
+.healthHistoryItem,
+.bmiBox {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: #e2e8f0;
+  border-radius: 16px;
 }
 
 .healthHistoryItem {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: #f8fafc;
-  color: #344054;
+  padding: 13px 14px;
   font-size: 14px;
 }
 
-.addButton {
-  padding: 10px 16px;
-  border-radius: 12px;
-  border: 1px solid #d6deea;
-  background: #111827;
-  color: #fff;
+.bmiBox {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  margin-bottom: 18px;
+  font-size: 14px;
+}
+
+.addButton,
+.actionButton,
+.smallActionBtn,
+.periodBtn {
+  border: none;
+  border-radius: 14px;
   cursor: pointer;
-  font-weight: 800;
+  font-weight: 900;
+  transition: 0.2s;
+}
+
+.addButton {
+  height: 54px;
+  padding: 0 24px;
+  background: linear-gradient(135deg, #00a550, #00c46a);
+  color: #ffffff;
+  box-shadow: 0 14px 30px rgba(0, 165, 80, 0.24);
+}
+
+.actionButton,
+.smallActionBtn,
+.periodBtn {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .actionButton {
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid #d6deea;
-  background: #fff;
-  cursor: pointer;
-  font-weight: 700;
-  color: #111827;
+  padding: 10px 14px;
 }
 
-.primaryBtn {
-  background: #111827;
-  color: #fff;
-  border-color: #111827;
+.smallActionBtn {
+  padding: 9px 12px;
+}
+
+.primaryBtn,
+.smallActionBtn.dark,
+.periodBtn.active {
+  background: #00a550;
+  color: #ffffff;
+  border-color: #00a550;
+}
+
+.addButton:hover,
+.actionButton:hover,
+.smallActionBtn:hover,
+.periodBtn:hover {
+  transform: translateY(-2px);
+}
+
+.healthCardActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(17, 24, 39, 0.45);
+  background: rgba(0, 0, 0, 0.62);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -131,103 +183,64 @@
   z-index: 1000;
 }
 
-.modalBox {
-  width: min(520px, 100%);
-  background: #fff;
-  border-radius: 20px;
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
+.modalBox,
+.chartModal {
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
   overflow: hidden;
 }
 
+.modalBox {
+  width: min(520px, 100%);
+  border-radius: 24px;
+}
+
+.chartModal {
+  width: min(900px, 100%);
+  max-height: 90vh;
+  border-radius: 28px;
+}
+
 .modalTitle {
-  padding: 18px 20px;
-  font-size: 18px;
+  padding: 20px 22px;
+  font-size: 20px;
   font-weight: 900;
-  border-bottom: 1px solid #eef1f6;
+  color: #f8fafc;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .modalContent {
-  padding: 20px;
+  padding: 22px;
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 .modalLabel {
   font-size: 14px;
-  font-weight: 800;
-  color: #111827;
+  font-weight: 900;
+  color: #cbd5e1;
 }
 
 .modalInput {
   width: 100%;
-  min-height: 44px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid #d6deea;
+  min-height: 48px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid #334155;
+  background: #111827;
+  color: #f8fafc;
   outline: none;
   box-sizing: border-box;
 }
 
-.modalButtons {
-  padding: 16px 20px;
-  border-top: 1px solid #eef1f6;
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
+.modalInput::placeholder {
+  color: #94a3b8;
 }
 
-.errorText {
-  background: #fff5f5;
-  border: 1px solid #ffd1d1;
-  color: #b42318;
-  padding: 10px 12px;
-  border-radius: 12px;
-  font-weight: 800;
-}
-.noSpin::-webkit-outer-spin-button,
-.noSpin::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.noSpin {
-  appearance: textfield;
-  -moz-appearance: textfield;
-}
-
-
-.healthCardActions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.smallActionBtn {
-  border: 1px solid #d0d5dd;
-  background: #ffffff;
-  color: #111827;
-  padding: 8px 10px;
-  border-radius: 10px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.smallActionBtn.dark {
-  background: #111827;
-  border-color: #111827;
-  color: #ffffff;
-}
-
-.bmiBox {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  background: #f8fafc;
-  border: 1px solid #e4e7ec;
-  border-radius: 14px;
-  padding: 12px;
-  margin-bottom: 14px;
-  font-size: 14px;
+.modalInput:focus {
+  border-color: #00a550;
+  box-shadow: 0 0 0 4px rgba(0, 165, 80, 0.14);
 }
 
 .textareaInput {
@@ -235,43 +248,35 @@
   resize: vertical;
 }
 
-.chartModal {
-  width: min(900px, 100%);
-  max-height: 90vh;
-  background: #ffffff;
-  border-radius: 24px;
-  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.18);
-  overflow: hidden;
+.modalButtons {
+  padding: 18px 22px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.errorText {
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  color: #fecaca;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-weight: 800;
 }
 
 .chartControls {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 18px 24px;
-  border-bottom: 1px solid #f2f4f7;
-}
-
-.periodBtn {
-  border: 1px solid #d0d5dd;
-  background: #ffffff;
-  color: #111827;
-  padding: 8px 12px;
-  border-radius: 12px;
-  cursor: pointer;
-  font-weight: 800;
-}
-
-.periodBtn.active {
-  background: #111827;
-  color: #ffffff;
-  border-color: #111827;
+  gap: 10px;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .chartSummary {
   padding: 16px 24px 0;
-  color: #475467;
-  font-weight: 700;
+  color: #cbd5e1;
+  font-weight: 800;
 }
 
 .chartBox {
@@ -281,6 +286,59 @@
   box-sizing: border-box;
 }
 
+.fluoroGreen {
+  color: #bbf7d0;
+  background: rgba(21, 128, 61, 0.28);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.fluoroBlue {
+  color: #7dd3fc;
+  background: rgba(3, 105, 161, 0.28);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.fluoroYellow {
+  color: #fde68a;
+  background: rgba(146, 64, 14, 0.28);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.fluoroRed {
+  color: #fecaca;
+  background: rgba(153, 27, 27, 0.28);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.fluoroGray {
+  color: #e5e7eb;
+  background: rgba(75, 85, 99, 0.35);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.sugarGreen,
+.sugarYellow,
+.sugarRed,
+.sugarBlue {
+  border-left-width: 5px;
+  border-left-style: solid;
+}
+
+.sugarGreen { border-left-color: #22c55e; }
+.sugarYellow { border-left-color: #eab308; }
+.sugarRed { border-left-color: #ef4444; }
+.sugarBlue { border-left-color: #3b82f6; }
+
 .noSpin::-webkit-outer-spin-button,
 .noSpin::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -292,59 +350,56 @@
   -moz-appearance: textfield;
 }
 
+@media (max-width: 700px) {
+  .healthPage {
+    padding: 18px;
+  }
 
-.fluoroGreen {
-  color: #15803d;
-  background: #dcfce7;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-weight: 700;
-}
+  .healthHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
 
-.fluoroBlue {
-  color: #0369a1;
-  background: #e0f2fe;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-weight: 700;
-}
+  .healthHeader h2 {
+    font-size: 32px;
+  }
 
-.fluoroYellow {
-  color: #92400e;
-  background: #fef3c7;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-weight: 700;
-}
+  .addButton {
+    width: 100%;
+  }
 
-.fluoroRed {
-  color: #991b1b;
-  background: #fee2e2;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-weight: 700;
-}
+  .healthCard {
+    padding: 22px;
+    border-radius: 26px;
+  }
 
-.fluoroGray {
-  color: #374151;
-  background: #e5e7eb;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-weight: 700;
-}
+  .healthCardTop,
+  .bmiBox,
+  .healthHistoryItem {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 
-.sugarGreen {
-  border-left: 5px solid #15803d;
-}
+  .healthCardTitle {
+    font-size: 22px;
+  }
 
-.sugarYellow {
-  border-left: 5px solid #ca8a04;
-}
+  .healthCardValue {
+    font-size: 28px;
+  }
 
-.sugarRed {
-  border-left: 5px solid #dc2626;
-}
+  .modalButtons {
+    flex-direction: column;
+  }
 
-.sugarBlue {
-  border-left: 5px solid #2563eb;
+  .actionButton,
+  .primaryBtn {
+    width: 100%;
+  }
+
+  .chartBox {
+    height: 300px;
+    padding: 16px;
+  }
 }
