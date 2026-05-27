@@ -20,7 +20,7 @@ const modeInfo = {
     subtitle: "Помощник для поиска лекарств в аптеках",
     placeholder: "Например: хочу купить парацетамол",
     greeting:
-      "Здравствуйте! Я помогу найти лекарство. Напишите название препарата, а потом я уточню город, форму выпуска, дозировку и что важнее: ближайшая аптека или лучшая цена.",
+      "Здравствуйте! Я помогу найти лекарство. Напишите название препарата, а потом я уточню город и что важнее: ближайшая аптека или лучшая цена.",
   },
 };
 
@@ -90,6 +90,21 @@ function priorityLabel(priority) {
   return "";
 }
 
+function hasMedicineBuyIntent(text) {
+  const lower = text.toLowerCase();
+
+  return (
+    lower.includes("купить") ||
+    lower.includes("найди") ||
+    lower.includes("найти") ||
+    lower.includes("хочу") ||
+    lower.includes("лекарство") ||
+    lower.includes("препарат") ||
+    lower.includes("теперь") ||
+    lower.includes("другое")
+  );
+}
+
 function cleanMedicineName(text) {
   let value = text.toLowerCase();
 
@@ -109,6 +124,9 @@ function cleanMedicineName(text) {
     "найти",
     "лекарство",
     "препарат",
+    "теперь",
+    "другое",
+    "другой",
     "в городе",
     "город",
     "по лучшей цене",
@@ -122,6 +140,7 @@ function cleanMedicineName(text) {
     "рядом",
     "поближе",
     "возле",
+    "недалеко",
   ];
 
   phrasesToRemove.forEach((phrase) => {
@@ -138,6 +157,29 @@ function cleanMedicineName(text) {
     .trim();
 
   return value;
+}
+
+function formatPharmacyResults(data, search) {
+  const pharmaciesText = data.pharmacies
+    .slice(0, 6)
+    .map((item, index) => {
+      return `${index + 1}. ${item.pharmacy || "Аптека"}
+
+Цена: ${item.price || "не указана"}
+Адрес: ${item.address || "адрес не указан"}${
+        item.status ? `\nСтатус: ${item.status}` : ""
+      }${item.updated ? `\n${item.updated}` : ""}
+Ссылка: ${item.url}`;
+    })
+    .join("\n\n");
+
+  return `Нашёл варианты покупки:
+
+${data.title || data.selectedProduct?.title || search.medicine}
+
+${pharmaciesText}
+
+Перед покупкой лучше позвонить в аптеку и уточнить наличие. Также проверьте инструкцию и противопоказания препарата.`;
 }
 
 export default function AiAssistantPage() {
@@ -223,7 +265,10 @@ export default function AiAssistantPage() {
       ...pharmacySearch,
     };
 
-    if (!nextSearch.medicine && cleanedMedicine) {
+    if (
+      cleanedMedicine &&
+      (!nextSearch.medicine || hasMedicineBuyIntent(text))
+    ) {
       nextSearch.medicine = cleanedMedicine;
     }
 
@@ -237,25 +282,116 @@ export default function AiAssistantPage() {
 
     setPharmacySearch(nextSearch);
 
-    let answer = "";
-
     if (!nextSearch.medicine) {
-      answer =
-        "Хорошо. Напишите название лекарства, которое хотите купить.\n\nНапример: парацетамол, нурофен, фурацилин.";
-    } else if (!nextSearch.city) {
-      answer = `Понял, вы хотите купить: ${nextSearch.medicine}.\n\nСкажите, пожалуйста, в каком городе хотите купить лекарство?\n\nТакже напишите, что вам будет удобнее:\n— ближайшая аптека;\n— лучшая цена.`;
-    } else if (!nextSearch.priority) {
-      answer = `Хорошо.\n\nЛекарство: ${nextSearch.medicine}\nГород: ${nextSearch.city}\n\nЧто вам важнее: ближайшая аптека или лучшая цена?`;
-    } else {
-      answer = `Отлично, я понял запрос.\n\nЛекарство: ${nextSearch.medicine}\nГород: ${nextSearch.city}\nПриоритет: ${priorityLabel(nextSearch.priority)}\n\nСледующий шаг — подключить backend к поиску через i-teka. После этого я смогу показать аптеки, цены, наличие и ссылки.\n\nПеред покупкой лучше уточнить наличие в аптеке и проверить инструкцию препарата.`;
+      setPharmacyMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text:
+            "Хорошо. Напишите название лекарства, которое хотите купить.\n\nНапример: парацетамол, нурофен, фурацилин.",
+        },
+      ]);
+
+      return;
     }
 
-    const botMessage = {
-      role: "assistant",
-      text: answer,
-    };
+    if (!nextSearch.city) {
+      setPharmacyMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: `Понял, вы хотите купить: ${nextSearch.medicine}.
 
-    setPharmacyMessages((prev) => [...prev, botMessage]);
+Скажите, пожалуйста, в каком городе хотите купить лекарство?
+
+Также напишите, что вам будет удобнее:
+— ближайшая аптека;
+— лучшая цена.`,
+        },
+      ]);
+
+      return;
+    }
+
+    if (!nextSearch.priority) {
+      setPharmacyMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: `Хорошо.
+
+Лекарство: ${nextSearch.medicine}
+Город: ${nextSearch.city}
+
+Что вам важнее: ближайшая аптека или лучшая цена?`,
+        },
+      ]);
+
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      setPharmacyMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: `Отлично, ищу варианты на i-teka...
+
+Лекарство: ${nextSearch.medicine}
+Город: ${nextSearch.city}
+Приоритет: ${priorityLabel(nextSearch.priority)}`,
+        },
+      ]);
+
+      const params = new URLSearchParams({
+        medicine: nextSearch.medicine,
+        city: nextSearch.city.toLowerCase(),
+        priority: nextSearch.priority,
+      });
+
+      const response = await fetch(`${API_URL}/api/pharmacy/search?${params}`);
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Ошибка запроса");
+      }
+
+      if (!data.success || !data.pharmacies || data.pharmacies.length === 0) {
+        setPharmacyMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            text:
+              data.message ||
+              "Не удалось найти лекарство. Попробуйте написать название точнее.",
+          },
+        ]);
+
+        return;
+      }
+
+      const botMessage = {
+        role: "assistant",
+        text: formatPharmacyResults(data, nextSearch),
+      };
+
+      setPharmacyMessages((prev) => [...prev, botMessage]);
+    } catch (error) {
+      console.error(error);
+
+      setPharmacyMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: "Ошибка поиска лекарства. Проверьте backend или попробуйте позже.",
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const sendMessage = async () => {
