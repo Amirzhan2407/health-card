@@ -19,25 +19,26 @@ export default function App() {
       {/* Стартовая страница */}
       <Route path="/" element={<Navigate to="/login" replace />} />
 
-      {/* Админ вход без layout */}
+      {/* Вход техподдержки сайта */}
       <Route path="/admin" element={<AdminLogin />} />
 
-      {/* Логин без layout */}
+      {/* Обычный вход пациента / врача */}
       <Route path="/login" element={<Login />} />
 
-      {/* Все внутренние страницы внутри layout */}
+      {/* Все основные страницы внутри layout */}
       <Route element={<MainLayout />}>
         <Route path="/home" element={<HomePage />} />
         <Route path="/passport" element={<Passport />} />
 
         <Route path="/documents" element={<DocumentsPage />} />
         <Route path="/documents-cloud" element={<DocumentsCloudPage />} />
+
         <Route path="/search" element={<Search />} />
         <Route path="/health" element={<HealthPage />} />
         <Route path="/ai-assistant" element={<AiAssistantPage />} />
       </Route>
 
-      {/* Фолбэк */}
+      {/* Если страница не найдена */}
       <Route path="*" element={<Navigate to="/home" replace />} />
     </Routes>
   );
