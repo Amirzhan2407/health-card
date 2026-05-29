@@ -11,12 +11,16 @@ import Search from "./pages/Search";
 import Login from "./pages/Login";
 import HealthPage from "./pages/HealthPage";
 import AiAssistantPage from "./pages/AiAssistantPage";
+import AdminLogin from "./pages/AdminLogin";
 
 export default function App() {
   return (
     <Routes>
-      {/* Стартовая страница — логин */}
+      {/* Стартовая страница */}
       <Route path="/" element={<Navigate to="/login" replace />} />
+
+      {/* Админ вход без layout */}
+      <Route path="/admin" element={<AdminLogin />} />
 
       {/* Логин без layout */}
       <Route path="/login" element={<Login />} />
