@@ -5,6 +5,8 @@ import {
   getStaffList,
   createStaffAdmin,
   changeStaffStatus,
+  checkAdminUsername,
+  createInitialAdminPassword,
 } from "../services/adminService.js";
 
 const router = express.Router();
@@ -67,6 +69,50 @@ router.post("/login", async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Ошибка сервера при входе.",
+    });
+  }
+});
+
+
+router.post("/check-username", async (req, res) => {
+  try {
+    const { username } = req.body;
+
+    const result = await checkAdminUsername({
+      username,
+    });
+
+    return res.status(result.status).json(result);
+  } catch (error) {
+    console.error("ADMIN CHECK USERNAME ERROR:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: "Ошибка проверки аккаунта.",
+    });
+  }
+});
+
+router.post("/create-password", async (req, res) => {
+  try {
+    const { username, employeeNumber, password, repeatPassword } = req.body;
+
+    const result = await createInitialAdminPassword({
+      username,
+      employeeNumber,
+      password,
+      repeatPassword,
+      ip: getClientIp(req),
+      userAgent: getUserAgent(req),
+    });
+
+    return res.status(result.status).json(result);
+  } catch (error) {
+    console.error("ADMIN CREATE PASSWORD ERROR:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: "Ошибка создания пароля.",
     });
   }
 });

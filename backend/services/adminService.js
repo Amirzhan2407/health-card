@@ -475,3 +475,159 @@ export async function changeStaffStatus({
     },
   };
 }
+
+
+
+export async function checkAdminUsername({ username }) {
+  const cleanUsername = normalizeUsername(username);
+
+  if (!cleanUsername) {
+    return {
+      success: false,
+      status: 400,
+      message: "Введите название аккаунта.",
+    };
+  }
+
+  const { data: admin, error } = await supabase
+    .from("site_admins")
+    .select(
+      "id, full_name, username, role, category, is_active, password_hash, must_set_password"
+    )
+    .eq("username", cleanUsername)
+    .single();
+
+  if (error || !admin) {
+    return {
+      success: false,
+      status: 404,
+      message: "Такой аккаунт не найден.",
+    };
+  }
+
+  if (!admin.is_active) {
+    return {
+      success: false,
+      status: 403,
+      message: "Аккаунт администратора заблокирован.",
+    };
+  }
+
+  if (!admin.password_hash || admin.must_set_password) {
+    return {
+      success: true,
+      status: 200,
+      needPasswordCreate: true,
+      message: "У вас ещё нет пароля. Введите уникальный номер и создайте пароль.",
+      admin: {
+        username: admin.username,
+        fullName: admin.full_name,
+      },
+    };
+  }
+
+  return {
+    success: true,
+    status: 200,
+    needPasswordCreate: false,
+    message: "Введите пароль для входа.",
+  };
+}
+
+export async function createInitialAdminPassword({
+  username,
+  employeeNumber,
+  password,
+  repeatPassword,
+  ip,
+  userAgent,
+}) {
+  const cleanUsername = normalizeUsername(username);
+
+  if (!cleanUsername || !employeeNumber || !password || !repeatPassword) {
+    return {
+      success: false,
+      status: 400,
+      message: "Заполните логин, уникальный номер и пароль.",
+    };
+  }
+
+  if (password !== repeatPassword) {
+    return {
+      success: false,
+      status: 400,
+      message: "Пароли не совпадают.",
+    };
+  }
+
+  if (password.length < 8) {
+    return {
+      success: false,
+      status: 400,
+      message: "Пароль должен быть минимум 8 символов.",
+    };
+  }
+
+  if (!/^[0-9]+$/.test(employeeNumber)) {
+    return {
+      success: false,
+      status: 400,
+      message: "Уникальный номер должен состоять только из цифр.",
+    };
+  }
+
+  const { data: admins, error } = await supabase.rpc(
+    "set_site_admin_password",
+    {
+      input_username: cleanUsername,
+      input_employee_number: employeeNumber,
+      input_password: password,
+    }
+  );
+
+  if (error) {
+    console.error("SET ADMIN PASSWORD ERROR:", error);
+
+    return {
+      success: false,
+      status: 500,
+      message: "Ошибка создания пароля.",
+    };
+  }
+
+  const admin = admins?.[0];
+
+  if (!admin) {
+    return {
+      success: false,
+      status: 400,
+      message: "Неверный логин или уникальный номер.",
+    };
+  }
+
+  await addAuditLog({
+    adminId: admin.id,
+    action: "admin_password_created",
+    details: {
+      username: cleanUsername,
+    },
+    ip,
+    userAgent,
+  });
+
+  const token = createToken(admin);
+
+  return {
+    success: true,
+    status: 200,
+    message: "Пароль создан. Выполнен вход в систему.",
+    token,
+    admin: {
+      id: admin.id,
+      fullName: admin.full_name,
+      username: admin.username,
+      role: admin.role,
+      category: admin.category,
+    },
+  };
+}

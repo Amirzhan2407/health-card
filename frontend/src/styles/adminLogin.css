@@ -324,3 +324,43 @@
     min-height: 56px;
   }
 }
+
+
+.adminLoginNotice {
+  padding: 14px 16px;
+
+  border-radius: 16px;
+
+  background: rgba(250, 204, 21, 0.12);
+
+  border: 1px solid rgba(250, 204, 21, 0.28);
+
+  color: #fde68a;
+
+  font-size: 14px;
+  line-height: 1.5;
+
+  font-weight: 900;
+}
+
+.adminSecondaryBtn {
+  min-height: 50px;
+
+  border-radius: 16px;
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+
+  background: rgba(255, 255, 255, 0.06);
+
+  color: #ffffff;
+
+  font-weight: 950;
+
+  cursor: pointer;
+
+  transition: 0.2s;
+}
+
+.adminSecondaryBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
