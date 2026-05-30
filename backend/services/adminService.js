@@ -1,5 +1,4 @@
 import { createClient } from "@supabase/supabase-js";
-import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 
@@ -102,7 +101,6 @@ export async function loginAdmin({ username, password, ip, userAgent }) {
       if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
         const lockedUntil = new Date();
         lockedUntil.setMinutes(lockedUntil.getMinutes() + LOCK_MINUTES);
-
         updateData.locked_until = lockedUntil.toISOString();
       }
 
@@ -187,14 +185,27 @@ export async function getStaffList(currentAdmin) {
     return {
       success: false,
       status: 403,
-      message: "Недостаточно прав.",
+      message: "Страница доступна только главному админу.",
     };
   }
 
   const { data, error } = await supabase
     .from("site_admins")
     .select(
-      "id, full_name, username, role, category, is_active, created_at, last_login_at"
+      `
+      id,
+      full_name,
+      username,
+      employee_number,
+      birth_date,
+      role,
+      category,
+      is_active,
+      must_set_password,
+      password_created_at,
+      created_at,
+      last_login_at
+      `
     )
     .order("created_at", { ascending: true });
 
@@ -204,7 +215,7 @@ export async function getStaffList(currentAdmin) {
     return {
       success: false,
       status: 500,
-      message: "Ошибка получения сотрудников.",
+      message: "Ошибка получения админов.",
     };
   }
 
@@ -219,7 +230,8 @@ export async function createStaffAdmin({
   currentAdmin,
   fullName,
   username,
-  password,
+  birthDate,
+  role,
   category,
   ip,
   userAgent,
@@ -228,24 +240,41 @@ export async function createStaffAdmin({
     return {
       success: false,
       status: 403,
-      message: "Только главный админ может добавлять сотрудников.",
+      message: "Только главный админ может добавлять админов.",
     };
   }
 
-  if (!fullName || !username || !password || !category) {
+  if (!fullName || !username || !role || !category) {
     return {
       success: false,
       status: 400,
-      message: "Заполните ФИО, аккаунт, пароль и категорию.",
+      message: "Заполните ФИО, логин, роль и категорию.",
+    };
+  }
+
+  if (!birthDate) {
+    return {
+      success: false,
+      status: 400,
+      message: "Укажите дату рождения.",
+    };
+  }
+
+  const allowedRoles = ["super_admin", "site_support"];
+
+  if (!allowedRoles.includes(role)) {
+    return {
+      success: false,
+      status: 400,
+      message: "Неверная роль.",
     };
   }
 
   const allowedCategories = [
+    "all",
     "gov_polyclinics",
     "gov_hospitals",
     "private_clinics",
-    "medical_centers",
-    "labs",
   ];
 
   if (!allowedCategories.includes(category)) {
@@ -256,24 +285,61 @@ export async function createStaffAdmin({
     };
   }
 
+  if (role === "site_support" && category === "all") {
+    return {
+      success: false,
+      status: 400,
+      message: "Обычный админ не может иметь доступ ко всем категориям.",
+    };
+  }
+
   const cleanUsername = normalizeUsername(username);
 
-  const passwordHash = await bcrypt.hash(password, 12);
+  const { data: employeeNumberData, error: numberError } = await supabase.rpc(
+    "generate_admin_employee_number"
+  );
+
+  if (numberError || !employeeNumberData) {
+    console.error("GENERATE EMPLOYEE NUMBER ERROR:", numberError);
+
+    return {
+      success: false,
+      status: 500,
+      message: "Не удалось создать уникальный номер.",
+    };
+  }
 
   const { data, error } = await supabase
     .from("site_admins")
     .insert({
       full_name: fullName.trim(),
       username: cleanUsername,
-      password_hash: passwordHash,
-      role: "site_support",
-      category,
+      birth_date: birthDate,
+      employee_number: employeeNumberData,
+      password_hash: null,
+      role,
+      category: role === "super_admin" ? "all" : category,
       is_active: true,
+      must_set_password: true,
+      password_created_at: null,
       failed_attempts: 0,
       locked_until: null,
       created_by: currentAdmin.id,
     })
-    .select("id, full_name, username, role, category, is_active, created_at")
+    .select(
+      `
+      id,
+      full_name,
+      username,
+      employee_number,
+      birth_date,
+      role,
+      category,
+      is_active,
+      must_set_password,
+      created_at
+      `
+    )
     .single();
 
   if (error) {
@@ -283,23 +349,25 @@ export async function createStaffAdmin({
       return {
         success: false,
         status: 409,
-        message: "Такой аккаунт уже существует.",
+        message: "Такой логин или уникальный номер уже существует.",
       };
     }
 
     return {
       success: false,
       status: 500,
-      message: "Ошибка создания администратора.",
+      message: "Ошибка создания админа.",
     };
   }
 
   await addAuditLog({
     adminId: currentAdmin.id,
-    action: "admin_staff_created",
+    action: "admin_created",
     details: {
       createdAdminId: data.id,
       username: data.username,
+      employeeNumber: data.employee_number,
+      role: data.role,
       category: data.category,
     },
     ip,
@@ -313,9 +381,12 @@ export async function createStaffAdmin({
       id: data.id,
       fullName: data.full_name,
       username: data.username,
+      employeeNumber: data.employee_number,
+      birthDate: data.birth_date,
       role: data.role,
       category: data.category,
       isActive: data.is_active,
+      mustSetPassword: data.must_set_password,
       createdAt: data.created_at,
     },
   };
@@ -332,7 +403,7 @@ export async function changeStaffStatus({
     return {
       success: false,
       status: 403,
-      message: "Только главный админ может менять статус сотрудников.",
+      message: "Только главный админ может менять статус админов.",
     };
   }
 
@@ -352,7 +423,19 @@ export async function changeStaffStatus({
     })
     .eq("id", staffId)
     .neq("role", "super_admin")
-    .select("id, full_name, username, role, category, is_active")
+    .select(
+      `
+      id,
+      full_name,
+      username,
+      employee_number,
+      birth_date,
+      role,
+      category,
+      is_active,
+      must_set_password
+      `
+    )
     .single();
 
   if (error || !data) {
@@ -361,13 +444,13 @@ export async function changeStaffStatus({
     return {
       success: false,
       status: 404,
-      message: "Сотрудник не найден.",
+      message: "Админ не найден.",
     };
   }
 
   await addAuditLog({
     adminId: currentAdmin.id,
-    action: "admin_staff_status_changed",
+    action: "admin_status_changed",
     details: {
       staffId,
       isActive,
@@ -383,9 +466,12 @@ export async function changeStaffStatus({
       id: data.id,
       fullName: data.full_name,
       username: data.username,
+      employeeNumber: data.employee_number,
+      birthDate: data.birth_date,
       role: data.role,
       category: data.category,
       isActive: data.is_active,
+      mustSetPassword: data.must_set_password,
     },
   };
 }

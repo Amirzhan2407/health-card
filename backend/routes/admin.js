@@ -88,20 +88,21 @@ router.get("/staff", requireAdminAuth, async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Ошибка получения сотрудников.",
+      message: "Ошибка получения админов.",
     });
   }
 });
 
 router.post("/staff", requireAdminAuth, async (req, res) => {
   try {
-    const { fullName, username, password, category } = req.body;
+    const { fullName, username, birthDate, role, category } = req.body;
 
     const result = await createStaffAdmin({
       currentAdmin: req.admin,
       fullName,
       username,
-      password,
+      birthDate,
+      role,
       category,
       ip: getClientIp(req),
       userAgent: getUserAgent(req),
@@ -113,7 +114,7 @@ router.post("/staff", requireAdminAuth, async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Ошибка создания сотрудника.",
+      message: "Ошибка создания админа.",
     });
   }
 });

@@ -373,7 +373,7 @@
 
 .adminStaffTable .adminTableHead,
 .adminStaffTable .adminTableRow {
-  grid-template-columns: 1.8fr 1.2fr 1fr 1.5fr 1fr 1.2fr;
+  grid-template-columns: 1.1fr 1.6fr 1.1fr 1.1fr 1fr 1.4fr 1fr 1.2fr;
 }
 
 .orgTable .adminTableHead,
@@ -681,4 +681,42 @@
   .adminSaveBtn {
     width: 100%;
   }
+}
+
+
+
+
+.adminErrorBox {
+  margin-bottom: 18px;
+
+  padding: 14px 16px;
+
+  border-radius: 16px;
+
+  background: rgba(239, 68, 68, 0.14);
+
+  border: 1px solid rgba(239, 68, 68, 0.28);
+
+  color: #fecaca;
+
+  font-weight: 900;
+}
+
+.adminLoadingText {
+  padding: 20px;
+
+  color: #94a3b8;
+
+  font-weight: 900;
+}
+
+.adminNeedPassword {
+  display: block;
+
+  margin-top: 6px;
+
+  color: #facc15;
+
+  font-size: 11px;
+  font-weight: 900;
 }

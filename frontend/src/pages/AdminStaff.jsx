@@ -1,5 +1,18 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "../styles/adminLayout.css";
+
+const API_URL = "https://health-card.onrender.com";
+
+const roleOptions = [
+  {
+    value: "super_admin",
+    label: "Главный админ",
+  },
+  {
+    value: "site_support",
+    label: "Обычный админ",
+  },
+];
 
 const categoryOptions = [
   {
@@ -14,192 +27,297 @@ const categoryOptions = [
     value: "private_clinics",
     label: "Частные клиники",
   },
-  {
-    value: "medical_centers",
-    label: "Медицинские центры",
-  },
-  {
-    value: "labs",
-    label: "Лаборатории / анализы",
-  },
 ];
 
-const initialAdmins = [
-  {
-    id: 1,
-    fullName: "Ещанов Амиржан Галинурович",
-    username: "Amir_zhan_07",
-    role: "super_admin",
-    category: "all",
-    status: "active",
-  },
-  {
-    id: 2,
-    fullName: "Админ Поликлиник 1",
-    username: "support_poly_1",
-    role: "site_support",
-    category: "gov_polyclinics",
-    status: "active",
-  },
-  {
-    id: 3,
-    fullName: "Админ Больниц 1",
-    username: "support_hospital_1",
-    role: "site_support",
-    category: "gov_hospitals",
-    status: "active",
-  },
-  {
-    id: 4,
-    fullName: "Админ Частных Клиник",
-    username: "support_private",
-    role: "site_support",
-    category: "private_clinics",
-    status: "active",
-  },
-];
+function roleLabel(value) {
+  if (value === "super_admin") return "Главный админ";
+  if (value === "site_support") return "Обычный админ";
+  return "Не указано";
+}
 
 function categoryLabel(value) {
   if (value === "all") return "Все категории";
 
   return (
-    categoryOptions.find((item) => item.value === value)?.label ||
-    "Не указано"
+    categoryOptions.find((item) => item.value === value)?.label || "Не указано"
   );
 }
 
+function formatDate(date) {
+  if (!date) return "Не указано";
+
+  return new Date(date).toLocaleDateString("ru-RU");
+}
+
 export default function AdminStaff() {
-  const [admins, setAdmins] = useState(initialAdmins);
+  const [admins, setAdmins] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [error, setError] = useState("");
   const [open, setOpen] = useState(false);
 
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [role, setRole] = useState("site_support");
   const [category, setCategory] = useState("gov_polyclinics");
+
+  const adminData = JSON.parse(localStorage.getItem("adminData") || "null");
+  const token = adminData?.token;
+
+  const isSuperAdmin = adminData?.role === "super_admin";
 
   const resetForm = () => {
     setFullName("");
     setUsername("");
-    setPassword("");
+    setBirthDate("");
+    setRole("site_support");
     setCategory("gov_polyclinics");
   };
 
-  const addAdmin = () => {
+  const loadAdmins = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const response = await fetch(`${API_URL}/api/admin/staff`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Не удалось загрузить админов.");
+      }
+
+      setAdmins(data.staff || []);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Ошибка загрузки админов.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (token && isSuperAdmin) {
+      loadAdmins();
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  const addAdmin = async () => {
     if (!fullName.trim()) {
-      alert("Введите ФИО администратора");
+      alert("Введите ФИО админа");
       return;
     }
 
     if (!username.trim()) {
-      alert("Введите название аккаунта");
+      alert("Введите логин админа");
       return;
     }
 
-    if (!password.trim()) {
-      alert("Введите пароль");
+    if (!birthDate) {
+      alert("Укажите дату рождения");
       return;
     }
 
-    const exists = admins.some(
-      (admin) => admin.username.toLowerCase() === username.trim().toLowerCase()
-    );
-
-    if (exists) {
-      alert("Такое название аккаунта уже существует");
+    if (role === "site_support" && category === "all") {
+      alert("Обычный админ не может иметь доступ ко всем категориям");
       return;
     }
 
-    const newAdmin = {
-      id: Date.now(),
-      fullName: fullName.trim(),
-      username: username.trim(),
-      role: "site_support",
-      category,
-      status: "active",
-    };
+    try {
+      setSaving(true);
+      setError("");
 
-    setAdmins((prev) => [...prev, newAdmin]);
-    resetForm();
-    setOpen(false);
+      const response = await fetch(`${API_URL}/api/admin/staff`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          fullName: fullName.trim(),
+          username: username.trim(),
+          birthDate,
+          role,
+          category: role === "super_admin" ? "all" : category,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Не удалось добавить админа.");
+      }
+
+      resetForm();
+      setOpen(false);
+      await loadAdmins();
+
+      alert(
+        `Админ создан.\n\nЛогин: ${data.admin.username}\nУникальный номер: ${data.admin.employeeNumber}`
+      );
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Ошибка создания админа.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const toggleStatus = (id) => {
-    setAdmins((prev) =>
-      prev.map((admin) =>
-        admin.id === id
-          ? {
-              ...admin,
-              status: admin.status === "active" ? "blocked" : "active",
-            }
-          : admin
-      )
-    );
+  const toggleStatus = async (admin) => {
+    if (admin.role === "super_admin") return;
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/admin/staff/${admin.id}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            isActive: !admin.is_active,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Не удалось изменить статус.");
+      }
+
+      await loadAdmins();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Ошибка изменения статуса.");
+    }
   };
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="adminPage">
+        <div className="adminPageHeader">
+          <div>
+            <h1>Нет доступа</h1>
+            <p>Страница “Админы” доступна только главному админу.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="adminPage">
       <div className="adminPageHeader">
         <div>
-          <h1>Сотрудники техподдержки</h1>
+          <h1>Админы</h1>
           <p>
-            Главный админ создаёт аккаунты сотрудников и назначает им категорию
-            ответственности.
+            Главный админ создаёт аккаунты сотрудников и назначает им роль и
+            категорию ответственности.
           </p>
         </div>
 
-        <button className="adminPrimaryBtn" type="button" onClick={() => setOpen(true)}>
+        <button
+          className="adminPrimaryBtn"
+          type="button"
+          onClick={() => setOpen(true)}
+        >
           + Добавить админа
         </button>
       </div>
 
-      <div className="adminTableCard">
-        <div className="adminTable adminStaffTable">
-          <div className="adminTableHead">
-            <span>ФИО</span>
-            <span>Аккаунт</span>
-            <span>Роль</span>
-            <span>Категория</span>
-            <span>Статус</span>
-            <span>Действие</span>
-          </div>
+      {error && <div className="adminErrorBox">{error}</div>}
 
-          {admins.map((admin) => (
-            <div className="adminTableRow" key={admin.id}>
-              <span className="strongText">{admin.fullName}</span>
-              <span>{admin.username}</span>
-              <span>{admin.role}</span>
-              <span>{categoryLabel(admin.category)}</span>
-              <span>
-                <b className={`statusPill ${admin.status}`}>
-                  {admin.status === "active" ? "Активен" : "Заблокирован"}
-                </b>
-              </span>
-              <span>
-                {admin.role === "super_admin" ? (
-                  <button className="adminSmallBtn disabled" type="button" disabled>
-                    Главный
-                  </button>
-                ) : (
-                  <button
-                    className="adminSmallBtn"
-                    type="button"
-                    onClick={() => toggleStatus(admin.id)}
-                  >
-                    {admin.status === "active" ? "Заблокировать" : "Разблокировать"}
-                  </button>
-                )}
-              </span>
+      <div className="adminTableCard">
+        {loading ? (
+          <div className="adminLoadingText">Загрузка админов...</div>
+        ) : (
+          <div className="adminTable adminStaffTable">
+            <div className="adminTableHead">
+              <span>Логин</span>
+              <span>ФИО</span>
+              <span>Уникальный номер</span>
+              <span>Дата рождения</span>
+              <span>Роль</span>
+              <span>Категория</span>
+              <span>Статус</span>
+              <span>Действие</span>
             </div>
-          ))}
-        </div>
+
+            {admins.map((admin) => (
+              <div className="adminTableRow" key={admin.id}>
+                <span className="strongText">{admin.username}</span>
+                <span>{admin.full_name}</span>
+                <span>{admin.employee_number || "—"}</span>
+                <span>{formatDate(admin.birth_date)}</span>
+                <span>{roleLabel(admin.role)}</span>
+                <span>{categoryLabel(admin.category)}</span>
+
+                <span>
+                  <b
+                    className={`statusPill ${
+                      admin.is_active ? "active" : "blocked"
+                    }`}
+                  >
+                    {admin.is_active ? "Активен" : "Заблокирован"}
+                  </b>
+
+                  {admin.must_set_password && (
+                    <small className="adminNeedPassword">
+                      Пароль не создан
+                    </small>
+                  )}
+                </span>
+
+                <span>
+                  {admin.role === "super_admin" ? (
+                    <button
+                      className="adminSmallBtn disabled"
+                      type="button"
+                      disabled
+                    >
+                      Главный
+                    </button>
+                  ) : (
+                    <button
+                      className="adminSmallBtn"
+                      type="button"
+                      onClick={() => toggleStatus(admin)}
+                    >
+                      {admin.is_active ? "Заблокировать" : "Разблокировать"}
+                    </button>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {open && (
         <div className="adminModalOverlay" onClick={() => setOpen(false)}>
           <div className="adminModal" onClick={(e) => e.stopPropagation()}>
-            <div className="adminModalTitle">Добавить администратора</div>
+            <div className="adminModalTitle">Добавить админа</div>
 
             <div className="adminModalBody">
+              <div className="adminField">
+                <label>Логин</label>
+                <input
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Например: support_poly_1"
+                />
+              </div>
+
               <div className="adminField">
                 <label>ФИО</label>
                 <input
@@ -210,30 +328,18 @@ export default function AdminStaff() {
               </div>
 
               <div className="adminField">
-                <label>Название аккаунта</label>
+                <label>Дата рождения</label>
                 <input
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Например: support_poly_1"
+                  type="date"
+                  value={birthDate}
+                  onChange={(e) => setBirthDate(e.target.value)}
                 />
               </div>
 
               <div className="adminField">
-                <label>Пароль для авторизации</label>
-                <input
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Например: Aa123456*"
-                />
-              </div>
-
-              <div className="adminField">
-                <label>Категория ответственности</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                >
-                  {categoryOptions.map((item) => (
+                <label>Роль</label>
+                <select value={role} onChange={(e) => setRole(e.target.value)}>
+                  {roleOptions.map((item) => (
                     <option value={item.value} key={item.value}>
                       {item.label}
                     </option>
@@ -241,19 +347,52 @@ export default function AdminStaff() {
                 </select>
               </div>
 
+              {role === "site_support" && (
+                <div className="adminField">
+                  <label>Категория ответственности</label>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                  >
+                    {categoryOptions.map((item) => (
+                      <option value={item.value} key={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {role === "super_admin" && (
+                <div className="adminHintBox">
+                  Для главного админа категория автоматически будет “Все
+                  категории”.
+                </div>
+              )}
+
               <div className="adminHintBox">
-                После подключения backend пароль будет сохраняться в базе только
-                как хэш. Обычный пароль в базе храниться не будет.
+                Уникальный номер создаётся автоматически. Пароль главный админ
+                не задаёт. Новый админ получит логин и уникальный номер, после
+                чего сам создаст пароль при первом входе.
               </div>
             </div>
 
             <div className="adminModalActions">
-              <button className="adminCancelBtn" type="button" onClick={() => setOpen(false)}>
+              <button
+                className="adminCancelBtn"
+                type="button"
+                onClick={() => setOpen(false)}
+              >
                 Отмена
               </button>
 
-              <button className="adminSaveBtn" type="button" onClick={addAdmin}>
-                Добавить
+              <button
+                className="adminSaveBtn"
+                type="button"
+                onClick={addAdmin}
+                disabled={saving}
+              >
+                {saving ? "Создание..." : "Добавить"}
               </button>
             </div>
           </div>
