@@ -40,13 +40,17 @@ export function verifyAdminToken(token) {
 }
 
 export async function addAuditLog({ adminId, action, details, ip, userAgent }) {
-  await supabase.from("admin_audit_logs").insert({
-    admin_id: adminId || null,
-    action,
-    details: details || {},
-    ip_address: ip || null,
-    user_agent: userAgent || null,
-  });
+  try {
+    await supabase.from("admin_audit_logs").insert({
+      admin_id: adminId || null,
+      action,
+      details: details || {},
+      ip_address: ip || null,
+      user_agent: userAgent || null,
+    });
+  } catch (error) {
+    console.error("AUDIT LOG ERROR:", error.message);
+  }
 }
 
 export async function loginAdmin({ username, password, ip, userAgent }) {
@@ -60,13 +64,65 @@ export async function loginAdmin({ username, password, ip, userAgent }) {
     };
   }
 
-  const { data: admin, error } = await supabase
-    .from("site_admins")
-    .select("*")
-    .eq("username", cleanUsername)
-    .single();
+  const { data: foundAdmins, error: checkError } = await supabase.rpc(
+    "check_site_admin_password",
+    {
+      input_username: cleanUsername,
+      input_password: password,
+    }
+  );
 
-  if (error || !admin) {
+  if (checkError) {
+    console.error("PASSWORD CHECK ERROR:", checkError);
+
+    return {
+      success: false,
+      status: 500,
+      message: "Ошибка проверки пароля.",
+    };
+  }
+
+  const admin = foundAdmins?.[0];
+
+  if (!admin) {
+    const { data: existingAdmin } = await supabase
+      .from("site_admins")
+      .select("id, failed_attempts")
+      .eq("username", cleanUsername)
+      .single();
+
+    if (existingAdmin) {
+      const failedAttempts = Number(existingAdmin.failed_attempts || 0) + 1;
+
+      const updateData = {
+        failed_attempts: failedAttempts,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
+        const lockedUntil = new Date();
+        lockedUntil.setMinutes(lockedUntil.getMinutes() + LOCK_MINUTES);
+
+        updateData.locked_until = lockedUntil.toISOString();
+      }
+
+      await supabase
+        .from("site_admins")
+        .update(updateData)
+        .eq("id", existingAdmin.id);
+
+      await addAuditLog({
+        adminId: existingAdmin.id,
+        action: "admin_login_failed",
+        details: {
+          username: cleanUsername,
+          failedAttempts,
+        },
+        ip,
+        userAgent,
+      });
+    }
+
     return {
       success: false,
       status: 401,
@@ -87,45 +143,6 @@ export async function loginAdmin({ username, password, ip, userAgent }) {
       success: false,
       status: 423,
       message: "Слишком много попыток входа. Попробуйте позже.",
-    };
-  }
-
-  const passwordOk = await bcrypt.compare(password, admin.password_hash);
-
-  if (!passwordOk) {
-    const failedAttempts = Number(admin.failed_attempts || 0) + 1;
-
-    const updateData = {
-      failed_attempts: failedAttempts,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
-      const lockedUntil = new Date();
-      lockedUntil.setMinutes(lockedUntil.getMinutes() + LOCK_MINUTES);
-      updateData.locked_until = lockedUntil.toISOString();
-    }
-
-    await supabase
-      .from("site_admins")
-      .update(updateData)
-      .eq("id", admin.id);
-
-    await addAuditLog({
-      adminId: admin.id,
-      action: "admin_login_failed",
-      details: {
-        username: cleanUsername,
-        failedAttempts,
-      },
-      ip,
-      userAgent,
-    });
-
-    return {
-      success: false,
-      status: 401,
-      message: "Неверный аккаунт или пароль.",
     };
   }
 
@@ -182,6 +199,8 @@ export async function getStaffList(currentAdmin) {
     .order("created_at", { ascending: true });
 
   if (error) {
+    console.error("GET STAFF ERROR:", error);
+
     return {
       success: false,
       status: 500,
@@ -237,23 +256,29 @@ export async function createStaffAdmin({
     };
   }
 
+  const cleanUsername = normalizeUsername(username);
+
   const passwordHash = await bcrypt.hash(password, 12);
 
   const { data, error } = await supabase
     .from("site_admins")
     .insert({
       full_name: fullName.trim(),
-      username: username.trim(),
+      username: cleanUsername,
       password_hash: passwordHash,
       role: "site_support",
       category,
       is_active: true,
+      failed_attempts: 0,
+      locked_until: null,
       created_by: currentAdmin.id,
     })
     .select("id, full_name, username, role, category, is_active, created_at")
     .single();
 
   if (error) {
+    console.error("CREATE STAFF ERROR:", error);
+
     if (error.code === "23505") {
       return {
         success: false,
@@ -284,7 +309,15 @@ export async function createStaffAdmin({
   return {
     success: true,
     status: 201,
-    admin: data,
+    admin: {
+      id: data.id,
+      fullName: data.full_name,
+      username: data.username,
+      role: data.role,
+      category: data.category,
+      isActive: data.is_active,
+      createdAt: data.created_at,
+    },
   };
 }
 
@@ -323,6 +356,8 @@ export async function changeStaffStatus({
     .single();
 
   if (error || !data) {
+    console.error("CHANGE STAFF STATUS ERROR:", error);
+
     return {
       success: false,
       status: 404,
@@ -344,6 +379,13 @@ export async function changeStaffStatus({
   return {
     success: true,
     status: 200,
-    admin: data,
+    admin: {
+      id: data.id,
+      fullName: data.full_name,
+      username: data.username,
+      role: data.role,
+      category: data.category,
+      isActive: data.is_active,
+    },
   };
 }
