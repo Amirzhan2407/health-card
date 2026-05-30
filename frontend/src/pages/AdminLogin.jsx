@@ -7,7 +7,7 @@ const API_URL = "https://health-card.onrender.com";
 export default function AdminLogin() {
   const navigate = useNavigate();
 
-  const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
   const [showPassword, setShowPassword] = useState(false);
@@ -17,8 +17,8 @@ export default function AdminLogin() {
   const loginAdmin = async () => {
     setError("");
 
-    if (!fullName.trim()) {
-      setError("Введите ФИО администратора.");
+    if (!username.trim()) {
+      setError("Введите название аккаунта.");
       return;
     }
 
@@ -35,9 +35,8 @@ export default function AdminLogin() {
         headers: {
           "Content-Type": "application/json",
         },
-
         body: JSON.stringify({
-          fullName: fullName.trim(),
+          username: username.trim(),
           password: password.trim(),
         }),
       });
@@ -52,8 +51,10 @@ export default function AdminLogin() {
         "adminData",
         JSON.stringify({
           id: data.admin.id,
+          username: data.admin.username,
           fullName: data.admin.fullName,
           role: data.admin.role,
+          category: data.admin.category,
           token: data.token,
         })
       );
@@ -90,14 +91,14 @@ export default function AdminLogin() {
 
         <div className="adminLoginForm">
           <div className="adminLoginField">
-            <label>ФИО администратора</label>
+            <label>Название аккаунта</label>
             <input
               type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               onKeyDown={onKeyDown}
-              placeholder="Например: Ещанов Амиржан Галинурович"
-              autoComplete="off"
+              placeholder="Например: Amir_zhan_07"
+              autoComplete="username"
             />
           </div>
 
