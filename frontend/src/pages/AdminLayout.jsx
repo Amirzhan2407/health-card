@@ -14,7 +14,7 @@ const allNavItems = [
   },
   {
     to: "/admin-panel/orgs",
-    label: "Организации",
+    label: "Заявления",
     roles: ["super_admin", "site_support"],
   },
   {
