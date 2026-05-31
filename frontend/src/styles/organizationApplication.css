@@ -1,0 +1,374 @@
+.orgApplicationPage {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+
+  position: relative;
+
+  overflow-x: hidden;
+
+  padding: 34px;
+
+  box-sizing: border-box;
+
+  background:
+    radial-gradient(circle at 10% 10%, rgba(0, 165, 80, 0.14), transparent 30%),
+    radial-gradient(circle at 90% 10%, rgba(0, 255, 255, 0.08), transparent 28%),
+    linear-gradient(135deg, #07111f 0%, #0b1728 46%, #07111f 100%);
+
+  color: #f8fafc;
+}
+
+.orgApplicationDecor {
+  position: absolute;
+
+  border-radius: 50%;
+
+  pointer-events: none;
+}
+
+.orgApplicationDecor.one {
+  width: 380px;
+  height: 380px;
+
+  top: -120px;
+  left: -100px;
+
+  background: rgba(0, 165, 80, 0.13);
+
+  filter: blur(2px);
+}
+
+.orgApplicationDecor.two {
+  width: 420px;
+  height: 420px;
+
+  right: -140px;
+  bottom: -160px;
+
+  background: rgba(0, 255, 255, 0.07);
+
+  filter: blur(2px);
+}
+
+.orgApplicationContainer {
+  width: 100%;
+  max-width: 1100px;
+
+  margin: 0 auto;
+
+  position: relative;
+  z-index: 2;
+}
+
+.orgApplicationHeader {
+  margin-bottom: 28px;
+}
+
+.orgApplicationBadge {
+  width: fit-content;
+
+  margin-bottom: 16px;
+
+  padding: 10px 14px;
+
+  border-radius: 999px;
+
+  background: rgba(0, 255, 255, 0.1);
+
+  border: 1px solid rgba(0, 255, 255, 0.16);
+
+  color: #00ffff;
+
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.orgApplicationHeader h1 {
+  margin: 0;
+
+  font-size: 44px;
+  font-weight: 950;
+
+  letter-spacing: -0.6px;
+
+  color: #ffffff;
+}
+
+.orgApplicationHeader p {
+  max-width: 780px;
+
+  margin: 12px 0 0;
+
+  color: #94a3b8;
+
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.orgApplicationForm {
+  display: grid;
+
+  gap: 20px;
+}
+
+.orgFormCard,
+.orgSuccessCard {
+  padding: 26px;
+
+  border-radius: 28px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(15, 23, 42, 0.94),
+      rgba(17, 24, 39, 0.98)
+    );
+
+  border: 1px solid rgba(255, 255, 255, 0.06);
+
+  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.24);
+}
+
+.orgFormTitle {
+  display: flex;
+  align-items: flex-start;
+
+  gap: 14px;
+
+  margin-bottom: 20px;
+}
+
+.orgFormTitle span {
+  width: 38px;
+  height: 38px;
+
+  flex: 0 0 38px;
+
+  border-radius: 14px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #00a550;
+
+  color: #ffffff;
+
+  font-weight: 950;
+}
+
+.orgFormTitle h2 {
+  margin: 0;
+
+  color: #ffffff;
+
+  font-size: 24px;
+  font-weight: 950;
+}
+
+.orgFormTitle p {
+  margin: 6px 0 0;
+
+  color: #94a3b8;
+
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.orgFormGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  gap: 16px;
+}
+
+.orgField {
+  display: grid;
+
+  gap: 8px;
+}
+
+.orgField.wide {
+  grid-column: 1 / -1;
+}
+
+.orgField label {
+  color: #cbd5e1;
+
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.orgField input,
+.orgField select,
+.orgField textarea {
+  width: 100%;
+
+  border-radius: 16px;
+
+  border: 1px solid #334155;
+
+  background: rgba(17, 24, 39, 0.92);
+
+  color: #f8fafc;
+
+  outline: none;
+
+  box-sizing: border-box;
+
+  font-size: 15px;
+  font-family: inherit;
+
+  transition: 0.2s;
+}
+
+.orgField input,
+.orgField select {
+  min-height: 52px;
+
+  padding: 12px 14px;
+}
+
+.orgField textarea {
+  min-height: 110px;
+
+  padding: 14px;
+
+  resize: vertical;
+}
+
+.orgField input::placeholder,
+.orgField textarea::placeholder {
+  color: #64748b;
+}
+
+.orgField input:focus,
+.orgField select:focus,
+.orgField textarea:focus {
+  border-color: #00a550;
+
+  box-shadow: 0 0 0 4px rgba(0, 165, 80, 0.14);
+}
+
+.orgApplicationActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.orgApplicationActions button,
+.orgSuccessCard button {
+  min-height: 56px;
+
+  padding: 0 24px;
+
+  border: none;
+  border-radius: 18px;
+
+  background: linear-gradient(135deg, #00a550, #00c46a);
+
+  color: #ffffff;
+
+  font-weight: 950;
+  font-size: 15px;
+
+  cursor: pointer;
+
+  box-shadow: 0 16px 34px rgba(0, 165, 80, 0.26);
+
+  transition: 0.2s;
+}
+
+.orgApplicationActions button:hover,
+.orgSuccessCard button:hover {
+  transform: translateY(-2px);
+}
+
+.orgSuccessCard {
+  text-align: center;
+
+  max-width: 680px;
+
+  margin: 0 auto;
+}
+
+.orgSuccessIcon {
+  width: 64px;
+  height: 64px;
+
+  margin: 0 auto 18px;
+
+  border-radius: 22px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #00a550;
+
+  color: #ffffff;
+
+  font-size: 34px;
+  font-weight: 950;
+}
+
+.orgSuccessCard h2 {
+  margin: 0;
+
+  color: #ffffff;
+
+  font-size: 30px;
+  font-weight: 950;
+}
+
+.orgSuccessCard p {
+  margin: 14px auto 22px;
+
+  color: #cbd5e1;
+
+  line-height: 1.7;
+
+  max-width: 560px;
+}
+
+/* MOBILE */
+
+@media (max-width: 700px) {
+  .orgApplicationPage {
+    padding: 22px 16px;
+
+    overflow-y: auto;
+
+    overscroll-behavior: contain;
+
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .orgApplicationHeader h1 {
+    font-size: 32px;
+  }
+
+  .orgApplicationHeader p {
+    font-size: 14px;
+  }
+
+  .orgFormCard,
+  .orgSuccessCard {
+    padding: 20px;
+
+    border-radius: 24px;
+  }
+
+  .orgFormGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .orgApplicationActions {
+    justify-content: stretch;
+  }
+
+  .orgApplicationActions button,
+  .orgSuccessCard button {
+    width: 100%;
+  }
+}

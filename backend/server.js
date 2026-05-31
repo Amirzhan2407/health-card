@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import pharmacyRoutes from "./routes/pharmacy.js";
 import aiRoutes from "./routes/ai.js";
 import adminRoutes from "./routes/admin.js";
+import organizationApplicationRoutes from "./routes/organizationApplications.js";
 
 dotenv.config();
 
@@ -16,6 +17,7 @@ app.use(express.json());
 app.use("/api/pharmacy", pharmacyRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/organization-applications", organizationApplicationRoutes);
 
 const PORT = process.env.PORT || 5000;
 

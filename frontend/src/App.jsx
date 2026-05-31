@@ -19,6 +19,7 @@ import AdminStaff from "./pages/AdminStaff";
 import AdminOrganizations from "./pages/AdminOrganizations";
 import AdminAuditLogs from "./pages/AdminAuditLogs";
 import AdminRoles from "./pages/AdminRoles";
+import OrganizationApplication from "./pages/OrganizationApplication";
 
 export default function App() {
   return (
@@ -48,6 +49,12 @@ export default function App() {
       </Route>
 
       <Route path="*" element={<Navigate to="/home" replace />} />
+
+
+      <Route
+  path="/organization-application"
+  element={<OrganizationApplication />}
+/>
     </Routes>
   );
 }
