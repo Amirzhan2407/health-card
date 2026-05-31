@@ -1,6 +1,8 @@
 import { useState } from "react";
 import "../styles/organizationApplication.css";
 
+const API_URL = "https://health-card.onrender.com";
+
 const organizationTypes = [
   {
     value: "gov_polyclinics",
@@ -44,19 +46,22 @@ export default function OrganizationApplication() {
     chiefDoctorFullName: "",
 
     senderFullName: "",
-    senderPosition: "",
     senderPhone: "",
     senderEmail: "",
-
-    medicalLicenseInfo: "",
-    registrationDocumentInfo: "",
-    chiefDoctorOrderInfo: "",
-    additionalDocumentsInfo: "",
 
     comment: "",
   });
 
+  const [files, setFiles] = useState({
+    medicalLicenseFile: null,
+    registrationDocumentFile: null,
+    chiefDoctorOrderFile: null,
+    additionalDocuments: [],
+  });
+
   const [success, setSuccess] = useState(false);
+  const [applicationNumber, setApplicationNumber] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const updateField = (field, value) => {
     setForm((prev) => ({
@@ -65,69 +70,137 @@ export default function OrganizationApplication() {
     }));
   };
 
+  const updateFile = (field, file) => {
+    setFiles((prev) => ({
+      ...prev,
+      [field]: file,
+    }));
+  };
+
   const onlyDigits = (value) => {
     return value.replace(/\D/g, "");
   };
 
+  const resetForm = () => {
+    setForm({
+      applicationType: "open_organization",
+
+      organizationName: "",
+      organizationType: "gov_polyclinics",
+      bin: "",
+      city: "",
+      address: "",
+
+      chiefDoctorFullName: "",
+
+      senderFullName: "",
+      senderPhone: "",
+      senderEmail: "",
+
+      comment: "",
+    });
+
+    setFiles({
+      medicalLicenseFile: null,
+      registrationDocumentFile: null,
+      chiefDoctorOrderFile: null,
+      additionalDocuments: [],
+    });
+
+    setApplicationNumber("");
+    setSuccess(false);
+  };
+
   const submitApplication = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (!form.organizationName.trim()) {
-    alert("Введите название организации");
-    return;
-  }
+    if (loading) return;
 
-  if (!form.bin.trim() || form.bin.length !== 12) {
-    alert("Введите корректный БИН организации. БИН должен состоять из 12 цифр.");
-    return;
-  }
-
-  if (!form.city.trim()) {
-    alert("Введите город");
-    return;
-  }
-
-  if (!form.address.trim()) {
-    alert("Введите адрес организации");
-    return;
-  }
-
-  if (!form.chiefDoctorFullName.trim()) {
-    alert("Введите ФИО главного врача");
-    return;
-  }
-
-  if (!form.senderFullName.trim()) {
-    alert("Введите ФИО отправителя заявки");
-    return;
-  }
-
-  try {
-    const response = await fetch(
-      "https://health-card.onrender.com/api/organization-applications",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(form),
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok || !data.success) {
-      throw new Error(data.message || "Не удалось отправить заявку.");
+    if (!form.organizationName.trim()) {
+      alert("Введите название организации");
+      return;
     }
 
-    console.log("Заявка создана:", data.application);
+    if (!form.bin.trim() || form.bin.length !== 12) {
+      alert("Введите корректный БИН организации. БИН должен состоять из 12 цифр.");
+      return;
+    }
 
-    setSuccess(true);
-  } catch (error) {
-    console.error(error);
-    alert(error.message || "Ошибка отправки заявки.");
-  }
-};
+    if (!form.city.trim()) {
+      alert("Введите город");
+      return;
+    }
+
+    if (!form.address.trim()) {
+      alert("Введите адрес организации");
+      return;
+    }
+
+    if (!form.chiefDoctorFullName.trim()) {
+      alert("Введите ФИО главного врача");
+      return;
+    }
+
+    if (!form.senderFullName.trim()) {
+      alert("Введите ФИО отправителя заявки");
+      return;
+    }
+
+    if (!files.medicalLicenseFile) {
+      alert("Загрузите лицензию на медицинскую деятельность");
+      return;
+    }
+
+    if (!files.registrationDocumentFile) {
+      alert("Загрузите документ о регистрации организации");
+      return;
+    }
+
+    if (!files.chiefDoctorOrderFile) {
+      alert("Загрузите документ о назначении главного врача");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const formData = new FormData();
+
+      Object.entries(form).forEach(([key, value]) => {
+        formData.append(key, value);
+      });
+
+      formData.append("medicalLicenseFile", files.medicalLicenseFile);
+      formData.append(
+        "registrationDocumentFile",
+        files.registrationDocumentFile
+      );
+      formData.append("chiefDoctorOrderFile", files.chiefDoctorOrderFile);
+
+      files.additionalDocuments.forEach((file) => {
+        formData.append("additionalDocuments", file);
+      });
+
+      const response = await fetch(`${API_URL}/api/organization-applications`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Не удалось отправить заявку.");
+      }
+
+      setApplicationNumber(data.application?.applicationNumber || "");
+      setSuccess(true);
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Ошибка отправки заявки.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="orgApplicationPage">
@@ -141,8 +214,9 @@ export default function OrganizationApplication() {
           <h1>Подать заявку на подключение</h1>
 
           <p>
-            Заполните данные медицинской организации. После отправки заявка
-            попадёт в админ-панель, где её проверит ответственный сотрудник.
+            Заполните данные медицинской организации и прикрепите документы.
+            После отправки заявка попадёт в админ-панель, где её проверит
+            ответственный сотрудник.
           </p>
         </div>
 
@@ -152,6 +226,12 @@ export default function OrganizationApplication() {
 
             <h2>Заявка отправлена</h2>
 
+            {applicationNumber && (
+              <div className="orgApplicationNumber">
+                Номер заявки: <b>{applicationNumber}</b>
+              </div>
+            )}
+
             <p>
               Ваша заявка принята в обработку. После проверки данных
               администратор изменит статус заявки. Если данных будет
@@ -159,7 +239,7 @@ export default function OrganizationApplication() {
               комментарием.
             </p>
 
-            <button type="button" onClick={() => setSuccess(false)}>
+            <button type="button" onClick={resetForm}>
               Отправить ещё одну заявку
             </button>
           </div>
@@ -282,32 +362,21 @@ export default function OrganizationApplication() {
                 <div>
                   <h2>Данные отправителя</h2>
                   <p>
-                    Эти данные нужны, чтобы администратор понимал, кто отправил
-                    заявление от имени организации.
+                    Заявку должен отправлять главный врач или представитель,
+                    который действует от имени медицинской организации.
                   </p>
                 </div>
               </div>
 
               <div className="orgFormGrid">
-                <div className="orgField">
+                <div className="orgField wide">
                   <label>ФИО отправителя</label>
                   <input
                     value={form.senderFullName}
                     onChange={(e) =>
                       updateField("senderFullName", e.target.value)
                     }
-                    placeholder="Например: Петров Пётр Петрович"
-                  />
-                </div>
-
-                <div className="orgField">
-                  <label>Должность отправителя</label>
-                  <input
-                    value={form.senderPosition}
-                    onChange={(e) =>
-                      updateField("senderPosition", e.target.value)
-                    }
-                    placeholder="Например: сотрудник администрации"
+                    placeholder="Например: Иванов Иван Иванович"
                   />
                 </div>
 
@@ -341,8 +410,8 @@ export default function OrganizationApplication() {
                 <div>
                   <h2>Документы</h2>
                   <p>
-                    Пока документы указываются текстом. Позже сюда можно
-                    добавить загрузку файлов.
+                    Загрузите документы в формате PDF или фото. Разрешены PDF,
+                    JPG, PNG и WEBP.
                   </p>
                 </div>
               </div>
@@ -350,46 +419,83 @@ export default function OrganizationApplication() {
               <div className="orgFormGrid">
                 <div className="orgField wide">
                   <label>Лицензия на медицинскую деятельность</label>
-                  <textarea
-                    value={form.medicalLicenseInfo}
+                  <input
+                    type="file"
+                    accept=".pdf,image/jpeg,image/png,image/webp"
                     onChange={(e) =>
-                      updateField("medicalLicenseInfo", e.target.value)
+                      updateFile(
+                        "medicalLicenseFile",
+                        e.target.files?.[0] || null
+                      )
                     }
-                    placeholder="Укажите номер лицензии, дату выдачи или описание документа"
                   />
+                  {files.medicalLicenseFile && (
+                    <div className="orgFileName">
+                      Выбран файл: {files.medicalLicenseFile.name}
+                    </div>
+                  )}
                 </div>
 
                 <div className="orgField wide">
                   <label>Документ о регистрации организации</label>
-                  <textarea
-                    value={form.registrationDocumentInfo}
+                  <input
+                    type="file"
+                    accept=".pdf,image/jpeg,image/png,image/webp"
                     onChange={(e) =>
-                      updateField("registrationDocumentInfo", e.target.value)
+                      updateFile(
+                        "registrationDocumentFile",
+                        e.target.files?.[0] || null
+                      )
                     }
-                    placeholder="Укажите данные регистрационного документа"
                   />
+                  {files.registrationDocumentFile && (
+                    <div className="orgFileName">
+                      Выбран файл: {files.registrationDocumentFile.name}
+                    </div>
+                  )}
                 </div>
 
                 <div className="orgField wide">
                   <label>Документ о назначении главного врача</label>
-                  <textarea
-                    value={form.chiefDoctorOrderInfo}
+                  <input
+                    type="file"
+                    accept=".pdf,image/jpeg,image/png,image/webp"
                     onChange={(e) =>
-                      updateField("chiefDoctorOrderInfo", e.target.value)
+                      updateFile(
+                        "chiefDoctorOrderFile",
+                        e.target.files?.[0] || null
+                      )
                     }
-                    placeholder="Укажите номер приказа или данные документа"
                   />
+                  {files.chiefDoctorOrderFile && (
+                    <div className="orgFileName">
+                      Выбран файл: {files.chiefDoctorOrderFile.name}
+                    </div>
+                  )}
                 </div>
 
                 <div className="orgField wide">
                   <label>Дополнительные документы</label>
-                  <textarea
-                    value={form.additionalDocumentsInfo}
+                  <input
+                    type="file"
+                    accept=".pdf,image/jpeg,image/png,image/webp"
+                    multiple
                     onChange={(e) =>
-                      updateField("additionalDocumentsInfo", e.target.value)
+                      updateFile(
+                        "additionalDocuments",
+                        Array.from(e.target.files || [])
+                      )
                     }
-                    placeholder="Если есть дополнительные документы, укажите их здесь"
                   />
+                  {files.additionalDocuments.length > 0 && (
+                    <div className="orgFileList">
+                      {files.additionalDocuments.map((file, index) => (
+                        <div key={`${file.name}-${index}`}>
+                          {index + 1}. {file.name}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </section>
@@ -419,7 +525,9 @@ export default function OrganizationApplication() {
             </section>
 
             <div className="orgApplicationActions">
-              <button type="submit">Отправить заявку</button>
+              <button type="submit" disabled={loading}>
+                {loading ? "Отправка..." : "Отправить заявку"}
+              </button>
             </div>
           </form>
         )}

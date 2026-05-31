@@ -1,4 +1,5 @@
 import express from "express";
+import multer from "multer";
 import {
   createOrganizationApplication,
   getOrganizationApplications,
@@ -9,6 +10,29 @@ import {
 import { verifyAdminToken } from "../services/adminService.js";
 
 const router = express.Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+  },
+  fileFilter: (req, file, cb) => {
+    const allowed = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+
+    if (!allowed.includes(file.mimetype)) {
+      return cb(
+        new Error("Разрешены только PDF, JPG, PNG или WEBP документы.")
+      );
+    }
+
+    cb(null, true);
+  },
+});
 
 function requireAdminAuth(req, res, next) {
   try {
@@ -36,28 +60,30 @@ function requireAdminAuth(req, res, next) {
   }
 }
 
-/*
-  Публичная отправка заявки организацией.
-  Токен админа не нужен.
-*/
-router.post("/", async (req, res) => {
-  try {
-    const result = await createOrganizationApplication(req.body);
+router.post(
+  "/",
+  upload.fields([
+    { name: "medicalLicenseFile", maxCount: 1 },
+    { name: "registrationDocumentFile", maxCount: 1 },
+    { name: "chiefDoctorOrderFile", maxCount: 1 },
+    { name: "additionalDocuments", maxCount: 5 },
+  ]),
+  async (req, res) => {
+    try {
+      const result = await createOrganizationApplication(req.body, req.files);
 
-    return res.status(result.status).json(result);
-  } catch (error) {
-    console.error("CREATE ORG APPLICATION ROUTE ERROR:", error.message);
+      return res.status(result.status).json(result);
+    } catch (error) {
+      console.error("CREATE ORG APPLICATION ROUTE ERROR:", error.message);
 
-    return res.status(500).json({
-      success: false,
-      message: "Ошибка отправки заявки.",
-    });
+      return res.status(500).json({
+        success: false,
+        message: error.message || "Ошибка отправки заявки.",
+      });
+    }
   }
-});
+);
 
-/*
-  Список заявок для админки.
-*/
 router.get("/admin", requireAdminAuth, async (req, res) => {
   try {
     const result = await getOrganizationApplications(req.admin);
@@ -73,9 +99,6 @@ router.get("/admin", requireAdminAuth, async (req, res) => {
   }
 });
 
-/*
-  Список обычных админов для назначения заявки.
-*/
 router.get("/support-admins", requireAdminAuth, async (req, res) => {
   try {
     const result = await getSupportAdminsForApplications(req.admin);
@@ -91,9 +114,6 @@ router.get("/support-admins", requireAdminAuth, async (req, res) => {
   }
 });
 
-/*
-  Назначить обычного админа на заявку.
-*/
 router.patch("/:id/assign", requireAdminAuth, async (req, res) => {
   try {
     const { assignedAdminId } = req.body;
@@ -115,9 +135,6 @@ router.patch("/:id/assign", requireAdminAuth, async (req, res) => {
   }
 });
 
-/*
-  Изменить статус заявки.
-*/
 router.patch("/:id/status", requireAdminAuth, async (req, res) => {
   try {
     const { status, reviewComment } = req.body;
