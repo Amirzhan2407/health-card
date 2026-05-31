@@ -284,6 +284,8 @@ export default function AdminOrganizations() {
             }
           : prev
       );
+
+      closeModal();
     } catch (err) {
       console.error(err);
       alert(err.message || "Ошибка изменения статуса.");
