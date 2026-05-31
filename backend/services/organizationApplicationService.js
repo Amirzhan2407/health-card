@@ -50,6 +50,7 @@ export async function createOrganizationApplication(payload, files = {}) {
   const applicationType = cleanText(
     payload.applicationType || "open_organization"
   );
+
   const organizationName = cleanText(payload.organizationName);
   const organizationType = cleanText(payload.organizationType);
 
@@ -188,28 +189,7 @@ export async function createOrganizationApplication(payload, files = {}) {
       assigned_admin_id: null,
       status: "new",
     })
-    .select(
-      `
-      id,
-      application_number,
-      application_type,
-      organization_name,
-      organization_type,
-      bin,
-      city,
-      address,
-      chief_doctor_full_name,
-      sender_full_name,
-      sender_phone,
-      sender_email,
-      comment,
-      review_comment,
-      assigned_admin_id,
-      status,
-      created_at,
-      updated_at
-      `
-    )
+    .select("*")
     .single();
 
   if (createError) {
@@ -226,7 +206,9 @@ export async function createOrganizationApplication(payload, files = {}) {
     return {
       success: false,
       status: 500,
-      message: "Ошибка создания заявки.",
+      message: `Ошибка создания заявки: ${
+        createError.message || "неизвестная ошибка"
+      }`,
     };
   }
 
@@ -260,16 +242,22 @@ export async function createOrganizationApplication(payload, files = {}) {
         .from("organization-documents")
         .upload(filePath, file.buffer, {
           contentType: file.mimetype,
-          upsert: false,
+          upsert: true,
         });
 
       if (uploadError) {
-        console.error("UPLOAD DOCUMENT ERROR:", uploadError);
+        console.error("UPLOAD DOCUMENT ERROR:", {
+          message: uploadError.message,
+          statusCode: uploadError.statusCode,
+          error: uploadError,
+        });
 
         return {
           success: false,
           status: 500,
-          message: "Заявка создана, но произошла ошибка загрузки документа.",
+          message: `Заявка создана, но произошла ошибка загрузки документа: ${
+            uploadError.message || "неизвестная ошибка"
+          }`,
         };
       }
 
@@ -300,7 +288,9 @@ export async function createOrganizationApplication(payload, files = {}) {
       return {
         success: false,
         status: 500,
-        message: "Заявка создана, но документы не сохранились в базе.",
+        message: `Заявка создана, но документы не сохранились в базе: ${
+          documentsError.message || "неизвестная ошибка"
+        }`,
       };
     }
   }
@@ -394,7 +384,9 @@ export async function getOrganizationApplications(currentAdmin) {
     return {
       success: false,
       status: 500,
-      message: "Ошибка получения заявок.",
+      message: `Ошибка получения заявок: ${
+        error.message || "неизвестная ошибка"
+      }`,
     };
   }
 
@@ -427,7 +419,9 @@ export async function getSupportAdminsForApplications(currentAdmin) {
     return {
       success: false,
       status: 500,
-      message: "Ошибка получения админов.",
+      message: `Ошибка получения админов: ${
+        error.message || "неизвестная ошибка"
+      }`,
     };
   }
 
@@ -519,7 +513,17 @@ export async function assignApplicationAdmin({
       updated_at: new Date().toISOString(),
     })
     .eq("id", applicationId)
-    .select("*")
+    .select(
+      `
+      *,
+      assigned_admin:site_admins!organization_applications_assigned_admin_id_fkey (
+        id,
+        full_name,
+        username,
+        category
+      )
+      `
+    )
     .single();
 
   if (error) {
@@ -528,7 +532,9 @@ export async function assignApplicationAdmin({
     return {
       success: false,
       status: 500,
-      message: "Ошибка назначения админа.",
+      message: `Ошибка назначения админа: ${
+        error.message || "неизвестная ошибка"
+      }`,
     };
   }
 
@@ -614,7 +620,27 @@ export async function updateApplicationStatus({
     .from("organization_applications")
     .update(updateData)
     .eq("id", applicationId)
-    .select("*")
+    .select(
+      `
+      *,
+      assigned_admin:site_admins!organization_applications_assigned_admin_id_fkey (
+        id,
+        full_name,
+        username,
+        category
+      ),
+      documents:organization_application_documents (
+        id,
+        document_type,
+        document_name,
+        file_url,
+        file_path,
+        mime_type,
+        file_size,
+        created_at
+      )
+      `
+    )
     .single();
 
   if (error) {
@@ -623,7 +649,9 @@ export async function updateApplicationStatus({
     return {
       success: false,
       status: 500,
-      message: "Ошибка изменения статуса.",
+      message: `Ошибка изменения статуса: ${
+        error.message || "неизвестная ошибка"
+      }`,
     };
   }
 

@@ -159,7 +159,6 @@ export default function AdminOrganizations() {
 
   const filteredApplications = useMemo(() => {
     if (filter === "all") return applications;
-
     return applications.filter((item) => item.status === filter);
   }, [applications, filter]);
 
@@ -209,7 +208,7 @@ export default function AdminOrganizations() {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            assignedAdminId,
+            assignedAdminId: assignAdminId,
           }),
         }
       );
@@ -219,22 +218,6 @@ export default function AdminOrganizations() {
       if (!response.ok || !data.success) {
         throw new Error(data.message || "Не удалось назначить админа.");
       }
-
-      const updated = data.application;
-
-      setApplications((prev) =>
-        prev.map((item) =>
-          item.id === selectedApplication.id
-            ? {
-                ...item,
-                assigned_admin_id: updated.assigned_admin_id,
-                status: updated.status,
-                assigned_at: updated.assigned_at,
-                updated_at: updated.updated_at,
-              }
-            : item
-        )
-      );
 
       await loadApplications();
     } catch (err) {
@@ -287,12 +270,7 @@ export default function AdminOrganizations() {
           item.id === selectedApplication.id
             ? {
                 ...item,
-                status: updated.status,
-                review_comment: updated.review_comment,
-                updated_at: updated.updated_at,
-                reviewed_at: updated.reviewed_at,
-                approved_at: updated.approved_at,
-                rejected_at: updated.rejected_at,
+                ...updated,
               }
             : item
         )
@@ -302,12 +280,7 @@ export default function AdminOrganizations() {
         prev
           ? {
               ...prev,
-              status: updated.status,
-              review_comment: updated.review_comment,
-              updated_at: updated.updated_at,
-              reviewed_at: updated.reviewed_at,
-              approved_at: updated.approved_at,
-              rejected_at: updated.rejected_at,
+              ...updated,
             }
           : prev
       );
@@ -371,11 +344,8 @@ export default function AdminOrganizations() {
                   </span>
 
                   <span>{application.organization_name}</span>
-
                   <span>{typeLabel(application.organization_type)}</span>
-
                   <span>{application.bin}</span>
-
                   <span>{application.city}</span>
 
                   <span>

@@ -74,7 +74,7 @@ router.post(
 
       return res.status(result.status).json(result);
     } catch (error) {
-      console.error("CREATE ORG APPLICATION ROUTE ERROR:", error.message);
+      console.error("CREATE ORG APPLICATION ROUTE ERROR:", error);
 
       return res.status(500).json({
         success: false,
@@ -90,7 +90,7 @@ router.get("/admin", requireAdminAuth, async (req, res) => {
 
     return res.status(result.status).json(result);
   } catch (error) {
-    console.error("GET ORG APPLICATIONS ROUTE ERROR:", error.message);
+    console.error("GET ORG APPLICATIONS ROUTE ERROR:", error);
 
     return res.status(500).json({
       success: false,
@@ -105,7 +105,7 @@ router.get("/support-admins", requireAdminAuth, async (req, res) => {
 
     return res.status(result.status).json(result);
   } catch (error) {
-    console.error("GET SUPPORT ADMINS ROUTE ERROR:", error.message);
+    console.error("GET SUPPORT ADMINS ROUTE ERROR:", error);
 
     return res.status(500).json({
       success: false,
@@ -126,7 +126,7 @@ router.patch("/:id/assign", requireAdminAuth, async (req, res) => {
 
     return res.status(result.status).json(result);
   } catch (error) {
-    console.error("ASSIGN ORG APPLICATION ROUTE ERROR:", error.message);
+    console.error("ASSIGN ORG APPLICATION ROUTE ERROR:", error);
 
     return res.status(500).json({
       success: false,
@@ -148,7 +148,7 @@ router.patch("/:id/status", requireAdminAuth, async (req, res) => {
 
     return res.status(result.status).json(result);
   } catch (error) {
-    console.error("UPDATE ORG APPLICATION STATUS ROUTE ERROR:", error.message);
+    console.error("UPDATE ORG APPLICATION STATUS ROUTE ERROR:", error);
 
     return res.status(500).json({
       success: false,
