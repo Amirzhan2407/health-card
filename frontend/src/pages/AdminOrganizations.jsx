@@ -52,7 +52,6 @@ function statusClass(status) {
 
 function formatDate(date) {
   if (!date) return "—";
-
   return new Date(date).toLocaleString("ru-RU");
 }
 
@@ -104,15 +103,15 @@ export default function AdminOrganizations() {
 
       setApplications(data.applications || []);
 
-      if (selectedApplication) {
+      setSelectedApplication((prev) => {
+        if (!prev) return prev;
+
         const fresh = (data.applications || []).find(
-          (item) => item.id === selectedApplication.id
+          (item) => item.id === prev.id
         );
 
-        if (fresh) {
-          setSelectedApplication(fresh);
-        }
-      }
+        return fresh || prev;
+      });
     } catch (err) {
       console.error(err);
       setError(err.message || "Ошибка получения заявлений.");
@@ -221,9 +220,23 @@ export default function AdminOrganizations() {
         throw new Error(data.message || "Не удалось назначить админа.");
       }
 
-      await loadApplications();
+      const updated = data.application;
 
-      alert("Ответственный админ назначен");
+      setApplications((prev) =>
+        prev.map((item) =>
+          item.id === selectedApplication.id
+            ? {
+                ...item,
+                assigned_admin_id: updated.assigned_admin_id,
+                status: updated.status,
+                assigned_at: updated.assigned_at,
+                updated_at: updated.updated_at,
+              }
+            : item
+        )
+      );
+
+      await loadApplications();
     } catch (err) {
       console.error(err);
       alert(err.message || "Ошибка назначения админа.");
@@ -267,9 +280,37 @@ export default function AdminOrganizations() {
         throw new Error(data.message || "Не удалось изменить статус.");
       }
 
-      await loadApplications();
+      const updated = data.application;
 
-      alert("Статус заявления обновлён");
+      setApplications((prev) =>
+        prev.map((item) =>
+          item.id === selectedApplication.id
+            ? {
+                ...item,
+                status: updated.status,
+                review_comment: updated.review_comment,
+                updated_at: updated.updated_at,
+                reviewed_at: updated.reviewed_at,
+                approved_at: updated.approved_at,
+                rejected_at: updated.rejected_at,
+              }
+            : item
+        )
+      );
+
+      setSelectedApplication((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: updated.status,
+              review_comment: updated.review_comment,
+              updated_at: updated.updated_at,
+              reviewed_at: updated.reviewed_at,
+              approved_at: updated.approved_at,
+              rejected_at: updated.rejected_at,
+            }
+          : prev
+      );
     } catch (err) {
       console.error(err);
       alert(err.message || "Ошибка изменения статуса.");
