@@ -1,0 +1,1 @@
+export { sendApplicationStatusEmail } from "../services/emailService.js";

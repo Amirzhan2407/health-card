@@ -12,6 +12,12 @@ const EMAIL_FROM = process.env.EMAIL_FROM || EMAIL_USER;
 
 function createTransporter() {
   if (!EMAIL_HOST || !EMAIL_USER || !EMAIL_PASS) {
+    console.error("EMAIL CONFIG ERROR:", {
+      EMAIL_HOST: Boolean(EMAIL_HOST),
+      EMAIL_USER: Boolean(EMAIL_USER),
+      EMAIL_PASS: Boolean(EMAIL_PASS),
+    });
+
     return null;
   }
 
@@ -29,27 +35,40 @@ function createTransporter() {
 function getStatusText(status) {
   if (status === "approved") return "одобрена";
   if (status === "rejected") return "отклонена";
-
   return "обновлена";
 }
 
 function getStatusColor(status) {
   if (status === "approved") return "#16a34a";
   if (status === "rejected") return "#dc2626";
-
   return "#2563eb";
 }
 
 function getStatusBackground(status) {
   if (status === "approved") return "#dcfce7";
   if (status === "rejected") return "#fee2e2";
-
   return "#dbeafe";
 }
 
+function escapeHtml(value = "") {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 function buildApplicationStatusEmail({ application, status, reviewComment }) {
-  const organizationName = application.organization_name || "Ваша организация";
-  const applicationNumber = application.application_number || "не указан";
+  const organizationName = escapeHtml(
+    application?.organization_name || "Ваша организация"
+  );
+
+  const applicationNumber = escapeHtml(
+    application?.application_number || "не указан"
+  );
+
+  const comment = escapeHtml(reviewComment || "Причина не указана.");
 
   const currentStatusText = getStatusText(status);
   const currentStatusColor = getStatusColor(status);
@@ -108,7 +127,7 @@ function buildApplicationStatusEmail({ application, status, reviewComment }) {
                 line-height: 1.6;
                 font-weight: 500;
               ">
-                ${reviewComment || "Причина не указана."}
+                ${comment}
               </div>
             </div>
           </td>
@@ -343,9 +362,7 @@ function buildApplicationStatusEmail({ application, status, reviewComment }) {
     `Номер заявки: ${applicationNumber}`,
     `Организация: ${organizationName}`,
     `Статус: заявка ${currentStatusText}`,
-    status === "rejected"
-      ? `Причина отклонения: ${reviewComment || "Причина не указана."}`
-      : "",
+    status === "rejected" ? `Причина отклонения: ${reviewComment || "Причина не указана."}` : "",
     status === "approved"
       ? "Заявка успешно прошла проверку. Следующий этап — подтверждение доступа главного врача через ЭЦП."
       : "",
@@ -378,8 +395,6 @@ export async function sendApplicationStatusEmail({
   const transporter = createTransporter();
 
   if (!transporter) {
-    console.error("EMAIL CONFIG ERROR: email environment variables are missing");
-
     return {
       success: false,
       message: "Email не настроен на сервере.",
