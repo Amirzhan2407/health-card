@@ -31,9 +31,6 @@ function createTransporter() {
     host: EMAIL_HOST,
     port: EMAIL_PORT,
     secure: EMAIL_SECURE,
-
-    // ВАЖНО ДЛЯ RENDER:
-    // заставляем nodemailer использовать IPv4
     family: 4,
 
     auth: {
@@ -41,14 +38,17 @@ function createTransporter() {
       pass: EMAIL_PASS,
     },
 
+    requireTLS: true,
+
     tls: {
       servername: EMAIL_HOST,
       rejectUnauthorized: true,
+      minVersion: "TLSv1.2",
     },
 
-    connectionTimeout: 20000,
-    greetingTimeout: 20000,
-    socketTimeout: 30000,
+    connectionTimeout: 60000,
+    greetingTimeout: 60000,
+    socketTimeout: 60000,
   });
 }
 
