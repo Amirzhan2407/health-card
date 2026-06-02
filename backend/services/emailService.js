@@ -1,75 +1,25 @@
-import nodemailer from "nodemailer";
 import dotenv from "dotenv";
-import dns from "node:dns";
 
 dotenv.config();
 
-// ВАЖНО ДЛЯ RENDER:
-// заставляем Node сначала использовать IPv4, а не IPv6
-dns.setDefaultResultOrder("ipv4first");
-
-const EMAIL_HOST = process.env.EMAIL_HOST || "smtp.gmail.com";
-const EMAIL_PORT = Number(process.env.EMAIL_PORT || 465);
-const EMAIL_SECURE = String(process.env.EMAIL_SECURE || "true") === "true";
-const EMAIL_USER = process.env.EMAIL_USER;
-const EMAIL_PASS = process.env.EMAIL_PASS;
-const EMAIL_FROM = process.env.EMAIL_FROM || EMAIL_USER;
-
-function createTransporter() {
-  if (!EMAIL_HOST || !EMAIL_USER || !EMAIL_PASS) {
-    console.error("EMAIL CONFIG ERROR:", {
-      EMAIL_HOST: Boolean(EMAIL_HOST),
-      EMAIL_USER: Boolean(EMAIL_USER),
-      EMAIL_PASS: Boolean(EMAIL_PASS),
-      EMAIL_FROM: Boolean(EMAIL_FROM),
-    });
-
-    return null;
-  }
-
-  return nodemailer.createTransport({
-    host: EMAIL_HOST,
-    port: EMAIL_PORT,
-    secure: EMAIL_SECURE,
-    family: 4,
-
-    auth: {
-      user: EMAIL_USER,
-      pass: EMAIL_PASS,
-    },
-
-    requireTLS: true,
-
-    tls: {
-      servername: EMAIL_HOST,
-      rejectUnauthorized: true,
-      minVersion: "TLSv1.2",
-    },
-
-    connectionTimeout: 60000,
-    greetingTimeout: 60000,
-    socketTimeout: 60000,
-  });
-}
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const EMAIL_FROM = process.env.EMAIL_FROM || "clinisOS <onboarding@resend.dev>";
 
 function getStatusText(status) {
   if (status === "approved") return "одобрена";
   if (status === "rejected") return "отклонена";
-
   return "обновлена";
 }
 
 function getStatusColor(status) {
   if (status === "approved") return "#16a34a";
   if (status === "rejected") return "#dc2626";
-
   return "#2563eb";
 }
 
 function getStatusBackground(status) {
   if (status === "approved") return "#dcfce7";
   if (status === "rejected") return "#fee2e2";
-
   return "#dbeafe";
 }
 
@@ -385,7 +335,7 @@ function buildApplicationStatusEmail({ application, status, reviewComment }) {
     "Ваша заявка была рассмотрена.",
     "",
     `Номер заявки: ${applicationNumber}`,
-    `Организация: ${organizationName}`,
+    `Организация: ${application?.organization_name || "Ваша организация"}`,
     `Статус: заявка ${currentStatusText}`,
     status === "rejected"
       ? `Причина отклонения: ${
@@ -421,12 +371,12 @@ export async function sendApplicationStatusEmail({
     };
   }
 
-  const transporter = createTransporter();
+  if (!RESEND_API_KEY) {
+    console.error("EMAIL CONFIG ERROR: RESEND_API_KEY is missing");
 
-  if (!transporter) {
     return {
       success: false,
-      message: "Email не настроен на сервере.",
+      message: "RESEND_API_KEY не настроен на сервере.",
     };
   }
 
@@ -437,13 +387,39 @@ export async function sendApplicationStatusEmail({
   });
 
   try {
-    await transporter.sendMail({
-      from: EMAIL_FROM,
-      to,
-      subject: email.subject,
-      text: email.text,
-      html: email.html,
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: EMAIL_FROM,
+        to: [to],
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+      }),
     });
+
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      console.error("RESEND EMAIL ERROR:", {
+        status: response.status,
+        result,
+      });
+
+      return {
+        success: false,
+        message:
+          result?.message ||
+          result?.error ||
+          `Ошибка Resend API: ${response.status}`,
+      };
+    }
+
+    console.log("RESEND EMAIL SENT:", result);
 
     return {
       success: true,
@@ -452,9 +428,6 @@ export async function sendApplicationStatusEmail({
   } catch (error) {
     console.error("SEND EMAIL ERROR:", {
       message: error.message,
-      code: error.code,
-      command: error.command,
-      response: error.response,
       stack: error.stack,
     });
 
