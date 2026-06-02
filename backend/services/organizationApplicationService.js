@@ -721,13 +721,34 @@ export async function updateApplicationStatus({
     comment: reviewComment || null,
   });
 
-  if (shouldSendStatusEmail(status) && application.sender_email) {
+  console.log("EMAIL CHECK:", {
+  applicationNumber: data.application_number,
+  status,
+  senderEmail: application.sender_email,
+  shouldSend: shouldSendStatusEmail(status),
+});
+
+if (shouldSendStatusEmail(status)) {
+  if (!application.sender_email) {
+    console.error("EMAIL SKIPPED: sender_email is empty");
+
+    await supabase.from("organization_application_history").insert({
+      application_id: applicationId,
+      admin_id: currentAdmin.id,
+      action: "application_email_failed",
+      old_status: status,
+      new_status: status,
+      comment: "Email получателя не указан в заявке.",
+    });
+  } else {
     const emailResult = await sendApplicationStatusEmail({
       to: application.sender_email,
       application: data,
       status,
       reviewComment,
     });
+
+    console.log("EMAIL RESULT:", emailResult);
 
     await supabase.from("organization_application_history").insert({
       application_id: applicationId,
@@ -740,7 +761,7 @@ export async function updateApplicationStatus({
       comment: emailResult.message,
     });
   }
-
+}
   return {
     success: true,
     status: 200,
