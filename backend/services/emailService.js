@@ -16,6 +16,7 @@ function createTransporter() {
       EMAIL_HOST: Boolean(EMAIL_HOST),
       EMAIL_USER: Boolean(EMAIL_USER),
       EMAIL_PASS: Boolean(EMAIL_PASS),
+      EMAIL_FROM: Boolean(EMAIL_FROM),
     });
 
     return null;
@@ -25,10 +26,24 @@ function createTransporter() {
     host: EMAIL_HOST,
     port: EMAIL_PORT,
     secure: EMAIL_SECURE,
+
+    // ВАЖНО ДЛЯ RENDER:
+    // заставляем подключаться к Gmail через IPv4, а не IPv6
+    family: 4,
+
     auth: {
       user: EMAIL_USER,
       pass: EMAIL_PASS,
     },
+
+    tls: {
+      servername: EMAIL_HOST,
+      rejectUnauthorized: true,
+    },
+
+    connectionTimeout: 20000,
+    greetingTimeout: 20000,
+    socketTimeout: 30000,
   });
 }
 
