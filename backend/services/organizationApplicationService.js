@@ -39,11 +39,35 @@ const allowedStatuses = [
   "rejected",
 ];
 
-function safeFileName(originalName = "document") {
-  return String(originalName)
-    .replace(/[^\p{L}\p{N}._-]+/gu, "_")
-    .replace(/_+/g, "_")
-    .slice(0, 160);
+function getFileExtension(file) {
+  const mimeType = file?.mimetype || "";
+
+  if (mimeType === "application/pdf") return "pdf";
+  if (mimeType === "image/jpeg") return "jpg";
+  if (mimeType === "image/png") return "png";
+  if (mimeType === "image/webp") return "webp";
+
+  const originalName = String(file?.originalname || "");
+  const dotIndex = originalName.lastIndexOf(".");
+
+  if (dotIndex !== -1) {
+    const ext = originalName
+      .slice(dotIndex + 1)
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+
+    return ext || "file";
+  }
+
+  return "file";
+}
+
+function createSafeStoragePath(applicationId, documentType, file, index) {
+  const extension = getFileExtension(file);
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).slice(2, 12);
+
+  return `${applicationId}/${documentType}_${timestamp}_${index}_${random}.${extension}`;
 }
 
 export async function createOrganizationApplication(payload, files = {}) {
@@ -235,8 +259,12 @@ export async function createOrganizationApplication(payload, files = {}) {
 
   for (const group of documentsToUpload) {
     for (const file of group.files) {
-      const fileName = safeFileName(file.originalname);
-      const filePath = `${application.id}/${Date.now()}-${fileName}`;
+      const filePath = createSafeStoragePath(
+  application.id,
+  group.type,
+  file,
+  index
+);
 
       const { error: uploadError } = await supabase.storage
         .from("organization-documents")
