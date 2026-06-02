@@ -1,9 +1,14 @@
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
+import dns from "node:dns";
 
 dotenv.config();
 
-const EMAIL_HOST = process.env.EMAIL_HOST;
+// ВАЖНО ДЛЯ RENDER:
+// заставляем Node сначала использовать IPv4, а не IPv6
+dns.setDefaultResultOrder("ipv4first");
+
+const EMAIL_HOST = process.env.EMAIL_HOST || "smtp.gmail.com";
 const EMAIL_PORT = Number(process.env.EMAIL_PORT || 465);
 const EMAIL_SECURE = String(process.env.EMAIL_SECURE || "true") === "true";
 const EMAIL_USER = process.env.EMAIL_USER;
@@ -28,7 +33,7 @@ function createTransporter() {
     secure: EMAIL_SECURE,
 
     // ВАЖНО ДЛЯ RENDER:
-    // заставляем подключаться к Gmail через IPv4, а не IPv6
+    // заставляем nodemailer использовать IPv4
     family: 4,
 
     auth: {
@@ -383,7 +388,9 @@ function buildApplicationStatusEmail({ application, status, reviewComment }) {
     `Организация: ${organizationName}`,
     `Статус: заявка ${currentStatusText}`,
     status === "rejected"
-      ? `Причина отклонения: ${reviewComment || application?.review_comment || "Причина не указана."}`
+      ? `Причина отклонения: ${
+          reviewComment || application?.review_comment || "Причина не указана."
+        }`
       : "",
     status === "approved"
       ? "Заявка успешно прошла проверку. Следующий этап — подтверждение доступа главного врача через ЭЦП."
@@ -443,7 +450,13 @@ export async function sendApplicationStatusEmail({
       message: "Письмо отправлено.",
     };
   } catch (error) {
-    console.error("SEND EMAIL ERROR:", error);
+    console.error("SEND EMAIL ERROR:", {
+      message: error.message,
+      code: error.code,
+      command: error.command,
+      response: error.response,
+      stack: error.stack,
+    });
 
     return {
       success: false,
