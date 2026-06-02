@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
+import { sendApplicationStatusEmail } from "./emailService.js";
 
 dotenv.config();
 
@@ -38,6 +39,10 @@ const allowedStatuses = [
   "approved",
   "rejected",
 ];
+
+function shouldSendStatusEmail(status) {
+  return ["approved", "rejected"].includes(status);
+}
 
 function getFileExtension(file) {
   const mimeType = file?.mimetype || "";
@@ -153,6 +158,14 @@ export async function createOrganizationApplication(payload, files = {}) {
     };
   }
 
+  if (!senderEmail) {
+    return {
+      success: false,
+      status: 400,
+      message: "Введите email для получения ответа по заявке.",
+    };
+  }
+
   const requiredFiles = [
     ["medicalLicenseFile", "лицензию на медицинскую деятельность"],
     ["registrationDocumentFile", "документ о регистрации организации"],
@@ -200,7 +213,7 @@ export async function createOrganizationApplication(payload, files = {}) {
       sender_full_name: senderFullName,
       sender_position: null,
       sender_phone: senderPhone || null,
-      sender_email: senderEmail || null,
+      sender_email: senderEmail,
 
       medical_license_info: null,
       registration_document_info: null,
@@ -258,32 +271,43 @@ export async function createOrganizationApplication(payload, files = {}) {
   const uploadedDocuments = [];
 
   for (const group of documentsToUpload) {
-    for (const file of group.files) {
+    for (let index = 0; index < group.files.length; index += 1) {
+      const file = group.files[index];
+
       const filePath = createSafeStoragePath(
-  application.id,
-  group.type,
-  file,
-  index
-);
+        application.id,
+        group.type,
+        file,
+        index
+      );
 
       const { error: uploadError } = await supabase.storage
         .from("organization-documents")
         .upload(filePath, file.buffer, {
           contentType: file.mimetype,
-          upsert: true,
+          upsert: false,
         });
 
       if (uploadError) {
         console.error("UPLOAD DOCUMENT ERROR:", {
           message: uploadError.message,
           statusCode: uploadError.statusCode,
+          filePath,
+          originalName: file.originalname,
+          mimeType: file.mimetype,
+          size: file.size,
           error: uploadError,
         });
+
+        await supabase
+          .from("organization_applications")
+          .delete()
+          .eq("id", application.id);
 
         return {
           success: false,
           status: 500,
-          message: `Заявка создана, но произошла ошибка загрузки документа: ${
+          message: `Ошибка загрузки документа: ${
             uploadError.message || "неизвестная ошибка"
           }`,
         };
@@ -313,10 +337,15 @@ export async function createOrganizationApplication(payload, files = {}) {
     if (documentsError) {
       console.error("SAVE DOCUMENTS ERROR:", documentsError);
 
+      await supabase
+        .from("organization_applications")
+        .delete()
+        .eq("id", application.id);
+
       return {
         success: false,
         status: 500,
-        message: `Заявка создана, но документы не сохранились в базе: ${
+        message: `Документы загрузились, но не сохранились в базе: ${
           documentsError.message || "неизвестная ошибка"
         }`,
       };
@@ -691,6 +720,26 @@ export async function updateApplicationStatus({
     new_status: status,
     comment: reviewComment || null,
   });
+
+  if (shouldSendStatusEmail(status) && application.sender_email) {
+    const emailResult = await sendApplicationStatusEmail({
+      to: application.sender_email,
+      application: data,
+      status,
+      reviewComment,
+    });
+
+    await supabase.from("organization_application_history").insert({
+      application_id: applicationId,
+      admin_id: currentAdmin.id,
+      action: emailResult.success
+        ? "application_email_sent"
+        : "application_email_failed",
+      old_status: status,
+      new_status: status,
+      comment: emailResult.message,
+    });
+  }
 
   return {
     success: true,

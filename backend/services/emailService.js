@@ -35,18 +35,21 @@ function createTransporter() {
 function getStatusText(status) {
   if (status === "approved") return "одобрена";
   if (status === "rejected") return "отклонена";
+
   return "обновлена";
 }
 
 function getStatusColor(status) {
   if (status === "approved") return "#16a34a";
   if (status === "rejected") return "#dc2626";
+
   return "#2563eb";
 }
 
 function getStatusBackground(status) {
   if (status === "approved") return "#dcfce7";
   if (status === "rejected") return "#fee2e2";
+
   return "#dbeafe";
 }
 
@@ -68,7 +71,9 @@ function buildApplicationStatusEmail({ application, status, reviewComment }) {
     application?.application_number || "не указан"
   );
 
-  const comment = escapeHtml(reviewComment || "Причина не указана.");
+  const safeReviewComment = escapeHtml(
+    reviewComment || application?.review_comment || "Причина не указана."
+  );
 
   const currentStatusText = getStatusText(status);
   const currentStatusColor = getStatusColor(status);
@@ -127,7 +132,7 @@ function buildApplicationStatusEmail({ application, status, reviewComment }) {
                 line-height: 1.6;
                 font-weight: 500;
               ">
-                ${comment}
+                ${safeReviewComment}
               </div>
             </div>
           </td>
@@ -362,7 +367,9 @@ function buildApplicationStatusEmail({ application, status, reviewComment }) {
     `Номер заявки: ${applicationNumber}`,
     `Организация: ${organizationName}`,
     `Статус: заявка ${currentStatusText}`,
-    status === "rejected" ? `Причина отклонения: ${reviewComment || "Причина не указана."}` : "",
+    status === "rejected"
+      ? `Причина отклонения: ${reviewComment || application?.review_comment || "Причина не указана."}`
+      : "",
     status === "approved"
       ? "Заявка успешно прошла проверку. Следующий этап — подтверждение доступа главного врача через ЭЦП."
       : "",
