@@ -14,6 +14,7 @@ const BUCKET_NAME = "organization-documents";
 function generateApplicationNumber() {
   const year = new Date().getFullYear();
   const randomPart = Math.floor(100000 + Math.random() * 900000);
+
   return `APP-${year}-${randomPart}`;
 }
 
@@ -25,15 +26,20 @@ function safeFileName(originalName = "document") {
     .slice(0, 160);
 }
 
-function normalizeApplicationType(value) {
-  if (value === "change_chief_doctor") return "change_chief_doctor";
-  return "new_organization";
-}
-
 function normalizeText(value) {
   if (value === undefined || value === null) return null;
+
   const text = String(value).trim();
+
   return text.length > 0 ? text : null;
+}
+
+function normalizeApplicationType(value) {
+  if (value === "change_chief_doctor") {
+    return "change_chief_doctor";
+  }
+
+  return "new_organization";
 }
 
 function getOrganizationTypeLabel(type) {
@@ -41,6 +47,9 @@ function getOrganizationTypeLabel(type) {
     state_polyclinic: "Государственная поликлиника",
     state_hospital: "Государственная больница",
     private_clinic: "Частная клиника",
+
+    gov_polyclinic: "Государственная поликлиника",
+    gov_hospital: "Государственная больница",
   };
 
   return map[type] || type || "Не указано";
@@ -52,6 +61,35 @@ function getApplicationTypeLabel(type) {
   }
 
   return "Подключение новой организации";
+}
+
+async function saveApplicationHistory({
+  applicationId,
+  action,
+  oldStatus = null,
+  newStatus = null,
+  comment = null,
+  adminId = null,
+}) {
+  const payload = {
+    application_id: applicationId,
+    action,
+    old_status: oldStatus,
+    new_status: newStatus,
+    comment: normalizeText(comment),
+  };
+
+  if (adminId) {
+    payload.admin_id = adminId;
+  }
+
+  const { error } = await supabase
+    .from("organization_application_history")
+    .insert(payload);
+
+  if (error) {
+    console.error("APPLICATION HISTORY ERROR:", error.message);
+  }
 }
 
 async function uploadApplicationFile(applicationId, documentType, file, index = 0) {
@@ -68,7 +106,9 @@ async function uploadApplicationFile(applicationId, documentType, file, index = 
     });
 
   if (uploadError) {
-    throw new Error(`Ошибка загрузки файла "${file.originalname}": ${uploadError.message}`);
+    throw new Error(
+      `Ошибка загрузки файла "${file.originalname}": ${uploadError.message}`
+    );
   }
 
   const { data: publicUrlData } = supabase.storage
@@ -96,31 +136,26 @@ async function uploadApplicationFile(applicationId, documentType, file, index = 
   return data;
 }
 
-async function saveApplicationHistory({
-  applicationId,
-  action,
-  oldStatus = null,
-  newStatus = null,
-  comment = null,
-  adminId = null,
-}) {
-  const { error } = await supabase.from("organization_application_history").insert({
-    application_id: applicationId,
-    admin_id: adminId,
-    action,
-    old_status: oldStatus,
-    new_status: newStatus,
-    comment,
+function normalizeFiles(files) {
+  if (!files) return {};
+
+  const normalized = {};
+
+  Object.entries(files).forEach(([key, value]) => {
+    if (!value) return;
+
+    if (Array.isArray(value)) {
+      normalized[key] = value;
+    } else {
+      normalized[key] = [value];
+    }
   });
 
-  if (error) {
-    console.error("HISTORY INSERT ERROR:", error.message);
-  }
+  return normalized;
 }
 
 export async function createOrganizationApplication({ body, files }) {
   const applicationType = normalizeApplicationType(body.application_type);
-
   const applicationNumber = generateApplicationNumber();
 
   const payload = {
@@ -155,23 +190,48 @@ export async function createOrganizationApplication({ body, files }) {
     throw new Error("Название организации обязательно.");
   }
 
+  if (!payload.organization_type) {
+    throw new Error("Тип организации обязателен.");
+  }
+
   if (!payload.bin) {
     throw new Error("БИН организации обязателен.");
+  }
+
+  if (!payload.city) {
+    throw new Error("Город обязателен.");
+  }
+
+  if (!payload.address) {
+    throw new Error("Адрес организации обязателен.");
+  }
+
+  if (!payload.sender_full_name) {
+    throw new Error("ФИО отправителя обязательно.");
+  }
+
+  if (!payload.sender_phone) {
+    throw new Error("Телефон отправителя обязателен.");
   }
 
   if (!payload.sender_email) {
     throw new Error("Email для ответа обязателен.");
   }
 
-  if (applicationType === "new_organization" && !payload.chief_doctor_full_name) {
-    throw new Error("ФИО главного врача обязательно.");
+  if (applicationType === "new_organization") {
+    if (!payload.chief_doctor_full_name) {
+      throw new Error("ФИО главного врача обязательно.");
+    }
   }
 
-  if (
-    applicationType === "change_chief_doctor" &&
-    (!payload.previous_chief_doctor_full_name || !payload.new_chief_doctor_full_name)
-  ) {
-    throw new Error("Укажите предыдущего и нового главного врача.");
+  if (applicationType === "change_chief_doctor") {
+    if (!payload.previous_chief_doctor_full_name) {
+      throw new Error("ФИО предыдущего главного врача обязательно.");
+    }
+
+    if (!payload.new_chief_doctor_full_name) {
+      throw new Error("ФИО нового главного врача обязательно.");
+    }
   }
 
   const { data: application, error } = await supabase
@@ -185,32 +245,20 @@ export async function createOrganizationApplication({ body, files }) {
   }
 
   const uploadedDocuments = [];
+  const normalizedFiles = normalizeFiles(files);
 
-  const fileEntries = files || {};
-
-  for (const [documentType, fileValue] of Object.entries(fileEntries)) {
-    if (!fileValue) continue;
-
-    if (Array.isArray(fileValue)) {
-      for (let index = 0; index < fileValue.length; index += 1) {
-        const document = await uploadApplicationFile(
-          application.id,
-          documentType,
-          fileValue[index],
-          index
-        );
-
-        if (document) uploadedDocuments.push(document);
-      }
-    } else {
+  for (const [documentType, fileList] of Object.entries(normalizedFiles)) {
+    for (let index = 0; index < fileList.length; index += 1) {
       const document = await uploadApplicationFile(
         application.id,
         documentType,
-        fileValue,
-        0
+        fileList[index],
+        index
       );
 
-      if (document) uploadedDocuments.push(document);
+      if (document) {
+        uploadedDocuments.push(document);
+      }
     }
   }
 
@@ -230,7 +278,7 @@ export async function createOrganizationApplication({ body, files }) {
   };
 }
 
-export async function getOrganizationApplications({ admin }) {
+export async function getOrganizationApplications({ admin } = {}) {
   let query = supabase
     .from("organization_applications")
     .select("*")
@@ -287,13 +335,66 @@ export async function getOrganizationApplicationById(id) {
   };
 }
 
+export async function assignApplicationAdmin({
+  id,
+  assignedAdminId,
+  adminId,
+  comment,
+}) {
+  const { data: currentApplication, error: currentError } = await supabase
+    .from("organization_applications")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (currentError) {
+    throw new Error(`Заявка не найдена: ${currentError.message}`);
+  }
+
+  const oldStatus = currentApplication.status;
+
+  const { data: updatedApplication, error } = await supabase
+    .from("organization_applications")
+    .update({
+      assigned_admin_id: assignedAdminId || null,
+      status: "in_progress",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(`Ошибка назначения администратора: ${error.message}`);
+  }
+
+  await saveApplicationHistory({
+    applicationId: id,
+    adminId,
+    action: "application_admin_assigned",
+    oldStatus,
+    newStatus: "in_progress",
+    comment:
+      normalizeText(comment) ||
+      `Заявка назначена администратору: ${assignedAdminId || "не указан"}`,
+  });
+
+  return updatedApplication;
+}
+
 export async function updateOrganizationApplicationStatus({
   id,
   status,
   reviewComment,
   adminId,
 }) {
-  const allowedStatuses = ["new", "in_progress", "approved", "rejected"];
+  const allowedStatuses = [
+    "new",
+    "in_progress",
+    "approved",
+    "rejected",
+    "waiting_eds",
+  ];
 
   if (!allowedStatuses.includes(status)) {
     throw new Error("Недопустимый статус заявки.");
@@ -356,7 +457,27 @@ export async function saveApplicationEmailHistory({
 export function formatApplicationForAdmin(application) {
   return {
     ...application,
-    application_type_label: getApplicationTypeLabel(application.application_type),
-    organization_type_label: getOrganizationTypeLabel(application.organization_type),
+    application_type_label: getApplicationTypeLabel(
+      application.application_type
+    ),
+    organization_type_label: getOrganizationTypeLabel(
+      application.organization_type
+    ),
+  };
+}
+
+export function getApplicationLabels() {
+  return {
+    applicationTypes: {
+      new_organization: "Подключение новой организации",
+      change_chief_doctor: "Изменение главного врача организации",
+    },
+    organizationTypes: {
+      state_polyclinic: "Государственная поликлиника",
+      state_hospital: "Государственная больница",
+      private_clinic: "Частная клиника",
+      gov_polyclinic: "Государственная поликлиника",
+      gov_hospital: "Государственная больница",
+    },
   };
 }
