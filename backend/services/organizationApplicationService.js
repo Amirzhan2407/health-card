@@ -63,6 +63,24 @@ function getApplicationTypeLabel(type) {
   return "Подключение новой организации";
 }
 
+function normalizeFiles(files) {
+  if (!files) return {};
+
+  const normalized = {};
+
+  Object.entries(files).forEach(([key, value]) => {
+    if (!value) return;
+
+    if (Array.isArray(value)) {
+      normalized[key] = value;
+    } else {
+      normalized[key] = [value];
+    }
+  });
+
+  return normalized;
+}
+
 async function saveApplicationHistory({
   applicationId,
   action,
@@ -134,24 +152,6 @@ async function uploadApplicationFile(applicationId, documentType, file, index = 
   }
 
   return data;
-}
-
-function normalizeFiles(files) {
-  if (!files) return {};
-
-  const normalized = {};
-
-  Object.entries(files).forEach(([key, value]) => {
-    if (!value) return;
-
-    if (Array.isArray(value)) {
-      normalized[key] = value;
-    } else {
-      normalized[key] = [value];
-    }
-  });
-
-  return normalized;
 }
 
 export async function createOrganizationApplication({ body, files }) {
@@ -452,6 +452,63 @@ export async function saveApplicationEmailHistory({
     newStatus: status,
     comment: message,
   });
+}
+
+export async function getSupportAdminsForApplications() {
+  const possibleTables = ["admins", "admin_users"];
+
+  for (const tableName of possibleTables) {
+    const { data, error } = await supabase
+      .from(tableName)
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error(
+        `GET SUPPORT ADMINS ERROR FROM ${tableName}:`,
+        error.message
+      );
+      continue;
+    }
+
+    const admins = (data || [])
+      .filter((admin) => {
+        const role = admin.role || admin.admin_role || "";
+        const status = admin.status || "";
+        const isActive = admin.is_active;
+
+        const isNotMainAdmin =
+          role !== "super_admin" &&
+          role !== "main_admin" &&
+          role !== "chief_admin";
+
+        const isNotBlocked =
+          status !== "blocked" &&
+          status !== "inactive" &&
+          isActive !== false;
+
+        return isNotMainAdmin && isNotBlocked;
+      })
+      .map((admin) => ({
+        id: admin.id,
+        full_name:
+          admin.full_name ||
+          admin.name ||
+          admin.username ||
+          admin.login ||
+          "Администратор",
+        username: admin.username || admin.login || null,
+        email: admin.email || null,
+        role: admin.role || admin.admin_role || "admin",
+        category: admin.category || admin.responsibility_category || null,
+        status: admin.status || "active",
+        is_active: admin.is_active !== false,
+      }));
+
+    return admins;
+  }
+
+  return [];
 }
 
 export function formatApplicationForAdmin(application) {
