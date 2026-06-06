@@ -538,3 +538,19 @@ export function getApplicationLabels() {
     },
   };
 }
+
+
+export async function updateApplicationStatus({
+  id,
+  status,
+  reviewComment,
+  comment,
+  adminId,
+}) {
+  return updateOrganizationApplicationStatus({
+    id,
+    status,
+    reviewComment: reviewComment || comment,
+    adminId,
+  });
+}
