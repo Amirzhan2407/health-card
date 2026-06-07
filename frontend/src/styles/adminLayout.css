@@ -1507,3 +1507,176 @@ textarea {
   line-height: 1.6;
   white-space: pre-wrap;
 }
+
+
+.chatStatus {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.chatStatus span {
+  color: #10f3df;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.messageHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.messageHeader b {
+  color: #10f3df;
+  font-weight: 950;
+  overflow-wrap: anywhere;
+}
+
+.messageHeader small {
+  color: #8aa0b8;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.messageItem p {
+  margin: 0;
+  color: #dbeafe;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.adminToastStack {
+  position: fixed;
+  top: 22px;
+  right: 22px;
+  z-index: 9999;
+  display: grid;
+  gap: 12px;
+  width: min(420px, calc(100vw - 28px));
+  pointer-events: none;
+}
+
+.adminToast {
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: 44px 1fr 24px;
+  gap: 12px;
+  width: 100%;
+  border: 1px solid rgba(16, 243, 223, 0.28);
+  background: rgba(15, 23, 42, 0.96);
+  color: #ffffff;
+  border-radius: 20px;
+  padding: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  text-align: left;
+  animation: adminToastIn 0.22s ease-out;
+}
+
+.adminToast:hover {
+  border-color: rgba(16, 243, 223, 0.65);
+  transform: translateY(-1px);
+}
+
+.adminToastIcon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: rgba(16, 243, 223, 0.14);
+  font-size: 21px;
+}
+
+.adminToastBody {
+  min-width: 0;
+}
+
+.adminToastBody strong {
+  display: block;
+  color: #10f3df;
+  font-size: 14px;
+  font-weight: 950;
+  margin-bottom: 3px;
+}
+
+.adminToastBody span {
+  display: block;
+  color: #8aa0b8;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.adminToastBody b {
+  display: block;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 950;
+  margin-bottom: 6px;
+  overflow-wrap: anywhere;
+}
+
+.adminToastBody p {
+  margin: 0;
+  color: #dbeafe;
+  line-height: 1.45;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.adminToastClose {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  color: #94a3b8;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.adminToastClose:hover {
+  background: rgba(148, 163, 184, 0.14);
+  color: #ffffff;
+}
+
+@keyframes adminToastIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 760px) {
+  .chatStatus {
+    display: grid;
+    grid-template-columns: 1fr;
+    margin-top: 14px;
+  }
+
+  .adminToastStack {
+    top: 12px;
+    right: 14px;
+    left: 14px;
+    width: auto;
+  }
+
+  .adminToast {
+    grid-template-columns: 38px 1fr 22px;
+    border-radius: 18px;
+  }
+
+  .adminToastIcon {
+    width: 38px;
+    height: 38px;
+    border-radius: 14px;
+  }
+}

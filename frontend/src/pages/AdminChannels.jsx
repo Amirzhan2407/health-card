@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { adminRequest } from "../api/adminApi";
 
 function text(value) {
@@ -29,6 +29,17 @@ export default function AdminChannels() {
   const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  const messagesEndRef = useRef(null);
+  const activeChannelRef = useRef(null);
+
+  function scrollToBottom() {
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+  }
 
   async function loadChannels() {
     setError("");
@@ -39,54 +50,97 @@ export default function AdminChannels() {
 
       setChannels(list);
 
-      if (list.length > 0) {
+      if (list.length > 0 && !activeChannelRef.current) {
+        activeChannelRef.current = list[0];
         setActiveChannel(list[0]);
-        await loadMessages(list[0].category);
+        await loadMessages(list[0].category, true);
       }
     } catch (err) {
       setError(err.message || "Не удалось загрузить каналы.");
     }
   }
 
-  async function loadMessages(category) {
+  async function loadMessages(category, withLoading = false) {
     if (!category) return;
+
+    if (withLoading) {
+      setLoadingMessages(true);
+    }
 
     setError("");
 
     try {
-      const result = await adminRequest(`/api/admin-channels/${category}/messages`);
-      setMessages(result.messages || []);
+      const result = await adminRequest(
+        `/api/admin-channels/${category}/messages`
+      );
+
+      const nextMessages = result.messages || [];
+      setMessages(nextMessages);
+      scrollToBottom();
     } catch (err) {
-      setMessages([]);
       setError(err.message || "Не удалось загрузить сообщения.");
+    } finally {
+      if (withLoading) {
+        setLoadingMessages(false);
+      }
     }
   }
 
   async function sendMessage() {
-    if (!activeChannel?.category || !message.trim()) return;
+    if (!activeChannel?.category || !message.trim() || sending) return;
 
+    const currentText = message.trim();
+
+    setSending(true);
     setError("");
 
     try {
+      setMessage("");
+
       await adminRequest(`/api/admin-channels/${activeChannel.category}/messages`, {
         method: "POST",
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({
+          message: currentText,
+        }),
       });
 
-      setMessage("");
       await loadMessages(activeChannel.category);
     } catch (err) {
+      setMessage(currentText);
       setError(err.message || "Не удалось отправить сообщение.");
+    } finally {
+      setSending(false);
     }
   }
 
   function selectChannel(channel) {
+    activeChannelRef.current = channel;
     setActiveChannel(channel);
-    loadMessages(channel.category);
+    setMessages([]);
+    loadMessages(channel.category, true);
+  }
+
+  function handleKeyDown(event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      sendMessage();
+    }
   }
 
   useEffect(() => {
     loadChannels();
+  }, []);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      const channel = activeChannelRef.current;
+
+      if (channel?.category) {
+        loadMessages(channel.category, false);
+      }
+    }, 1000);
+
+    return () => clearInterval(intervalId);
   }, []);
 
   return (
@@ -141,17 +195,23 @@ export default function AdminChannels() {
                   <p>{text(activeChannel.description)}</p>
                 </div>
 
-                <button
-                  type="button"
-                  className="miniBtn"
-                  onClick={() => loadMessages(activeChannel.category)}
-                >
-                  Обновить
-                </button>
+                <div className="chatStatus">
+                  <span>Автообновление: 1 секунда</span>
+
+                  <button
+                    type="button"
+                    className="miniBtn"
+                    onClick={() => loadMessages(activeChannel.category, true)}
+                  >
+                    Обновить сейчас
+                  </button>
+                </div>
               </div>
 
               <div className="messagesBox">
-                {messages.length === 0 ? (
+                {loadingMessages ? (
+                  <p className="muted">Загрузка сообщений...</p>
+                ) : messages.length === 0 ? (
                   <p className="muted">Сообщений пока нет</p>
                 ) : (
                   messages.map((item) => (
@@ -168,17 +228,20 @@ export default function AdminChannels() {
                     </div>
                   ))
                 )}
+
+                <div ref={messagesEndRef} />
               </div>
 
               <div className="sendBox">
                 <textarea
                   value={message}
-                  onChange={(e) => setMessage(e.target.value)}
+                  onChange={(event) => setMessage(event.target.value)}
+                  onKeyDown={handleKeyDown}
                   placeholder="Напишите сообщение..."
                 />
 
-                <button type="button" onClick={sendMessage}>
-                  Отправить
+                <button type="button" onClick={sendMessage} disabled={sending}>
+                  {sending ? "Отправка..." : "Отправить"}
                 </button>
               </div>
             </>

@@ -1,11 +1,12 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import "../styles/adminLayout.css";
+import AdminChannelNotifier from "../components/AdminChannelNotifier";
 
 const allNavItems = [
   {
     to: "/admin-panel",
     label: "Главная",
-    roles: ["super_admin", "site_support"],
+    roles: ["super_admin", "site_support", "support_admin"],
   },
   {
     to: "/admin-panel/staff",
@@ -15,22 +16,22 @@ const allNavItems = [
   {
     to: "/admin-panel/applications",
     label: "Заявления",
-    roles: ["super_admin", "site_support"],
+    roles: ["super_admin", "site_support", "support_admin"],
   },
   {
-    to: "/admin-panel/orgs",
+    to: "/admin-panel/organizations",
     label: "Организации",
-    roles: ["super_admin", "site_support"],
+    roles: ["super_admin", "site_support", "support_admin"],
   },
   {
     to: "/admin-panel/channels",
     label: "Каналы",
-    roles: ["super_admin", "site_support"],
+    roles: ["super_admin", "site_support", "support_admin"],
   },
   {
     to: "/admin-panel/logs",
     label: "Журнал",
-    roles: ["super_admin", "site_support"],
+    roles: ["super_admin", "site_support", "support_admin"],
   },
   {
     to: "/admin-panel/roles",
@@ -42,7 +43,20 @@ const allNavItems = [
 function roleLabel(role) {
   if (role === "super_admin") return "Главный админ";
   if (role === "site_support") return "Обычный админ";
+  if (role === "support_admin") return "Обычный админ";
+
   return "Админ";
+}
+
+function getAdminName(adminData) {
+  return (
+    adminData?.fullName ||
+    adminData?.full_name ||
+    adminData?.name ||
+    adminData?.fio ||
+    adminData?.username ||
+    "Админ"
+  );
 }
 
 export default function AdminLayout() {
@@ -55,26 +69,25 @@ export default function AdminLayout() {
     return null;
   }
 
+  const adminRole = adminData.role;
+
   const navItems = allNavItems.filter((item) =>
-    item.roles.includes(adminData.role)
+    item.roles.includes(adminRole)
   );
 
   function logout() {
     localStorage.removeItem("adminData");
-    localStorage.removeItem("adminToken");
-    localStorage.removeItem("token");
-    localStorage.removeItem("authToken");
     navigate("/admin");
   }
 
   return (
     <div className="adminShell">
+      <AdminChannelNotifier />
+
       <aside className="adminSidebar">
         <div className="adminLogoBlock">
           <div className="adminLogoCircle">
-            {(adminData.fullName || adminData.username || "A")
-              .charAt(0)
-              .toUpperCase()}
+            {getAdminName(adminData).slice(0, 1).toUpperCase()}
           </div>
 
           <div>
@@ -100,7 +113,7 @@ export default function AdminLayout() {
 
         <div className="adminSidebarProfile">
           <span>Вы вошли как</span>
-          <b>{adminData.fullName || adminData.username || "Админ"}</b>
+          <b>{getAdminName(adminData)}</b>
           <small>{roleLabel(adminData.role)}</small>
         </div>
 
