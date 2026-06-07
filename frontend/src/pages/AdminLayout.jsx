@@ -13,8 +13,18 @@ const allNavItems = [
     roles: ["super_admin"],
   },
   {
-    to: "/admin-panel/orgs",
+    to: "/admin-panel/applications",
     label: "Заявления",
+    roles: ["super_admin", "site_support"],
+  },
+  {
+    to: "/admin-panel/orgs",
+    label: "Организации",
+    roles: ["super_admin", "site_support"],
+  },
+  {
+    to: "/admin-panel/channels",
+    label: "Каналы",
     roles: ["super_admin", "site_support"],
   },
   {
@@ -54,6 +64,10 @@ export default function AdminLayout() {
 
   const logout = () => {
     localStorage.removeItem("adminData");
+    localStorage.removeItem("adminToken");
+    localStorage.removeItem("token");
+    localStorage.removeItem("authToken");
+
     navigate("/admin");
   };
 
@@ -61,7 +75,11 @@ export default function AdminLayout() {
     <div className="adminShell">
       <aside className="adminSidebar">
         <div className="adminLogoBlock">
-          <div className="adminLogoCircle">A</div>
+          <div className="adminLogoCircle">
+            {(adminData.fullName || adminData.username || "A")
+              .charAt(0)
+              .toUpperCase()}
+          </div>
 
           <div>
             <b>MedCard Admin</b>
@@ -86,7 +104,7 @@ export default function AdminLayout() {
 
         <div className="adminSidebarProfile">
           <span>Вы вошли как</span>
-          <b>{adminData.fullName || "Админ"}</b>
+          <b>{adminData.fullName || adminData.username || "Админ"}</b>
           <small>{roleLabel(adminData.role)}</small>
         </div>
 

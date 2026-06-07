@@ -20,6 +20,7 @@ import AdminOrganizations from "./pages/AdminOrganizations";
 import AdminAuditLogs from "./pages/AdminAuditLogs";
 import AdminRoles from "./pages/AdminRoles";
 import OrganizationApplication from "./pages/OrganizationApplication";
+import AdminApplications from "./pages/AdminApplications";
 
 export default function App() {
   return (
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="orgs" element={<AdminOrganizations />} />
         <Route path="logs" element={<AdminAuditLogs />} />
         <Route path="roles" element={<AdminRoles />} />
+        <Route path="applications" element={<AdminApplications />} />
       </Route>
 
       <Route path="/login" element={<Login />} />
