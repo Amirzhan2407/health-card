@@ -1,580 +1,238 @@
 import { useEffect, useMemo, useState } from "react";
-import "../styles/adminLayout.css";
 
-const API_URL = "https://health-card.onrender.com";
+const API_URL =
+  import.meta.env.VITE_API_URL || "https://health-card.onrender.com";
 
-const statusOptions = [
-  { value: "all", label: "Все" },
-  { value: "new", label: "Новые" },
-  { value: "assigned", label: "Назначенные" },
-  { value: "in_progress", label: "В процессе" },
-  { value: "needs_fix", label: "Требуют исправления" },
-  { value: "resubmitted", label: "Отправлены повторно" },
-  { value: "waiting_eds", label: "Ожидают ЭЦП" },
-  { value: "approved", label: "Одобрены" },
-  { value: "rejected", label: "Отклонены" },
-];
+function getToken() {
+  const adminData = JSON.parse(localStorage.getItem("adminData") || "null");
 
-const changeStatusOptions = [
-  { value: "in_progress", label: "В процессе проверки" },
-  { value: "needs_fix", label: "Требует исправления" },
-  { value: "waiting_eds", label: "Ожидает ЭЦП главного врача" },
-  { value: "approved", label: "Одобрена" },
-  { value: "rejected", label: "Отклонена" },
-];
-
-function typeLabel(type) {
-  if (type === "gov_polyclinics") return "Государственная поликлиника";
-  if (type === "gov_hospitals") return "Государственная больница";
-  if (type === "private_clinics") return "Частная клиника";
-  return "Не указано";
+  return (
+    localStorage.getItem("adminToken") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("authToken") ||
+    adminData?.token ||
+    ""
+  );
 }
 
-function statusLabel(status) {
-  if (status === "new") return "Новая заявка";
-  if (status === "assigned") return "Назначена";
-  if (status === "in_progress") return "В процессе";
-  if (status === "needs_fix") return "Требует исправления";
-  if (status === "resubmitted") return "Отправлена повторно";
-  if (status === "waiting_eds") return "Ожидает ЭЦП";
-  if (status === "approved") return "Одобрена";
-  if (status === "rejected") return "Отклонена";
-  return "Неизвестно";
+function formatStatus(status) {
+  const map = {
+    active: "Открыта",
+    opened: "Открыта",
+    connected: "Подключена",
+    waiting_eds: "Ожидает ЭЦП",
+    in_progress: "В процессе",
+    rejected: "Отклонена",
+    blocked: "Заблокирована",
+  };
+
+  return map[status] || status || "—";
 }
 
-function statusClass(status) {
-  if (status === "approved") return "active";
-  if (status === "rejected") return "blocked";
-  if (status === "needs_fix") return "warning";
-  if (status === "waiting_eds") return "info";
-  return "neutral";
-}
+function categoryLabel(type) {
+  const map = {
+    state_polyclinic: "Государственная поликлиника",
+    state_hospital: "Государственная больница",
+    private_clinic: "Частная клиника",
+    gov_polyclinic: "Государственная поликлиника",
+    gov_hospital: "Государственная больница",
+  };
 
-function formatDate(date) {
-  if (!date) return "—";
-  return new Date(date).toLocaleString("ru-RU");
-}
-
-function documentTypeLabel(type) {
-  if (type === "medical_license") return "Лицензия";
-  if (type === "registration_document") return "Регистрация организации";
-  if (type === "chief_doctor_order") return "Назначение главного врача";
-  if (type === "other") return "Дополнительный документ";
-  return "Документ";
+  return map[type] || type || "—";
 }
 
 export default function AdminOrganizations() {
-  const adminData = JSON.parse(localStorage.getItem("adminData") || "null");
-  const token = adminData?.token;
-  const isSuperAdmin = adminData?.role === "super_admin";
-
-  const [applications, setApplications] = useState([]);
-  const [supportAdmins, setSupportAdmins] = useState([]);
-
-  const [loading, setLoading] = useState(true);
+  const [organizations, setOrganizations] = useState([]);
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const [filter, setFilter] = useState("all");
-  const [selectedApplication, setSelectedApplication] = useState(null);
+  const token = useMemo(() => getToken(), []);
 
-  const [assignAdminId, setAssignAdminId] = useState("");
-  const [newStatus, setNewStatus] = useState("in_progress");
-  const [reviewComment, setReviewComment] = useState("");
-  const [saving, setSaving] = useState(false);
+  async function loadOrganizations() {
+    setIsLoading(true);
+    setError("");
 
-  const loadApplications = async () => {
     try {
-      setError("");
-
-      const response = await fetch(
-        `${API_URL}/api/organization-applications/admin`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || "Ошибка получения заявлений.");
-      }
-
-      setApplications(data.applications || []);
-
-      setSelectedApplication((prev) => {
-        if (!prev) return prev;
-
-        const fresh = (data.applications || []).find(
-          (item) => item.id === prev.id
-        );
-
-        return fresh || prev;
+      const response = await fetch(`${API_URL}/api/organizations`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
       });
-    } catch (err) {
-      console.error(err);
-      setError(err.message || "Ошибка получения заявлений.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const loadSupportAdmins = async () => {
-    if (!isSuperAdmin) return;
+      const result = await response.json().catch(() => null);
 
-    try {
-      const response = await fetch(
-        `${API_URL}/api/organization-applications/support-admins`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || "Ошибка получения админов.");
+      if (!response.ok) {
+        throw new Error(
+          result?.message ||
+            "Список организаций пока не подключён на backend."
+        );
       }
 
-      setSupportAdmins(data.admins || []);
+      const list = Array.isArray(result)
+        ? result
+        : result.organizations || result.data || [];
+
+      setOrganizations(Array.isArray(list) ? list : []);
     } catch (err) {
-      console.error(err);
+      setError(
+        err.message ||
+          "Организации пока не загружаются. Backend для организаций подключим следующим шагом."
+      );
+      setOrganizations([]);
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }
 
   useEffect(() => {
-    loadApplications();
-    loadSupportAdmins();
-
-    const interval = setInterval(() => {
-      loadApplications();
-    }, 5000);
-
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadOrganizations();
   }, []);
 
-  const filteredApplications = useMemo(() => {
-    if (filter === "all") return applications;
-    return applications.filter((item) => item.status === filter);
-  }, [applications, filter]);
-
-  const availableAdminsForSelected = useMemo(() => {
-    if (!selectedApplication) return [];
-
-    return supportAdmins.filter(
-      (admin) => admin.category === selectedApplication.organization_type
-    );
-  }, [supportAdmins, selectedApplication]);
-
-  const openApplication = (application) => {
-    setSelectedApplication(application);
-    setAssignAdminId(application.assigned_admin_id || "");
-    setNewStatus(
-      application.status === "new" || application.status === "assigned"
-        ? "in_progress"
-        : application.status
-    );
-    setReviewComment(application.review_comment || "");
-  };
-
-  const closeModal = () => {
-    setSelectedApplication(null);
-    setAssignAdminId("");
-    setNewStatus("in_progress");
-    setReviewComment("");
-  };
-
-  const assignAdmin = async () => {
-    if (!selectedApplication) return;
-
-    if (!assignAdminId) {
-      alert("Выберите ответственного админа");
-      return;
-    }
-
-    try {
-      setSaving(true);
-
-      const response = await fetch(
-        `${API_URL}/api/organization-applications/${selectedApplication.id}/assign`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            assignedAdminId: assignAdminId,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || "Не удалось назначить админа.");
-      }
-
-      await loadApplications();
-    } catch (err) {
-      console.error(err);
-      alert(err.message || "Ошибка назначения админа.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const changeStatus = async () => {
-    if (!selectedApplication) return;
-
-    if (
-      (newStatus === "needs_fix" || newStatus === "rejected") &&
-      !reviewComment.trim()
-    ) {
-      alert("Для отклонения или исправления обязательно напишите комментарий");
-      return;
-    }
-
-    try {
-      setSaving(true);
-
-      const response = await fetch(
-        `${API_URL}/api/organization-applications/${selectedApplication.id}/status`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            status: newStatus,
-            reviewComment: reviewComment.trim(),
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || "Не удалось изменить статус.");
-      }
-
-      const updated = data.application;
-
-      setApplications((prev) =>
-        prev.map((item) =>
-          item.id === selectedApplication.id
-            ? {
-                ...item,
-                ...updated,
-              }
-            : item
-        )
-      );
-
-      setSelectedApplication((prev) =>
-        prev
-          ? {
-              ...prev,
-              ...updated,
-            }
-          : prev
-      );
-
-      closeModal();
-    } catch (err) {
-      console.error(err);
-      alert(err.message || "Ошибка изменения статуса.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
-    <div className="adminPage">
-      <div className="adminPageHeader">
+    <main className="adminOrganizationsPage">
+      <section className="orgHead">
         <div>
-          <h1>Заявления организаций</h1>
+          <h1>Организации</h1>
           <p>
-            Проверка заявлений на подключение медицинских организаций к системе.
+            Список подключённых больниц, поликлиник и частных клиник. После
+            одобрения заявок организации будут появляться здесь.
           </p>
         </div>
-      </div>
 
-      <div className="adminTabs">
-        {statusOptions.map((item) => (
-          <button
-            key={item.value}
-            type="button"
-            className={filter === item.value ? "active" : ""}
-            onClick={() => setFilter(item.value)}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+        <button type="button" onClick={loadOrganizations} disabled={isLoading}>
+          {isLoading ? "Загрузка..." : "Обновить"}
+        </button>
+      </section>
 
-      {error && <div className="adminErrorBox">{error}</div>}
+      {error ? <div className="orgNotice">{error}</div> : null}
 
-      <div className="adminTableCard">
-        {loading ? (
-          <div className="adminLoadingText">Загрузка заявлений...</div>
-        ) : (
-          <div className="adminTable adminApplicationsTable">
-            <div className="adminTableHead">
-              <span>№ заявки</span>
-              <span>Организация</span>
-              <span>Тип</span>
-              <span>БИН</span>
-              <span>Город</span>
-              <span>Ответственный</span>
-              <span>Статус</span>
-              <span>Действие</span>
-            </div>
-
-            {filteredApplications.length === 0 ? (
-              <div className="adminEmptyRow">Заявлений пока нет</div>
-            ) : (
-              filteredApplications.map((application) => (
-                <div className="adminTableRow" key={application.id}>
-                  <span className="strongText">
-                    {application.application_number || "—"}
-                  </span>
-
-                  <span>{application.organization_name}</span>
-                  <span>{typeLabel(application.organization_type)}</span>
-                  <span>{application.bin}</span>
-                  <span>{application.city}</span>
-
-                  <span>
-                    {application.assigned_admin?.full_name || "Не назначен"}
-                  </span>
-
-                  <span>
-                    <b
-                      className={`statusPill ${statusClass(
-                        application.status
-                      )}`}
-                    >
-                      {statusLabel(application.status)}
-                    </b>
-                  </span>
-
-                  <span>
-                    <button
-                      className="adminSmallBtn"
-                      type="button"
-                      onClick={() => openApplication(application)}
-                    >
-                      Открыть
-                    </button>
-                  </span>
-                </div>
-              ))
-            )}
+      <section className="orgCard">
+        <div className="orgTable">
+          <div className="orgRow orgRowHead">
+            <span>Название</span>
+            <span>Категория</span>
+            <span>БИН</span>
+            <span>Город</span>
+            <span>Главный врач</span>
+            <span>Статус</span>
           </div>
-        )}
-      </div>
 
-      {selectedApplication && (
-        <div className="adminModalOverlay" onClick={closeModal}>
-          <div
-            className="adminModal adminApplicationModal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="adminModalTitle">
-              Заявление {selectedApplication.application_number}
-            </div>
-
-            <div className="adminApplicationGrid">
-              <section className="adminApplicationSection">
-                <h3>Данные для главного админа</h3>
-
-                <div className="adminInfoList">
-                  <div>
-                    <span>Название организации</span>
-                    <b>{selectedApplication.organization_name}</b>
-                  </div>
-
-                  <div>
-                    <span>Тип организации</span>
-                    <b>{typeLabel(selectedApplication.organization_type)}</b>
-                  </div>
-
-                  <div>
-                    <span>Статус</span>
-                    <b>{statusLabel(selectedApplication.status)}</b>
-                  </div>
-
-                  <div>
-                    <span>Дата подачи</span>
-                    <b>{formatDate(selectedApplication.created_at)}</b>
-                  </div>
-
-                  <div>
-                    <span>Ответственный админ</span>
-                    <b>
-                      {selectedApplication.assigned_admin?.full_name ||
-                        "Не назначен"}
-                    </b>
-                  </div>
-                </div>
-
-                {isSuperAdmin && (
-                  <div className="adminAssignBox">
-                    <label>Назначить ответственного</label>
-
-                    <select
-                      value={assignAdminId}
-                      onChange={(e) => setAssignAdminId(e.target.value)}
-                    >
-                      <option value="">Выберите админа</option>
-
-                      {availableAdminsForSelected.map((admin) => (
-                        <option value={admin.id} key={admin.id}>
-                          {admin.full_name} / {admin.username}
-                        </option>
-                      ))}
-                    </select>
-
-                    <button
-                      type="button"
-                      className="adminSaveBtn"
-                      onClick={assignAdmin}
-                      disabled={saving}
-                    >
-                      {saving ? "Сохранение..." : "Назначить"}
-                    </button>
-                  </div>
-                )}
-              </section>
-
-              <section className="adminApplicationSection">
-                <h3>Данные для проверки</h3>
-
-                <div className="adminInfoList">
-                  <div>
-                    <span>БИН</span>
-                    <b>{selectedApplication.bin}</b>
-                  </div>
-
-                  <div>
-                    <span>Город</span>
-                    <b>{selectedApplication.city}</b>
-                  </div>
-
-                  <div>
-                    <span>Адрес</span>
-                    <b>{selectedApplication.address}</b>
-                  </div>
-
-                  <div>
-                    <span>ФИО главного врача</span>
-                    <b>{selectedApplication.chief_doctor_full_name}</b>
-                  </div>
-
-                  <div>
-                    <span>ФИО отправителя</span>
-                    <b>{selectedApplication.sender_full_name}</b>
-                  </div>
-
-                  <div>
-                    <span>Телефон</span>
-                    <b>{selectedApplication.sender_phone || "Не указан"}</b>
-                  </div>
-
-                  <div>
-                    <span>Email</span>
-                    <b>{selectedApplication.sender_email || "Не указан"}</b>
-                  </div>
-                </div>
-              </section>
-            </div>
-
-            <section className="adminApplicationSection">
-              <h3>Документы</h3>
-
-              {selectedApplication.documents?.length > 0 ? (
-                <div className="adminDocumentsList">
-                  {selectedApplication.documents.map((doc) => (
-                    <a
-                      href={doc.file_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      key={doc.id}
-                    >
-                      <span>{documentTypeLabel(doc.document_type)}</span>
-                      <b>{doc.document_name}</b>
-                    </a>
-                  ))}
-                </div>
-              ) : (
-                <div className="adminEmptyText">Документы не найдены</div>
-              )}
-            </section>
-
-            <section className="adminApplicationSection">
-              <h3>Комментарий организации</h3>
-
-              <div className="adminCommentBox">
-                {selectedApplication.comment || "Комментарий не указан"}
+          {isLoading ? (
+            <div className="emptyOrg">Загрузка...</div>
+          ) : organizations.length === 0 ? (
+            <div className="emptyOrg">Организаций пока нет</div>
+          ) : (
+            organizations.map((org) => (
+              <div key={org.id} className="orgRow">
+                <span>{org.organization_name || "—"}</span>
+                <span>{categoryLabel(org.organization_type)}</span>
+                <span>{org.bin || "—"}</span>
+                <span>{org.city || "—"}</span>
+                <span>{org.chief_doctor_full_name || "—"}</span>
+                <span>
+                  <b>{formatStatus(org.status)}</b>
+                </span>
               </div>
-            </section>
-
-            <section className="adminApplicationSection">
-              <h3>Проверка заявления</h3>
-
-              <div className="adminCheckGrid">
-                <div className="adminField">
-                  <label>Новый статус</label>
-                  <select
-                    value={newStatus}
-                    onChange={(e) => setNewStatus(e.target.value)}
-                  >
-                    {changeStatusOptions.map((item) => (
-                      <option value={item.value} key={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="adminField wide">
-                  <label>Комментарий проверки</label>
-                  <textarea
-                    value={reviewComment}
-                    onChange={(e) => setReviewComment(e.target.value)}
-                    placeholder="Например: не хватает лицензии или БИН не совпадает с документами"
-                  />
-                </div>
-              </div>
-            </section>
-
-            <div className="adminModalActions">
-              <button
-                className="adminCancelBtn"
-                type="button"
-                onClick={closeModal}
-              >
-                Закрыть
-              </button>
-
-              <button
-                className="adminSaveBtn"
-                type="button"
-                onClick={changeStatus}
-                disabled={saving}
-              >
-                {saving ? "Сохранение..." : "Сохранить статус"}
-              </button>
-            </div>
-          </div>
+            ))
+          )}
         </div>
-      )}
-    </div>
+      </section>
+
+      <style>{`
+        .adminOrganizationsPage {
+          min-height: 100vh;
+          padding: 40px;
+          color: #fff;
+        }
+
+        .orgHead {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 16px;
+          margin-bottom: 24px;
+        }
+
+        .orgHead h1 {
+          margin: 0 0 10px;
+          font-size: 42px;
+          font-weight: 950;
+        }
+
+        .orgHead p {
+          margin: 0;
+          color: #9fb2c8;
+        }
+
+        .orgHead button {
+          border: 0;
+          border-radius: 14px;
+          background: #10f3df;
+          color: #06202e;
+          padding: 12px 18px;
+          font-weight: 950;
+          cursor: pointer;
+        }
+
+        .orgNotice {
+          margin-bottom: 18px;
+          padding: 16px;
+          border-radius: 16px;
+          color: #fde68a;
+          background: rgba(120, 53, 15, 0.35);
+          border: 1px solid rgba(251, 191, 36, 0.35);
+          font-weight: 800;
+        }
+
+        .orgCard {
+          background: rgba(15, 23, 42, 0.78);
+          border: 1px solid rgba(148, 163, 184, 0.14);
+          border-radius: 26px;
+          padding: 20px;
+          overflow-x: auto;
+        }
+
+        .orgRow {
+          min-width: 1000px;
+          display: grid;
+          grid-template-columns: 240px 220px 140px 150px 220px 150px;
+          gap: 14px;
+          padding: 15px 16px;
+          border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+          color: #dbeafe;
+        }
+
+        .orgRowHead {
+          background: rgba(30, 41, 59, 0.72);
+          border-radius: 16px;
+          color: #9fb2c8;
+          font-weight: 950;
+        }
+
+        .emptyOrg {
+          padding: 28px 16px;
+          color: #9fb2c8;
+          font-weight: 800;
+        }
+
+        @media (max-width: 700px) {
+          .adminOrganizationsPage {
+            padding: 20px 14px;
+          }
+
+          .orgHead {
+            display: block;
+          }
+
+          .orgHead h1 {
+            font-size: 32px;
+          }
+
+          .orgHead button {
+            margin-top: 16px;
+          }
+        }
+      `}</style>
+    </main>
   );
 }

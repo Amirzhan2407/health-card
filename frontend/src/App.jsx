@@ -26,7 +26,6 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Клиентская часть */}
         <Route path="/" element={<MainLayout />}>
           <Route index element={<HomePage />} />
           <Route path="search" element={<Search />} />
@@ -43,10 +42,8 @@ function App() {
           />
         </Route>
 
-        {/* Вход админа */}
         <Route path="/admin" element={<AdminLogin />} />
 
-        {/* Админ-панель */}
         <Route path="/admin-panel" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
           <Route path="staff" element={<AdminStaff />} />
@@ -57,7 +54,6 @@ function App() {
           <Route path="roles" element={<AdminRoles />} />
         </Route>
 
-        {/* Старые ссылки, чтобы ничего не ломалось */}
         <Route
           path="/admin-panel/organizations"
           element={<Navigate to="/admin-panel/orgs" replace />}
@@ -68,7 +64,11 @@ function App() {
           element={<Navigate to="/admin-panel/applications" replace />}
         />
 
-        {/* Если страницы нет */}
+        <Route
+          path="/admin-panel/orgs-old"
+          element={<Navigate to="/admin-panel/orgs" replace />}
+        />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

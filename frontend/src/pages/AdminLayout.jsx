@@ -42,7 +42,6 @@ const allNavItems = [
 function roleLabel(role) {
   if (role === "super_admin") return "Главный админ";
   if (role === "site_support") return "Обычный админ";
-
   return "Админ";
 }
 
@@ -56,10 +55,8 @@ export default function AdminLayout() {
     return null;
   }
 
-  const adminRole = adminData.role;
-
   const navItems = allNavItems.filter((item) =>
-    item.roles.includes(adminRole)
+    item.roles.includes(adminData.role)
   );
 
   const logout = () => {
@@ -67,7 +64,6 @@ export default function AdminLayout() {
     localStorage.removeItem("adminToken");
     localStorage.removeItem("token");
     localStorage.removeItem("authToken");
-
     navigate("/admin");
   };
 
