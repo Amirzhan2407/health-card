@@ -29,41 +29,34 @@ function roleLabel(role) {
   return "админ";
 }
 
-function getAdminLogin(admin) {
+function getLogin(admin) {
   return (
     admin?.username ||
     admin?.login ||
-    admin?.email ||
     admin?.admin_login ||
     admin?.user_login ||
+    admin?.email ||
     "admin"
   );
 }
 
-function getAdminFullName(admin) {
+function getFullName(admin) {
   return (
-    admin?.full_name ||
     admin?.fullName ||
+    admin?.full_name ||
     admin?.full_name_ru ||
     admin?.name ||
     admin?.fio ||
-    admin?.fullNameRu ||
     "Без ФИО"
   );
 }
 
-function getAdminRole(admin) {
+function getRole(admin) {
   return admin?.role || admin?.admin_role || "admin";
 }
 
-function getAdminDisplayLabel(admin) {
-  if (!admin) return "Администратор";
-
-  const login = getAdminLogin(admin);
-  const fullName = getAdminFullName(admin);
-  const role = roleLabel(getAdminRole(admin));
-
-  return `${login}, ${fullName} (${role})`;
+function makeSenderLabel({ username, fullName, role }) {
+  return `${username || "admin"}, ${fullName || "Без ФИО"} (${roleLabel(role)})`;
 }
 
 function canAccess(admin, category) {
@@ -106,48 +99,66 @@ async function ensureChannels() {
   }
 }
 
-function addAdminToMap(map, admin) {
-  const label = getAdminDisplayLabel(admin);
+async function findAdminById(adminId) {
+  if (!adminId) return null;
 
-  const possibleIds = [
-    admin.id,
-    admin.admin_id,
-    admin.user_id,
-    admin.auth_user_id,
-    admin.uid,
-  ].filter(Boolean);
+  const tables = ["admins", "admin_users", "support_admins"];
 
-  for (const id of possibleIds) {
-    map.set(String(id), {
-      id: String(id),
-      label,
-      username: getAdminLogin(admin),
-      fullName: getAdminFullName(admin),
-      role: getAdminRole(admin),
-    });
-  }
-}
-
-async function getAdminsMap() {
-  const map = new Map();
-
-  const possibleTables = ["admins", "admin_users"];
-
-  for (const table of possibleTables) {
+  for (const table of tables) {
     try {
-      const { data, error } = await supabase.from(table).select("*");
+      const { data, error } = await supabase
+        .from(table)
+        .select("*")
+        .or(
+          `id.eq.${adminId},admin_id.eq.${adminId},user_id.eq.${adminId},auth_user_id.eq.${adminId},uid.eq.${adminId}`
+        )
+        .maybeSingle();
 
-      if (!error && Array.isArray(data)) {
-        for (const admin of data) {
-          addAdminToMap(map, admin);
-        }
-      }
-    } catch (error) {
-      console.log(`ADMIN MAP SKIP TABLE ${table}:`, error.message);
+      if (!error && data) return data;
+    } catch {
+      continue;
     }
   }
 
-  return map;
+  return null;
+}
+
+async function enrichMessage(message) {
+  if (
+    message.sender_username ||
+    message.sender_full_name ||
+    message.sender_role
+  ) {
+    return {
+      ...message,
+      sender_label: makeSenderLabel({
+        username: message.sender_username,
+        fullName: message.sender_full_name,
+        role: message.sender_role,
+      }),
+    };
+  }
+
+  const admin = await findAdminById(message.sender_admin_id);
+
+  if (!admin) {
+    return {
+      ...message,
+      sender_label: `Неизвестный админ (${message.sender_admin_id})`,
+    };
+  }
+
+  return {
+    ...message,
+    sender_username: getLogin(admin),
+    sender_full_name: getFullName(admin),
+    sender_role: getRole(admin),
+    sender_label: makeSenderLabel({
+      username: getLogin(admin),
+      fullName: getFullName(admin),
+      role: getRole(admin),
+    }),
+  };
 }
 
 router.get("/", requireAdminAuth, async (req, res) => {
@@ -221,20 +232,11 @@ router.get("/:category/messages", requireAdminAuth, async (req, res) => {
       });
     }
 
-    const adminsMap = await getAdminsMap();
+    const enrichedMessages = [];
 
-    const enrichedMessages = (messages || []).map((message) => {
-      const senderId = String(message.sender_admin_id || "");
-      const sender = adminsMap.get(senderId);
-
-      return {
-        ...message,
-        sender_label: sender?.label || `Неизвестный админ (${senderId})`,
-        sender_username: sender?.username || "",
-        sender_full_name: sender?.fullName || "",
-        sender_role: sender?.role || "",
-      };
-    });
+    for (const message of messages || []) {
+      enrichedMessages.push(await enrichMessage(message));
+    }
 
     return res.status(200).json({
       success: true,
@@ -281,11 +283,18 @@ router.post("/:category/messages", requireAdminAuth, async (req, res) => {
       });
     }
 
+    const username = getLogin(req.admin);
+    const fullName = getFullName(req.admin);
+    const role = getRole(req.admin);
+
     const { data, error } = await supabase
       .from("admin_channel_messages")
       .insert({
         channel_id: channel.id,
         sender_admin_id: req.admin.id,
+        sender_username: username,
+        sender_full_name: fullName,
+        sender_role: role,
         message,
         application_id: req.body.applicationId || null,
         organization_id: req.body.organizationId || null,
@@ -300,14 +309,11 @@ router.post("/:category/messages", requireAdminAuth, async (req, res) => {
       });
     }
 
-    const adminsMap = await getAdminsMap();
-    const currentAdmin =
-      adminsMap.get(String(req.admin.id)) || {
-        label: getAdminDisplayLabel(req.admin),
-        username: getAdminLogin(req.admin),
-        fullName: getAdminFullName(req.admin),
-        role: getAdminRole(req.admin),
-      };
+    const senderLabel = makeSenderLabel({
+      username,
+      fullName,
+      role,
+    });
 
     await createAuditLog({
       adminId: req.admin.id,
@@ -315,7 +321,7 @@ router.post("/:category/messages", requireAdminAuth, async (req, res) => {
       entityType: "admin_channel",
       entityId: channel.id,
       title: "Сообщение в канал",
-      details: `${currentAdmin.label}: ${message}`,
+      details: `${senderLabel}: ${message}`,
       newData: data,
     });
 
@@ -323,10 +329,7 @@ router.post("/:category/messages", requireAdminAuth, async (req, res) => {
       success: true,
       message: {
         ...data,
-        sender_label: currentAdmin.label,
-        sender_username: currentAdmin.username,
-        sender_full_name: currentAdmin.fullName,
-        sender_role: currentAdmin.role,
+        sender_label: senderLabel,
       },
     });
   } catch (error) {
