@@ -4,6 +4,7 @@ import { adminRequest } from "../api/adminApi";
 const ACTION_LABELS = {
   admin_login_success: "Вход в систему",
   admin_login_failed: "Неудачная попытка входа",
+
   admin_created: "Создал администратора",
   admin_updated: "Изменил администратора",
   admin_blocked: "Заблокировал администратора",
@@ -22,24 +23,40 @@ const ACTION_LABELS = {
   channel_message_sent: "Отправил сообщение в канал",
 };
 
-const ACTION_GROUPS = [
-  { value: "all", label: "Все действия" },
-  { value: "auth", label: "Авторизация" },
+const STATUS_LABELS = {
+  new: "Новая",
+  assigned: "Назначена",
+  in_progress: "В процессе",
+  needs_fix: "Требует исправления",
+  resent: "Отправлена повторно",
+  waiting_eds: "Ожидает ЭЦП",
+  approved: "Одобрена",
+  rejected: "Отклонена",
+  active: "Открыта",
+  blocked: "Заблокирована",
+};
+
+const ENTITY_LABELS = {
+  organization_application: "Заявка",
+  organization: "Организация",
+  admin: "Администратор",
+  admin_channel: "Канал",
+};
+
+const GROUPS = [
+  { value: "all", label: "Все" },
+  { value: "auth", label: "Входы" },
   { value: "applications", label: "Заявки" },
   { value: "organizations", label: "Организации" },
   { value: "admins", label: "Админы" },
   { value: "channels", label: "Каналы" },
 ];
 
-function safeText(value, empty = "—") {
-  if (value === null || value === undefined || value === "") return empty;
+function safeText(value, fallback = "—") {
+  if (value === null || value === undefined || value === "") return fallback;
 
   if (typeof value === "object") {
-    try {
-      return JSON.stringify(value, null, 2);
-    } catch {
-      return empty;
-    }
+    return fallback;
   }
 
   return String(value);
@@ -61,25 +78,20 @@ function formatDate(value) {
   }
 }
 
-function getActionLabel(action) {
+function actionLabel(action) {
   return ACTION_LABELS[action] || action || "Действие";
 }
 
-function getAdminName(log) {
-  return (
-    log.admin_full_name ||
-    log.admin_name ||
-    log.admin_username ||
-    log.username ||
-    log.email ||
-    log.admin_email ||
-    log.admin_id ||
-    "Система"
-  );
+function entityLabel(entityType) {
+  return ENTITY_LABELS[entityType] || entityType || "Событие";
 }
 
-function getActionGroup(action, entityType) {
-  const value = `${action || ""} ${entityType || ""}`.toLowerCase();
+function statusLabel(status) {
+  return STATUS_LABELS[status] || status || "—";
+}
+
+function groupByAction(action = "", entityType = "") {
+  const value = `${action} ${entityType}`.toLowerCase();
 
   if (value.includes("login") || value.includes("auth")) return "auth";
   if (value.includes("application")) return "applications";
@@ -90,39 +102,139 @@ function getActionGroup(action, entityType) {
   return "other";
 }
 
-function getReadableDetails(log) {
-  if (log.details) return safeText(log.details);
-
-  const data = log.new_data || log.old_data;
-
-  if (!data) return "Подробности не указаны.";
-
-  if (typeof data === "string") return data;
-
-  if (data.username) return `Пользователь: ${data.username}`;
-  if (data.organization_name) return `Организация: ${data.organization_name}`;
-  if (data.application_number) return `Заявка: ${data.application_number}`;
-  if (data.status) return `Статус: ${data.status}`;
-
-  return safeText(data);
+function getAdminName(log) {
+  return (
+    log.admin_full_name ||
+    log.admin_name ||
+    log.admin_username ||
+    log.username ||
+    log.email ||
+    log.admin_email ||
+    "Администратор"
+  );
 }
 
-function getEntityLabel(log) {
-  const entityType = log.entity_type;
+function getOldData(log) {
+  if (log.old_data && typeof log.old_data === "object") return log.old_data;
+  return {};
+}
 
-  if (entityType === "organization_application") return "Заявка";
-  if (entityType === "organization") return "Организация";
-  if (entityType === "admin") return "Админ";
-  if (entityType === "admin_channel") return "Канал";
+function getNewData(log) {
+  if (log.new_data && typeof log.new_data === "object") return log.new_data;
+  return {};
+}
 
-  return entityType || "Событие";
+function getObjectName(log) {
+  const oldData = getOldData(log);
+  const newData = getNewData(log);
+
+  return (
+    newData.application_number ||
+    oldData.application_number ||
+    newData.organization_name ||
+    oldData.organization_name ||
+    newData.title ||
+    oldData.title ||
+    safeText(log.title, "")
+  );
+}
+
+function getReadableDetails(log) {
+  const oldData = getOldData(log);
+  const newData = getNewData(log);
+
+  if (log.action === "admin_login_success") {
+    const username = newData.username || oldData.username || log.username;
+    return username
+      ? `Администратор вошёл в систему. Логин: ${username}`
+      : "Администратор вошёл в систему.";
+  }
+
+  if (log.action === "admin_login_failed") {
+    const username = newData.username || oldData.username || log.username;
+    return username
+      ? `Неудачная попытка входа. Логин: ${username}`
+      : "Неудачная попытка входа.";
+  }
+
+  if (log.action === "application_status_changed") {
+    const oldStatus = oldData.status || log.old_status;
+    const newStatus = newData.status || log.new_status;
+
+    if (oldStatus || newStatus) {
+      return `${statusLabel(oldStatus)} → ${statusLabel(newStatus)}`;
+    }
+
+    if (log.details) {
+      return safeText(log.details);
+    }
+
+    return "Статус заявки был изменён.";
+  }
+
+  if (log.action === "application_assigned") {
+    return "Заявка назначена ответственному администратору.";
+  }
+
+  if (log.action === "organization_updated") {
+    const name = newData.organization_name || oldData.organization_name;
+    return name
+      ? `Изменены данные организации: ${name}`
+      : "Изменены данные организации.";
+  }
+
+  if (log.action === "channel_message_sent") {
+    return "Администратор отправил сообщение в канал.";
+  }
+
+  if (log.details) {
+    return safeText(log.details);
+  }
+
+  return "Действие выполнено.";
+}
+
+function getShortEntity(log) {
+  const oldData = getOldData(log);
+  const newData = getNewData(log);
+
+  if (log.entity_type === "organization_application") {
+    return (
+      newData.application_number ||
+      oldData.application_number ||
+      "Заявка"
+    );
+  }
+
+  if (log.entity_type === "organization") {
+    return (
+      newData.organization_name ||
+      oldData.organization_name ||
+      "Организация"
+    );
+  }
+
+  if (log.entity_type === "admin") {
+    return (
+      newData.full_name ||
+      oldData.full_name ||
+      newData.username ||
+      oldData.username ||
+      "Администратор"
+    );
+  }
+
+  if (log.entity_type === "admin_channel") {
+    return newData.title || oldData.title || "Канал";
+  }
+
+  return getObjectName(log) || entityLabel(log.entity_type);
 }
 
 export default function AdminAuditLogs() {
   const [logs, setLogs] = useState([]);
   const [search, setSearch] = useState("");
   const [group, setGroup] = useState("all");
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -149,25 +261,30 @@ export default function AdminAuditLogs() {
     const q = search.trim().toLowerCase();
 
     return logs.filter((log) => {
-      const logGroup = getActionGroup(log.action, log.entity_type);
+      const currentGroup = groupByAction(log.action, log.entity_type);
 
-      if (group !== "all" && logGroup !== group) {
+      if (group !== "all" && currentGroup !== group) {
         return false;
       }
 
       if (!q) return true;
 
+      const oldData = getOldData(log);
+      const newData = getNewData(log);
+
       const source = [
         getAdminName(log),
-        getActionLabel(log.action),
-        log.action,
-        log.title,
-        log.details,
-        log.entity_type,
-        log.entity_id,
-        safeText(log.old_data, ""),
-        safeText(log.new_data, ""),
+        actionLabel(log.action),
+        getReadableDetails(log),
+        getShortEntity(log),
+        oldData.application_number,
+        newData.application_number,
+        oldData.organization_name,
+        newData.organization_name,
+        oldData.username,
+        newData.username,
       ]
+        .filter(Boolean)
         .join(" ")
         .toLowerCase();
 
@@ -181,8 +298,8 @@ export default function AdminAuditLogs() {
         <div>
           <h1>Журнал действий</h1>
           <p>
-            История входов, изменений заявок, организаций, админов и сообщений в
-            каналах.
+            Понятная история действий: входы, заявки, организации, админы и
+            сообщения.
           </p>
         </div>
 
@@ -214,14 +331,11 @@ export default function AdminAuditLogs() {
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Поиск по админу, заявке, организации или действию..."
+          placeholder="Поиск по админу, заявке, организации..."
         />
 
-        <select
-          value={group}
-          onChange={(event) => setGroup(event.target.value)}
-        >
-          {ACTION_GROUPS.map((item) => (
+        <select value={group} onChange={(event) => setGroup(event.target.value)}>
+          {GROUPS.map((item) => (
             <option key={item.value} value={item.value}>
               {item.label}
             </option>
@@ -235,68 +349,46 @@ export default function AdminAuditLogs() {
           <span>{filteredLogs.length} шт.</span>
         </div>
 
-        <div className="auditList">
+        <div className="auditTable">
+          <div className="auditRow auditRowHead">
+            <span>Админ</span>
+            <span>Действие</span>
+            <span>Объект</span>
+            <span>Подробности</span>
+            <span>Дата</span>
+          </div>
+
           {loading ? (
             <div className="auditEmpty">Загрузка журнала...</div>
           ) : filteredLogs.length === 0 ? (
             <div className="auditEmpty">Записей пока нет.</div>
           ) : (
             filteredLogs.map((log) => (
-              <article
+              <div
                 key={log.id || `${log.action}-${log.created_at}-${log.entity_id}`}
-                className="auditItem"
+                className="auditRow"
               >
-                <div className="auditItemTop">
-                  <div>
-                    <strong>{safeText(getAdminName(log))}</strong>
-                    <span>{getActionLabel(log.action)}</span>
-                  </div>
+                <span>
+                  <b>{safeText(getAdminName(log))}</b>
+                </span>
 
+                <span>
+                  <strong className={`actionBadge ${groupByAction(log.action, log.entity_type)}`}>
+                    {actionLabel(log.action)}
+                  </strong>
+                </span>
+
+                <span>
+                  <b>{safeText(getShortEntity(log))}</b>
+                  <small>{entityLabel(log.entity_type)}</small>
+                </span>
+
+                <span>{getReadableDetails(log)}</span>
+
+                <span>
                   <time>{formatDate(log.created_at)}</time>
-                </div>
-
-                <div className="auditInfo">
-                  <div>
-                    <small>Действие</small>
-                    <b>{getActionLabel(log.action)}</b>
-                  </div>
-
-                  <div>
-                    <small>Объект</small>
-                    <b>{getEntityLabel(log)}</b>
-                  </div>
-
-                  <div>
-                    <small>ID объекта</small>
-                    <b>{safeText(log.entity_id)}</b>
-                  </div>
-                </div>
-
-                <div className="auditDetails">
-                  <small>Подробности</small>
-                  <p>{getReadableDetails(log)}</p>
-                </div>
-
-                {(log.old_data || log.new_data) && (
-                  <details className="auditRaw">
-                    <summary>Показать технические данные</summary>
-
-                    {log.old_data ? (
-                      <>
-                        <b>Было:</b>
-                        <pre>{safeText(log.old_data)}</pre>
-                      </>
-                    ) : null}
-
-                    {log.new_data ? (
-                      <>
-                        <b>Стало:</b>
-                        <pre>{safeText(log.new_data)}</pre>
-                      </>
-                    ) : null}
-                  </details>
-                )}
-              </article>
+                </span>
+              </div>
             ))
           )}
         </div>
@@ -418,104 +510,78 @@ export default function AdminAuditLogs() {
           font-weight: 950;
         }
 
-        .auditList {
+        .auditTable {
+          overflow-x: auto;
+        }
+
+        .auditRow {
+          min-width: 1050px;
           display: grid;
+          grid-template-columns: 210px 220px 220px minmax(260px, 1fr) 150px;
           gap: 14px;
-        }
-
-        .auditItem {
-          background: rgba(2, 6, 23, 0.34);
-          border: 1px solid rgba(148, 163, 184, 0.1);
-          border-radius: 20px;
-          padding: 18px;
-        }
-
-        .auditItemTop {
-          display: flex;
-          justify-content: space-between;
-          gap: 16px;
-          margin-bottom: 16px;
-        }
-
-        .auditItemTop strong {
-          display: block;
-          margin-bottom: 5px;
-          font-size: 16px;
-        }
-
-        .auditItemTop span {
-          color: #10f3df;
-          font-weight: 950;
-          font-size: 13px;
-        }
-
-        .auditItemTop time {
-          color: #8aa0b8;
-          font-size: 13px;
-          white-space: nowrap;
-        }
-
-        .auditInfo {
-          display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
-          gap: 12px;
-          margin-bottom: 14px;
-        }
-
-        .auditInfo div {
-          background: rgba(15, 23, 42, 0.72);
-          border-radius: 14px;
-          padding: 12px;
-          min-width: 0;
-        }
-
-        .auditInfo small,
-        .auditDetails small {
-          display: block;
-          color: #8aa0b8;
-          font-size: 12px;
-          font-weight: 900;
-          margin-bottom: 6px;
-        }
-
-        .auditInfo b {
-          overflow-wrap: anywhere;
-        }
-
-        .auditDetails {
-          background: rgba(15, 23, 42, 0.48);
-          border-radius: 14px;
-          padding: 12px;
-        }
-
-        .auditDetails p {
-          margin: 0;
+          align-items: center;
+          padding: 16px;
+          border-bottom: 1px solid rgba(148, 163, 184, 0.1);
           color: #dbeafe;
-          line-height: 1.6;
-          white-space: pre-wrap;
-          overflow-wrap: anywhere;
         }
 
-        .auditRaw {
-          margin-top: 12px;
+        .auditRowHead {
+          background: rgba(30, 41, 59, 0.72);
+          border-radius: 16px;
           color: #9fb2c8;
+          font-weight: 950;
         }
 
-        .auditRaw summary {
-          cursor: pointer;
-          color: #22d3ee;
-          font-weight: 900;
-        }
-
-        .auditRaw pre {
-          max-height: 220px;
-          overflow: auto;
-          background: rgba(2, 6, 23, 0.8);
-          border-radius: 12px;
-          padding: 12px;
-          color: #cbd5e1;
-          white-space: pre-wrap;
+        .auditRow span {
+          min-width: 0;
           overflow-wrap: anywhere;
+        }
+
+        .auditRow small {
+          display: block;
+          color: #8aa0b8;
+          margin-top: 4px;
+          font-size: 12px;
+        }
+
+        .auditRow time {
+          color: #9fb2c8;
+          font-size: 13px;
+        }
+
+        .actionBadge {
+          display: inline-flex;
+          border-radius: 999px;
+          padding: 8px 11px;
+          font-size: 12px;
+          font-weight: 950;
+          background: rgba(34, 211, 238, 0.13);
+          color: #67e8f9;
+        }
+
+        .actionBadge.auth {
+          background: rgba(59, 130, 246, 0.16);
+          color: #bfdbfe;
+        }
+
+        .actionBadge.applications {
+          background: rgba(245, 158, 11, 0.16);
+          color: #fde68a;
+        }
+
+        .actionBadge.organizations {
+          background: rgba(34, 197, 94, 0.16);
+          color: #86efac;
+        }
+
+        .actionBadge.admins {
+          background: rgba(168, 85, 247, 0.16);
+          color: #e9d5ff;
+        }
+
+        .actionBadge.channels {
+          background: rgba(20, 184, 166, 0.16);
+          color: #99f6e4;
         }
 
         .auditEmpty {
@@ -526,7 +592,6 @@ export default function AdminAuditLogs() {
 
         @media (max-width: 900px) {
           .auditStats,
-          .auditInfo,
           .auditFilters {
             grid-template-columns: 1fr;
           }
@@ -537,8 +602,7 @@ export default function AdminAuditLogs() {
             padding: 20px 14px;
           }
 
-          .auditHead,
-          .auditItemTop {
+          .auditHead {
             display: block;
           }
 
@@ -550,9 +614,21 @@ export default function AdminAuditLogs() {
             margin-top: 16px;
           }
 
-          .auditItemTop time {
-            display: block;
-            margin-top: 8px;
+          .auditRow,
+          .auditRowHead {
+            min-width: 0;
+            grid-template-columns: 1fr;
+          }
+
+          .auditRowHead {
+            display: none;
+          }
+
+          .auditRow {
+            background: rgba(2, 6, 23, 0.34);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            border-radius: 18px;
+            margin-bottom: 12px;
           }
         }
       `}</style>
