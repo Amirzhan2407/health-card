@@ -1680,3 +1680,14 @@ textarea {
     border-radius: 14px;
   }
 }
+
+.messagesBox {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scroll-behavior: auto !important;
+  overscroll-behavior: contain;
+}
+
+.chatBox {
+  min-height: 0;
+}

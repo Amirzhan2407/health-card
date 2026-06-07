@@ -23,6 +23,12 @@ function getSenderLabel(item) {
   return item.sender_label || "Неизвестный админ";
 }
 
+function getMessagesSignature(list) {
+  return (list || [])
+    .map((item) => `${item.id || item.created_at}:${item.message}`)
+    .join("|");
+}
+
 export default function AdminChannels() {
   const [channels, setChannels] = useState([]);
   const [activeChannel, setActiveChannel] = useState(null);
@@ -35,16 +41,13 @@ export default function AdminChannels() {
   const messagesBoxRef = useRef(null);
   const messagesEndRef = useRef(null);
   const activeChannelRef = useRef(null);
-  const shouldStickToBottomRef = useRef(true);
+  const messagesSignatureRef = useRef("");
 
   function isNearBottom() {
     const box = messagesBoxRef.current;
-
     if (!box) return true;
 
-    const distanceFromBottom =
-      box.scrollHeight - box.scrollTop - box.clientHeight;
-
+    const distanceFromBottom = box.scrollHeight - box.scrollTop - box.clientHeight;
     return distanceFromBottom < 120;
   }
 
@@ -52,10 +55,6 @@ export default function AdminChannels() {
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior });
     }, 80);
-  }
-
-  function handleMessagesScroll() {
-    shouldStickToBottomRef.current = isNearBottom();
   }
 
   async function loadChannels() {
@@ -70,7 +69,11 @@ export default function AdminChannels() {
       if (list.length > 0 && !activeChannelRef.current) {
         activeChannelRef.current = list[0];
         setActiveChannel(list[0]);
-        await loadMessages(list[0].category, true, true);
+        await loadMessages(list[0].category, {
+          withLoading: true,
+          forceScrollBottom: true,
+          silentAutoRefresh: false,
+        });
       }
     } catch (err) {
       setError(err.message || "Не удалось загрузить каналы.");
@@ -79,11 +82,17 @@ export default function AdminChannels() {
 
   async function loadMessages(
     category,
-    withLoading = false,
-    forceScrollBottom = false
+    {
+      withLoading = false,
+      forceScrollBottom = false,
+      silentAutoRefresh = false,
+    } = {}
   ) {
     if (!category) return;
 
+    const box = messagesBoxRef.current;
+    const previousScrollTop = box?.scrollTop || 0;
+    const previousScrollHeight = box?.scrollHeight || 0;
     const wasNearBottom = isNearBottom();
 
     if (withLoading) {
@@ -98,15 +107,37 @@ export default function AdminChannels() {
       );
 
       const nextMessages = result.messages || [];
+      const nextSignature = getMessagesSignature(nextMessages);
+
+      if (nextSignature === messagesSignatureRef.current) {
+        return;
+      }
+
+      messagesSignatureRef.current = nextSignature;
 
       setMessages(nextMessages);
 
-      const shouldScroll =
-        forceScrollBottom || wasNearBottom || shouldStickToBottomRef.current;
+      setTimeout(() => {
+        const currentBox = messagesBoxRef.current;
+        if (!currentBox) return;
 
-      if (shouldScroll) {
-        scrollToBottom(forceScrollBottom ? "auto" : "smooth");
-      }
+        if (forceScrollBottom) {
+          scrollToBottom("auto");
+          return;
+        }
+
+        if (silentAutoRefresh) {
+          const newScrollHeight = currentBox.scrollHeight;
+          const heightDiff = newScrollHeight - previousScrollHeight;
+
+          currentBox.scrollTop = previousScrollTop + heightDiff;
+          return;
+        }
+
+        if (wasNearBottom) {
+          scrollToBottom("smooth");
+        }
+      }, 50);
     } catch (err) {
       setError(err.message || "Не удалось загрузить сообщения.");
     } finally {
@@ -126,7 +157,6 @@ export default function AdminChannels() {
 
     try {
       setMessage("");
-      shouldStickToBottomRef.current = true;
 
       await adminRequest(`/api/admin-channels/${activeChannel.category}/messages`, {
         method: "POST",
@@ -135,7 +165,9 @@ export default function AdminChannels() {
         }),
       });
 
-      await loadMessages(activeChannel.category, false, true);
+      await loadMessages(activeChannel.category, {
+        forceScrollBottom: true,
+      });
     } catch (err) {
       setMessage(currentText);
       setError(err.message || "Не удалось отправить сообщение.");
@@ -146,10 +178,14 @@ export default function AdminChannels() {
 
   function selectChannel(channel) {
     activeChannelRef.current = channel;
-    shouldStickToBottomRef.current = true;
     setActiveChannel(channel);
     setMessages([]);
-    loadMessages(channel.category, true, true);
+    messagesSignatureRef.current = "";
+
+    loadMessages(channel.category, {
+      withLoading: true,
+      forceScrollBottom: true,
+    });
   }
 
   function handleKeyDown(event) {
@@ -168,7 +204,9 @@ export default function AdminChannels() {
       const channel = activeChannelRef.current;
 
       if (channel?.category) {
-        loadMessages(channel.category, false, false);
+        loadMessages(channel.category, {
+          silentAutoRefresh: true,
+        });
       }
     }, 1000);
 
@@ -234,7 +272,10 @@ export default function AdminChannels() {
                     type="button"
                     className="miniBtn"
                     onClick={() =>
-                      loadMessages(activeChannel.category, true, true)
+                      loadMessages(activeChannel.category, {
+                        withLoading: true,
+                        forceScrollBottom: true,
+                      })
                     }
                   >
                     Обновить сейчас
@@ -242,11 +283,7 @@ export default function AdminChannels() {
                 </div>
               </div>
 
-              <div
-                className="messagesBox"
-                ref={messagesBoxRef}
-                onScroll={handleMessagesScroll}
-              >
+              <div className="messagesBox" ref={messagesBoxRef}>
                 {loadingMessages ? (
                   <p className="muted">Загрузка сообщений...</p>
                 ) : messages.length === 0 ? (
