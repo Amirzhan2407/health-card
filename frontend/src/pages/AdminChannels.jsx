@@ -32,13 +32,30 @@ export default function AdminChannels() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
 
+  const messagesBoxRef = useRef(null);
   const messagesEndRef = useRef(null);
   const activeChannelRef = useRef(null);
+  const shouldStickToBottomRef = useRef(true);
 
-  function scrollToBottom() {
+  function isNearBottom() {
+    const box = messagesBoxRef.current;
+
+    if (!box) return true;
+
+    const distanceFromBottom =
+      box.scrollHeight - box.scrollTop - box.clientHeight;
+
+    return distanceFromBottom < 120;
+  }
+
+  function scrollToBottom(behavior = "smooth") {
     setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
+      messagesEndRef.current?.scrollIntoView({ behavior });
+    }, 80);
+  }
+
+  function handleMessagesScroll() {
+    shouldStickToBottomRef.current = isNearBottom();
   }
 
   async function loadChannels() {
@@ -53,15 +70,21 @@ export default function AdminChannels() {
       if (list.length > 0 && !activeChannelRef.current) {
         activeChannelRef.current = list[0];
         setActiveChannel(list[0]);
-        await loadMessages(list[0].category, true);
+        await loadMessages(list[0].category, true, true);
       }
     } catch (err) {
       setError(err.message || "Не удалось загрузить каналы.");
     }
   }
 
-  async function loadMessages(category, withLoading = false) {
+  async function loadMessages(
+    category,
+    withLoading = false,
+    forceScrollBottom = false
+  ) {
     if (!category) return;
+
+    const wasNearBottom = isNearBottom();
 
     if (withLoading) {
       setLoadingMessages(true);
@@ -75,8 +98,15 @@ export default function AdminChannels() {
       );
 
       const nextMessages = result.messages || [];
+
       setMessages(nextMessages);
-      scrollToBottom();
+
+      const shouldScroll =
+        forceScrollBottom || wasNearBottom || shouldStickToBottomRef.current;
+
+      if (shouldScroll) {
+        scrollToBottom(forceScrollBottom ? "auto" : "smooth");
+      }
     } catch (err) {
       setError(err.message || "Не удалось загрузить сообщения.");
     } finally {
@@ -96,6 +126,7 @@ export default function AdminChannels() {
 
     try {
       setMessage("");
+      shouldStickToBottomRef.current = true;
 
       await adminRequest(`/api/admin-channels/${activeChannel.category}/messages`, {
         method: "POST",
@@ -104,7 +135,7 @@ export default function AdminChannels() {
         }),
       });
 
-      await loadMessages(activeChannel.category);
+      await loadMessages(activeChannel.category, false, true);
     } catch (err) {
       setMessage(currentText);
       setError(err.message || "Не удалось отправить сообщение.");
@@ -115,9 +146,10 @@ export default function AdminChannels() {
 
   function selectChannel(channel) {
     activeChannelRef.current = channel;
+    shouldStickToBottomRef.current = true;
     setActiveChannel(channel);
     setMessages([]);
-    loadMessages(channel.category, true);
+    loadMessages(channel.category, true, true);
   }
 
   function handleKeyDown(event) {
@@ -136,7 +168,7 @@ export default function AdminChannels() {
       const channel = activeChannelRef.current;
 
       if (channel?.category) {
-        loadMessages(channel.category, false);
+        loadMessages(channel.category, false, false);
       }
     }, 1000);
 
@@ -201,14 +233,20 @@ export default function AdminChannels() {
                   <button
                     type="button"
                     className="miniBtn"
-                    onClick={() => loadMessages(activeChannel.category, true)}
+                    onClick={() =>
+                      loadMessages(activeChannel.category, true, true)
+                    }
                   >
                     Обновить сейчас
                   </button>
                 </div>
               </div>
 
-              <div className="messagesBox">
+              <div
+                className="messagesBox"
+                ref={messagesBoxRef}
+                onScroll={handleMessagesScroll}
+              >
                 {loadingMessages ? (
                   <p className="muted">Загрузка сообщений...</p>
                 ) : messages.length === 0 ? (
