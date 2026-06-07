@@ -1454,3 +1454,27 @@ textarea {
     width: 100%;
   }
 }
+
+
+.messageHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.messageHeader b {
+  color: #ffffff;
+  font-weight: 950;
+}
+
+.messageHeader small {
+  color: #8aa0b8;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.messageItem.mine .messageHeader b {
+  color: #10f3df;
+}

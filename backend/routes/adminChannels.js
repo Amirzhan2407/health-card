@@ -24,7 +24,16 @@ function normalizeCategory(value) {
 
 function canAccess(admin, category) {
   if (admin.role === "super_admin") return true;
-  return normalizeCategory(admin.category) === normalizeCategory(category);
+
+  const adminCategory =
+    admin.category ||
+    admin.organization_type ||
+    admin.assigned_category ||
+    admin.support_category;
+
+  if (!adminCategory) return true;
+
+  return normalizeCategory(adminCategory) === normalizeCategory(category);
 }
 
 async function ensureChannels() {
@@ -51,6 +60,39 @@ async function ensureChannels() {
       .from("admin_channels")
       .upsert(channel, { onConflict: "category" });
   }
+}
+
+function getAdminDisplayName(admin) {
+  if (!admin) return "Администратор";
+
+  return (
+    admin.full_name ||
+    admin.fullName ||
+    admin.name ||
+    admin.username ||
+    admin.email ||
+    "Администратор"
+  );
+}
+
+async function getAdminsMap() {
+  const tables = ["admins", "admin_users"];
+
+  for (const table of tables) {
+    const { data, error } = await supabase.from(table).select("*");
+
+    if (!error) {
+      const map = new Map();
+
+      for (const admin of data || []) {
+        map.set(admin.id, getAdminDisplayName(admin));
+      }
+
+      return map;
+    }
+  }
+
+  return new Map();
 }
 
 router.get("/", requireAdminAuth, async (req, res) => {
@@ -110,7 +152,7 @@ router.get("/:category/messages", requireAdminAuth, async (req, res) => {
       });
     }
 
-    const { data, error } = await supabase
+    const { data: messages, error } = await supabase
       .from("admin_channel_messages")
       .select("*")
       .eq("channel_id", channel.id)
@@ -124,10 +166,20 @@ router.get("/:category/messages", requireAdminAuth, async (req, res) => {
       });
     }
 
+    const adminsMap = await getAdminsMap();
+
+    const enrichedMessages = (messages || []).map((message) => ({
+      ...message,
+      sender_name:
+        adminsMap.get(message.sender_admin_id) ||
+        message.sender_name ||
+        "Администратор",
+    }));
+
     return res.status(200).json({
       success: true,
       channel,
-      messages: data || [],
+      messages: enrichedMessages,
     });
   } catch (error) {
     return res.status(500).json({
@@ -169,11 +221,14 @@ router.post("/:category/messages", requireAdminAuth, async (req, res) => {
       });
     }
 
+    const senderName = getAdminDisplayName(req.admin);
+
     const { data, error } = await supabase
       .from("admin_channel_messages")
       .insert({
         channel_id: channel.id,
         sender_admin_id: req.admin.id,
+        sender_name: senderName,
         message,
         application_id: req.body.applicationId || null,
         organization_id: req.body.organizationId || null,
@@ -194,13 +249,16 @@ router.post("/:category/messages", requireAdminAuth, async (req, res) => {
       entityType: "admin_channel",
       entityId: channel.id,
       title: "Сообщение в канал",
-      details: channel.title,
+      details: `${senderName}: ${message}`,
       newData: data,
     });
 
     return res.status(201).json({
       success: true,
-      message: data,
+      message: {
+        ...data,
+        sender_name: senderName,
+      },
     });
   } catch (error) {
     return res.status(500).json({

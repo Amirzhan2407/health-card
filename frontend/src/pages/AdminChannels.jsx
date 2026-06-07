@@ -9,7 +9,27 @@ function text(value) {
 
 function formatDate(value) {
   if (!value) return "";
-  return new Date(value).toLocaleString("ru-RU");
+  return new Date(value).toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getSenderName(item, adminData) {
+  if (item.sender_admin_id === adminData?.id) {
+    return "Вы";
+  }
+
+  return (
+    item.sender_name ||
+    item.sender_full_name ||
+    item.admin_name ||
+    item.admin_full_name ||
+    "Администратор"
+  );
 }
 
 export default function AdminChannels() {
@@ -27,6 +47,7 @@ export default function AdminChannels() {
     try {
       const result = await adminRequest("/api/admin-channels");
       const list = result.channels || [];
+
       setChannels(list);
 
       if (list.length > 0) {
@@ -129,7 +150,11 @@ export default function AdminChannels() {
                   <p>{text(activeChannel.description)}</p>
                 </div>
 
-                <button type="button" className="miniBtn" onClick={() => loadMessages(activeChannel.category)}>
+                <button
+                  type="button"
+                  className="miniBtn"
+                  onClick={() => loadMessages(activeChannel.category)}
+                >
                   Обновить
                 </button>
               </div>
@@ -146,10 +171,11 @@ export default function AdminChannels() {
                         key={item.id || item.created_at}
                         className={isMine ? "messageItem mine" : "messageItem"}
                       >
-                        <div>
-                          <b>{isMine ? "Вы" : text(item.sender_admin_id || "Админ")}</b>
+                        <div className="messageHeader">
+                          <b>{getSenderName(item, adminData)}</b>
                           <small>{formatDate(item.created_at)}</small>
                         </div>
+
                         <p>{text(item.message)}</p>
                       </div>
                     );
