@@ -26,7 +26,6 @@ function roleLabel(role) {
   if (role === "super_admin") return "главный админ";
   if (role === "site_support") return "обычный админ";
   if (role === "support_admin") return "обычный админ";
-
   return "админ";
 }
 
@@ -35,6 +34,8 @@ function getAdminLogin(admin) {
     admin?.username ||
     admin?.login ||
     admin?.email ||
+    admin?.admin_login ||
+    admin?.user_login ||
     "admin"
   );
 }
@@ -43,10 +44,16 @@ function getAdminFullName(admin) {
   return (
     admin?.full_name ||
     admin?.fullName ||
+    admin?.full_name_ru ||
     admin?.name ||
     admin?.fio ||
+    admin?.fullNameRu ||
     "Без ФИО"
   );
+}
+
+function getAdminRole(admin) {
+  return admin?.role || admin?.admin_role || "admin";
 }
 
 function getAdminDisplayLabel(admin) {
@@ -54,7 +61,7 @@ function getAdminDisplayLabel(admin) {
 
   const login = getAdminLogin(admin);
   const fullName = getAdminFullName(admin);
-  const role = roleLabel(admin.role);
+  const role = roleLabel(getAdminRole(admin));
 
   return `${login}, ${fullName} (${role})`;
 }
@@ -99,30 +106,48 @@ async function ensureChannels() {
   }
 }
 
+function addAdminToMap(map, admin) {
+  const label = getAdminDisplayLabel(admin);
+
+  const possibleIds = [
+    admin.id,
+    admin.admin_id,
+    admin.user_id,
+    admin.auth_user_id,
+    admin.uid,
+  ].filter(Boolean);
+
+  for (const id of possibleIds) {
+    map.set(String(id), {
+      id: String(id),
+      label,
+      username: getAdminLogin(admin),
+      fullName: getAdminFullName(admin),
+      role: getAdminRole(admin),
+    });
+  }
+}
+
 async function getAdminsMap() {
+  const map = new Map();
+
   const possibleTables = ["admins", "admin_users"];
 
   for (const table of possibleTables) {
-    const { data, error } = await supabase.from(table).select("*");
+    try {
+      const { data, error } = await supabase.from(table).select("*");
 
-    if (!error) {
-      const map = new Map();
-
-      for (const admin of data || []) {
-        map.set(admin.id, {
-          id: admin.id,
-          label: getAdminDisplayLabel(admin),
-          username: getAdminLogin(admin),
-          fullName: getAdminFullName(admin),
-          role: admin.role,
-        });
+      if (!error && Array.isArray(data)) {
+        for (const admin of data) {
+          addAdminToMap(map, admin);
+        }
       }
-
-      return map;
+    } catch (error) {
+      console.log(`ADMIN MAP SKIP TABLE ${table}:`, error.message);
     }
   }
 
-  return new Map();
+  return map;
 }
 
 router.get("/", requireAdminAuth, async (req, res) => {
@@ -199,11 +224,12 @@ router.get("/:category/messages", requireAdminAuth, async (req, res) => {
     const adminsMap = await getAdminsMap();
 
     const enrichedMessages = (messages || []).map((message) => {
-      const sender = adminsMap.get(message.sender_admin_id);
+      const senderId = String(message.sender_admin_id || "");
+      const sender = adminsMap.get(senderId);
 
       return {
         ...message,
-        sender_label: sender?.label || "Администратор",
+        sender_label: sender?.label || `Неизвестный админ (${senderId})`,
         sender_username: sender?.username || "",
         sender_full_name: sender?.fullName || "",
         sender_role: sender?.role || "",
@@ -274,7 +300,14 @@ router.post("/:category/messages", requireAdminAuth, async (req, res) => {
       });
     }
 
-    const senderLabel = getAdminDisplayLabel(req.admin);
+    const adminsMap = await getAdminsMap();
+    const currentAdmin =
+      adminsMap.get(String(req.admin.id)) || {
+        label: getAdminDisplayLabel(req.admin),
+        username: getAdminLogin(req.admin),
+        fullName: getAdminFullName(req.admin),
+        role: getAdminRole(req.admin),
+      };
 
     await createAuditLog({
       adminId: req.admin.id,
@@ -282,7 +315,7 @@ router.post("/:category/messages", requireAdminAuth, async (req, res) => {
       entityType: "admin_channel",
       entityId: channel.id,
       title: "Сообщение в канал",
-      details: `${senderLabel}: ${message}`,
+      details: `${currentAdmin.label}: ${message}`,
       newData: data,
     });
 
@@ -290,10 +323,10 @@ router.post("/:category/messages", requireAdminAuth, async (req, res) => {
       success: true,
       message: {
         ...data,
-        sender_label: senderLabel,
-        sender_username: getAdminLogin(req.admin),
-        sender_full_name: getAdminFullName(req.admin),
-        sender_role: req.admin.role,
+        sender_label: currentAdmin.label,
+        sender_username: currentAdmin.username,
+        sender_full_name: currentAdmin.fullName,
+        sender_role: currentAdmin.role,
       },
     });
   } catch (error) {
