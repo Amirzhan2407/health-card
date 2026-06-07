@@ -7,6 +7,10 @@ import aiRoutes from "./routes/ai.js";
 import adminRoutes from "./routes/admin.js";
 import organizationApplicationRoutes from "./routes/organizationApplications.js";
 
+import superAdminDashboardRoutes from "./routes/superAdminDashboard.js";
+import adminChannelsRoutes from "./routes/adminChannels.js";
+import auditLogsRoutes from "./routes/auditLogs.js";
+
 dotenv.config();
 
 const app = express();
@@ -23,8 +27,8 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(express.json({ limit: "20mb" }));
+app.use(express.urlencoded({ extended: true, limit: "20mb" }));
 
 app.get("/", (req, res) => {
   res.json({
@@ -44,6 +48,10 @@ app.use("/api/pharmacy", pharmacyRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/organization-applications", organizationApplicationRoutes);
+
+app.use("/api/super-admin-dashboard", superAdminDashboardRoutes);
+app.use("/api/admin-channels", adminChannelsRoutes);
+app.use("/api/audit-logs", auditLogsRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
