@@ -916,3 +916,434 @@
     max-height: calc(100vh - 20px);
   }
 }
+
+
+.adminContentPage {
+  min-height: 100vh;
+  padding: 40px;
+  color: #ffffff;
+}
+
+.adminPageHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.adminPageHead h1 {
+  margin: 0 0 10px;
+  font-size: 42px;
+  font-weight: 950;
+}
+
+.adminPageHead p {
+  margin: 0;
+  color: #9fb2c8;
+  line-height: 1.6;
+}
+
+.adminPageHead button,
+.miniBtn,
+.sendBox button {
+  border: 0;
+  border-radius: 14px;
+  background: #10f3df;
+  color: #06202e;
+  padding: 12px 16px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.adminTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.adminTabs button {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.72);
+  color: #dbeafe;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.adminTabs button.active {
+  background: #10f3df;
+  color: #06202e;
+}
+
+.adminError {
+  margin-bottom: 18px;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  background: rgba(127, 29, 29, 0.38);
+  color: #fecaca;
+  padding: 16px;
+  border-radius: 16px;
+  font-weight: 800;
+}
+
+.adminWorkGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(380px, 0.75fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.adminCard {
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 26px;
+  padding: 20px;
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.cardTop h2 {
+  margin: 0;
+}
+
+.cardTop span {
+  color: #22d3ee;
+  font-weight: 950;
+}
+
+.adminTable {
+  overflow-x: auto;
+}
+
+.adminRow {
+  min-width: 1000px;
+  display: grid;
+  grid-template-columns: 140px 210px 210px 170px 120px 130px 100px;
+  gap: 14px;
+  align-items: center;
+  padding: 15px 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  color: #dbeafe;
+}
+
+.adminRowHead {
+  background: rgba(30, 41, 59, 0.72);
+  border-radius: 16px;
+  color: #9fb2c8;
+  font-weight: 950;
+}
+
+.adminRow small {
+  display: block;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.emptyRow,
+.emptyDetails {
+  padding: 28px 16px;
+  color: #9fb2c8;
+  font-weight: 800;
+}
+
+.emptyDetails {
+  min-height: 260px;
+  display: grid;
+  place-content: center;
+  text-align: center;
+}
+
+.pill {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 7px 11px;
+  font-size: 12px;
+  font-weight: 950;
+  background: rgba(34, 211, 238, 0.13);
+  color: #67e8f9;
+}
+
+.pill.approved {
+  background: rgba(34, 197, 94, 0.16);
+  color: #86efac;
+}
+
+.pill.rejected {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fecaca;
+}
+
+.pill.in_progress {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fde68a;
+}
+
+.detailsTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.detailsTop h2 {
+  margin: 0 0 6px;
+}
+
+.detailsTop p {
+  margin: 0;
+  color: #9fb2c8;
+}
+
+.section {
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  margin-top: 18px;
+  padding-top: 18px;
+}
+
+.section h3 {
+  margin: 0 0 14px;
+}
+
+.infoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.infoGrid div {
+  background: rgba(2, 6, 23, 0.34);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 16px;
+  padding: 13px;
+}
+
+.infoGrid span {
+  display: block;
+  color: #8aa0b8;
+  font-size: 12px;
+  font-weight: 900;
+  margin-bottom: 6px;
+}
+
+.docList {
+  display: grid;
+  gap: 10px;
+}
+
+.docList a {
+  color: #dbeafe;
+  background: rgba(2, 6, 23, 0.34);
+  border-radius: 14px;
+  padding: 12px;
+  text-decoration: none;
+}
+
+.muted {
+  color: #8aa0b8;
+}
+
+textarea,
+.adminSearch {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(2, 6, 23, 0.5);
+  color: #fff;
+  border-radius: 15px;
+  padding: 13px;
+  outline: none;
+}
+
+textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.actions button {
+  border: 0;
+  border-radius: 15px;
+  padding: 13px;
+  color: #fff;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.process {
+  background: #f59e0b;
+}
+
+.approve {
+  background: #16a34a;
+}
+
+.reject {
+  background: #dc2626;
+}
+
+.channelGrid {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 22px;
+}
+
+.channelList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.channelList button {
+  text-align: left;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(2, 6, 23, 0.34);
+  color: #fff;
+  border-radius: 18px;
+  padding: 16px;
+  cursor: pointer;
+}
+
+.channelList button.active {
+  border-color: #10f3df;
+  background: rgba(16, 243, 223, 0.12);
+}
+
+.channelList button span {
+  display: block;
+  margin-top: 6px;
+  color: #9fb2c8;
+}
+
+.messagesBox {
+  height: 480px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.messageItem {
+  background: rgba(2, 6, 23, 0.42);
+  border-radius: 18px;
+  padding: 14px;
+}
+
+.messageItem.mine {
+  background: rgba(16, 243, 223, 0.12);
+}
+
+.messageItem small {
+  display: block;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.messageItem p {
+  color: #dbeafe;
+  line-height: 1.6;
+}
+
+.sendBox {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+}
+
+.logList {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.logItem {
+  background: rgba(2, 6, 23, 0.34);
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.logTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.logTop span {
+  display: block;
+  color: #22d3ee;
+  font-size: 13px;
+  font-weight: 900;
+  margin-top: 4px;
+}
+
+.logTop time {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.logItem h3 {
+  margin: 0 0 8px;
+}
+
+.logItem p {
+  margin: 0 0 12px;
+  color: #cbd5e1;
+}
+
+.logMeta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.logMeta span {
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #9fb2c8;
+  font-size: 12px;
+}
+
+@media (max-width: 1100px) {
+  .adminWorkGrid,
+  .channelGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .adminContentPage {
+    padding: 20px 14px;
+  }
+
+  .adminPageHead,
+  .detailsTop,
+  .logTop {
+    display: block;
+  }
+
+  .adminPageHead h1 {
+    font-size: 32px;
+  }
+
+  .adminPageHead button {
+    margin-top: 16px;
+  }
+
+  .infoGrid,
+  .actions,
+  .sendBox {
+    grid-template-columns: 1fr;
+  }
+}
