@@ -1,49 +1,13 @@
 import express from "express";
-import { verifyAdminToken } from "../services/adminService.js";
-import { getAuditLogs } from "../services/auditLogService.js";
+import { requireAdminAuth } from "../middleware/requireAdminAuth.js";
+import { getAuditLogs } from "../services/adminAuditService.js";
 
 const router = express.Router();
 
-function requireAdminAuth(req, res, next) {
-  try {
-    const authHeader = req.headers.authorization || "";
-    const token = authHeader.startsWith("Bearer ")
-      ? authHeader.slice(7)
-      : "";
-
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: "Нет токена авторизации.",
-      });
-    }
-
-    req.admin = verifyAdminToken(token);
-    return next();
-  } catch (error) {
-    return res.status(401).json({
-      success: false,
-      message: "Неверный или просроченный токен.",
-    });
-  }
-}
-
 router.get("/", requireAdminAuth, async (req, res) => {
-  try {
-    const result = await getAuditLogs({
-      currentAdmin: req.admin,
-      filters: req.query,
-    });
+  const result = await getAuditLogs({ admin: req.admin });
 
-    return res.status(result.status).json(result);
-  } catch (error) {
-    console.error("GET AUDIT LOGS ROUTE ERROR:", error.message);
-
-    return res.status(500).json({
-      success: false,
-      message: error.message || "Ошибка получения журнала.",
-    });
-  }
+  return res.status(result.status || 200).json(result);
 });
 
 export default router;

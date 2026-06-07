@@ -1,7 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-
-const API_URL =
-  import.meta.env.VITE_API_URL || "https://health-card.onrender.com";
+import { useEffect, useState } from "react";
+import { adminRequest, getAdminData } from "../api/adminApi";
 
 const CHANNEL_LABELS = {
   state_polyclinic: "Канал государственных поликлиник",
@@ -9,93 +7,89 @@ const CHANNEL_LABELS = {
   private_clinic: "Канал частных клиник",
 };
 
-function getToken() {
-  return (
-    localStorage.getItem("adminToken") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("authToken") ||
-    ""
-  );
-}
-
 export default function AdminChannels() {
+  const adminData = getAdminData();
+
   const [channels, setChannels] = useState([]);
   const [activeChannel, setActiveChannel] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [message, setMessage] = useState("");
+  const [messageText, setMessageText] = useState("");
+
+  const [loading, setLoading] = useState(false);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
 
-  const token = useMemo(() => getToken(), []);
-
-  async function apiFetch(path, options = {}) {
-    const response = await fetch(`${API_URL}${path}`, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(options.headers || {}),
-      },
-    });
-
-    const result = await response.json().catch(() => null);
-
-    if (!response.ok) {
-      throw new Error(
-        result?.message || result?.error || `Ошибка запроса: ${response.status}`
-      );
-    }
-
-    return result;
-  }
-
   async function loadChannels() {
+    setLoading(true);
     setError("");
 
     try {
-      const result = await apiFetch("/api/admin-channels");
-      const list = result.channels || result.data || [];
-      setChannels(Array.isArray(list) ? list : []);
+      const result = await adminRequest("/api/admin-channels");
+      const list = result.channels || [];
 
-      if (!activeChannel && list?.length) {
+      setChannels(list);
+
+      if (list.length > 0 && !activeChannel) {
         setActiveChannel(list[0]);
-        loadMessages(list[0].category);
+        await loadMessages(list[0].category);
       }
     } catch (err) {
+      setChannels([]);
       setError(err.message || "Не удалось загрузить каналы.");
+    } finally {
+      setLoading(false);
     }
   }
 
   async function loadMessages(category) {
     if (!category) return;
 
+    setMessagesLoading(true);
     setError("");
 
     try {
-      const result = await apiFetch(`/api/admin-channels/${category}/messages`);
+      const result = await adminRequest(
+        `/api/admin-channels/${category}/messages`
+      );
+
       setMessages(result.messages || []);
     } catch (err) {
-      setError(err.message || "Не удалось загрузить сообщения.");
       setMessages([]);
+      setError(err.message || "Не удалось загрузить сообщения.");
+    } finally {
+      setMessagesLoading(false);
     }
   }
 
   async function sendMessage() {
-    if (!activeChannel?.category || !message.trim()) return;
+    if (!activeChannel?.category) {
+      setError("Сначала выберите канал.");
+      return;
+    }
 
+    if (!messageText.trim()) {
+      setError("Сообщение не может быть пустым.");
+      return;
+    }
+
+    setSending(true);
     setError("");
 
     try {
-      await apiFetch(`/api/admin-channels/${activeChannel.category}/messages`, {
+      await adminRequest(`/api/admin-channels/${activeChannel.category}/messages`, {
         method: "POST",
         body: JSON.stringify({
-          message,
+          message: messageText,
         }),
       });
 
-      setMessage("");
+      setMessageText("");
       await loadMessages(activeChannel.category);
     } catch (err) {
       setError(err.message || "Не удалось отправить сообщение.");
+    } finally {
+      setSending(false);
     }
   }
 
@@ -104,28 +98,50 @@ export default function AdminChannels() {
     loadMessages(channel.category);
   }
 
+  function formatDate(value) {
+    if (!value) return "";
+    return new Date(value).toLocaleString("ru-RU");
+  }
+
+  function senderName(item) {
+    return (
+      item.sender_name ||
+      item.admin_name ||
+      item.sender_full_name ||
+      item.sender_admin_name ||
+      item.sender_admin_id ||
+      "Админ"
+    );
+  }
+
   useEffect(() => {
     loadChannels();
   }, []);
 
   return (
-    <main className="adminChannelsPage">
-      <div className="channelsHead">
-        <h1>Каналы</h1>
-        <p>
-          Общие каналы для главного админа и обычных админов по категориям
-          организаций.
-        </p>
-      </div>
+    <main className="channelsPage">
+      <section className="channelsHead">
+        <div>
+          <h1>Каналы</h1>
+          <p>
+            Общие каналы для главного админа и обычных админов по категориям
+            организаций.
+          </p>
+        </div>
+
+        <button type="button" onClick={loadChannels} disabled={loading}>
+          {loading ? "Загрузка..." : "Обновить"}
+        </button>
+      </section>
 
       {error ? <div className="channelsError">{error}</div> : null}
 
-      <section className="channelsLayout">
+      <section className="channelsGrid">
         <aside className="channelsList">
           <h2>Список каналов</h2>
 
           {channels.length === 0 ? (
-            <p className="emptyText">Каналы не найдены</p>
+            <p className="emptyText">Каналы пока не найдены.</p>
           ) : (
             channels.map((channel) => (
               <button
@@ -147,55 +163,68 @@ export default function AdminChannels() {
           )}
         </aside>
 
-        <section className="channelChat">
+        <section className="chatCard">
           {!activeChannel ? (
-            <div className="chatPlaceholder">
-              <h2>Выберите канал</h2>
-              <p>После выбора канала здесь появятся сообщения.</p>
+            <div className="chatEmpty">
+              <h2>Канал не выбран</h2>
+              <p>Выберите канал слева.</p>
             </div>
           ) : (
             <>
-              <div className="chatHeader">
-                <h2>
-                  {activeChannel.title ||
-                    CHANNEL_LABELS[activeChannel.category] ||
-                    "Канал"}
-                </h2>
+              <div className="chatTop">
+                <div>
+                  <h2>
+                    {activeChannel.title ||
+                      CHANNEL_LABELS[activeChannel.category] ||
+                      "Канал"}
+                  </h2>
+                  <p>{activeChannel.description || "Общий чат админов"}</p>
+                </div>
+
                 <button
                   type="button"
                   onClick={() => loadMessages(activeChannel.category)}
+                  disabled={messagesLoading}
                 >
-                  Обновить
+                  {messagesLoading ? "..." : "Обновить"}
                 </button>
               </div>
 
               <div className="messagesBox">
-                {messages.length === 0 ? (
-                  <p className="emptyText">Сообщений пока нет</p>
+                {messagesLoading ? (
+                  <p className="emptyText">Загрузка сообщений...</p>
+                ) : messages.length === 0 ? (
+                  <p className="emptyText">Сообщений пока нет.</p>
                 ) : (
-                  messages.map((item) => (
-                    <div key={item.id || item.created_at} className="messageItem">
-                      <strong>{item.sender_admin_id || "Админ"}</strong>
-                      <p>{item.message}</p>
-                      <small>
-                        {item.created_at
-                          ? new Date(item.created_at).toLocaleString("ru-RU")
-                          : ""}
-                      </small>
-                    </div>
-                  ))
+                  messages.map((item) => {
+                    const isMine = item.sender_admin_id === adminData?.id;
+
+                    return (
+                      <div
+                        key={item.id || item.created_at}
+                        className={isMine ? "messageItem mine" : "messageItem"}
+                      >
+                        <div className="messageMeta">
+                          <strong>{isMine ? "Вы" : senderName(item)}</strong>
+                          <span>{formatDate(item.created_at)}</span>
+                        </div>
+
+                        <p>{item.message}</p>
+                      </div>
+                    );
+                  })
                 )}
               </div>
 
               <div className="sendBox">
                 <textarea
-                  value={message}
-                  onChange={(event) => setMessage(event.target.value)}
+                  value={messageText}
+                  onChange={(event) => setMessageText(event.target.value)}
                   placeholder="Напишите сообщение в канал..."
                 />
 
-                <button type="button" onClick={sendMessage}>
-                  Отправить
+                <button type="button" onClick={sendMessage} disabled={sending}>
+                  {sending ? "Отправка..." : "Отправить"}
                 </button>
               </div>
             </>
@@ -204,10 +233,18 @@ export default function AdminChannels() {
       </section>
 
       <style>{`
-        .adminChannelsPage {
+        .channelsPage {
           min-height: 100vh;
           padding: 40px;
           color: #fff;
+        }
+
+        .channelsHead {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 16px;
+          margin-bottom: 24px;
         }
 
         .channelsHead h1 {
@@ -217,8 +254,21 @@ export default function AdminChannels() {
         }
 
         .channelsHead p {
-          margin: 0 0 24px;
+          margin: 0;
           color: #9fb2c8;
+          line-height: 1.6;
+        }
+
+        .channelsHead button,
+        .chatTop button,
+        .sendBox button {
+          border: 0;
+          border-radius: 14px;
+          background: #10f3df;
+          color: #06202e;
+          padding: 12px 18px;
+          font-weight: 950;
+          cursor: pointer;
         }
 
         .channelsError {
@@ -231,22 +281,22 @@ export default function AdminChannels() {
           font-weight: 800;
         }
 
-        .channelsLayout {
+        .channelsGrid {
           display: grid;
-          grid-template-columns: 360px 1fr;
+          grid-template-columns: 360px minmax(0, 1fr);
           gap: 22px;
+          align-items: start;
         }
 
         .channelsList,
-        .channelChat {
+        .chatCard {
           background: rgba(15, 23, 42, 0.78);
           border: 1px solid rgba(148, 163, 184, 0.14);
           border-radius: 26px;
           padding: 20px;
         }
 
-        .channelsList h2,
-        .chatHeader h2 {
+        .channelsList h2 {
           margin: 0 0 16px;
         }
 
@@ -271,37 +321,35 @@ export default function AdminChannels() {
           background: rgba(16, 243, 223, 0.12);
         }
 
-        .channelsList button strong {
+        .channelsList strong {
           display: block;
           margin-bottom: 6px;
         }
 
-        .channelsList button span {
+        .channelsList span,
+        .chatTop p,
+        .emptyText {
           color: #9fb2c8;
-          font-size: 13px;
         }
 
-        .chatHeader {
+        .chatTop {
           display: flex;
-          align-items: center;
           justify-content: space-between;
-          gap: 12px;
-          margin-bottom: 16px;
+          gap: 16px;
+          align-items: flex-start;
+          margin-bottom: 18px;
         }
 
-        .chatHeader button,
-        .sendBox button {
-          border: 0;
-          border-radius: 14px;
-          background: #10f3df;
-          color: #06202e;
-          font-weight: 950;
-          padding: 12px 16px;
-          cursor: pointer;
+        .chatTop h2 {
+          margin: 0 0 6px;
+        }
+
+        .chatTop p {
+          margin: 0;
         }
 
         .messagesBox {
-          height: 460px;
+          height: 500px;
           overflow-y: auto;
           display: flex;
           flex-direction: column;
@@ -311,21 +359,36 @@ export default function AdminChannels() {
         }
 
         .messageItem {
-          background: rgba(2, 6, 23, 0.34);
+          max-width: 78%;
+          background: rgba(2, 6, 23, 0.42);
           border: 1px solid rgba(148, 163, 184, 0.1);
-          border-radius: 16px;
+          border-radius: 18px;
           padding: 14px;
         }
 
-        .messageItem p {
-          margin: 8px 0;
-          color: #dbeafe;
-          line-height: 1.5;
+        .messageItem.mine {
+          align-self: flex-end;
+          background: rgba(16, 243, 223, 0.12);
+          border-color: rgba(16, 243, 223, 0.25);
         }
 
-        .messageItem small,
-        .emptyText {
-          color: #8aa0b8;
+        .messageMeta {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 8px;
+        }
+
+        .messageMeta span {
+          color: #64748b;
+          font-size: 12px;
+        }
+
+        .messageItem p {
+          margin: 0;
+          color: #dbeafe;
+          line-height: 1.6;
+          white-space: pre-wrap;
         }
 
         .sendBox {
@@ -335,7 +398,7 @@ export default function AdminChannels() {
         }
 
         .sendBox textarea {
-          min-height: 70px;
+          min-height: 74px;
           border: 1px solid rgba(148, 163, 184, 0.22);
           background: rgba(2, 6, 23, 0.5);
           color: #fff;
@@ -345,7 +408,7 @@ export default function AdminChannels() {
           outline: none;
         }
 
-        .chatPlaceholder {
+        .chatEmpty {
           min-height: 420px;
           display: grid;
           place-content: center;
@@ -353,17 +416,37 @@ export default function AdminChannels() {
           color: #9fb2c8;
         }
 
-        @media (max-width: 900px) {
-          .adminChannelsPage {
+        @media (max-width: 1000px) {
+          .channelsGrid {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @media (max-width: 760px) {
+          .channelsPage {
             padding: 20px 14px;
           }
 
-          .channelsLayout {
-            grid-template-columns: 1fr;
+          .channelsHead,
+          .chatTop {
+            display: block;
+          }
+
+          .channelsHead h1 {
+            font-size: 32px;
+          }
+
+          .channelsHead button,
+          .chatTop button {
+            margin-top: 16px;
           }
 
           .sendBox {
             grid-template-columns: 1fr;
+          }
+
+          .messageItem {
+            max-width: 100%;
           }
         }
       `}</style>

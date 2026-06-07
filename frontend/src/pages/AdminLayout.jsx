@@ -59,13 +59,13 @@ export default function AdminLayout() {
     item.roles.includes(adminData.role)
   );
 
-  const logout = () => {
+  function logout() {
     localStorage.removeItem("adminData");
     localStorage.removeItem("adminToken");
     localStorage.removeItem("token");
     localStorage.removeItem("authToken");
     navigate("/admin");
-  };
+  }
 
   return (
     <div className="adminShell">

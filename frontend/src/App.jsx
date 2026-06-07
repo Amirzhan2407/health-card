@@ -18,9 +18,9 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminStaff from "./pages/AdminStaff";
 import AdminApplications from "./pages/AdminApplications";
 import AdminOrganizations from "./pages/AdminOrganizations";
+import AdminChannels from "./pages/AdminChannels";
 import AdminAuditLogs from "./pages/AdminAuditLogs";
 import AdminRoles from "./pages/AdminRoles";
-import AdminChannels from "./pages/AdminChannels";
 
 function App() {
   return (
@@ -59,13 +59,13 @@ function App() {
       />
 
       <Route
-        path="/admin-panel/applications-old"
-        element={<Navigate to="/admin-panel/applications" replace />}
+        path="/admin-panel/orgs-old"
+        element={<Navigate to="/admin-panel/orgs" replace />}
       />
 
       <Route
-        path="/admin-panel/orgs-old"
-        element={<Navigate to="/admin-panel/orgs" replace />}
+        path="/admin-panel/applications-old"
+        element={<Navigate to="/admin-panel/applications" replace />}
       />
 
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,29 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
-
-const API_URL =
-  import.meta.env.VITE_API_URL || "https://health-card.onrender.com";
-
-function getToken() {
-  const adminData = JSON.parse(localStorage.getItem("adminData") || "null");
-
-  return (
-    localStorage.getItem("adminToken") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("authToken") ||
-    adminData?.token ||
-    ""
-  );
-}
+import { useEffect, useState } from "react";
+import { adminRequest } from "../api/adminApi";
 
 function PieChart({ title, stats }) {
   const total = stats?.total || 0;
 
   const items = [
-    { label: "Открыты", value: stats?.opened || 0 },
-    { label: "Не открылись", value: stats?.notOpened || 0 },
-    { label: "В процессе", value: stats?.inProcess || 0 },
-    { label: "Ожидают ЭЦП", value: stats?.waitingEds || 0 },
-    { label: "Отклонены", value: stats?.rejected || 0 },
+    { label: "Открыты", value: stats?.opened || 0, color: "#22c55e" },
+    { label: "Не открылись", value: stats?.notOpened || 0, color: "#64748b" },
+    { label: "В процессе", value: stats?.inProcess || 0, color: "#f59e0b" },
+    { label: "Ожидают ЭЦП", value: stats?.waitingEds || 0, color: "#3b82f6" },
+    { label: "Отклонены", value: stats?.rejected || 0, color: "#ef4444" },
   ];
 
   let current = 0;
@@ -31,46 +17,32 @@ function PieChart({ title, stats }) {
   const gradient =
     total > 0
       ? items
-          .map((item, index) => {
+          .map((item) => {
             const start = current;
             const end = current + (item.value / total) * 100;
             current = end;
-
-            const colors = [
-              "#22c55e",
-              "#64748b",
-              "#f59e0b",
-              "#3b82f6",
-              "#ef4444",
-            ];
-
-            return `${colors[index]} ${start}% ${end}%`;
+            return `${item.color} ${start}% ${end}%`;
           })
           .join(", ")
       : "#1e293b 0% 100%";
 
   return (
-    <div className="dashboardChartCard">
+    <div className="chartCard">
       <h2>{title}</h2>
 
-      <div
-        className="pieChart"
-        style={{
-          background: `conic-gradient(${gradient})`,
-        }}
-      >
+      <div className="pie" style={{ background: `conic-gradient(${gradient})` }}>
         <div>
-          <strong>{total}</strong>
+          <b>{total}</b>
           <span>всего</span>
         </div>
       </div>
 
-      <div className="chartLegend">
+      <div className="legend">
         {items.map((item) => (
-          <div key={item.label}>
+          <p key={item.label}>
             <span>{item.label}</span>
             <b>{item.value}</b>
-          </div>
+          </p>
         ))}
       </div>
     </div>
@@ -80,33 +52,19 @@ function PieChart({ title, stats }) {
 export default function AdminDashboard() {
   const [dashboard, setDashboard] = useState(null);
   const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-
-  const token = useMemo(() => getToken(), []);
+  const [loading, setLoading] = useState(false);
 
   async function loadDashboard() {
-    setIsLoading(true);
+    setLoading(true);
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/api/super-admin-dashboard`, {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-
-      const result = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(result?.message || "Не удалось загрузить главную.");
-      }
-
-      setDashboard(result.dashboard || result.data || result);
+      const result = await adminRequest("/api/admin-dashboard");
+      setDashboard(result.dashboard);
     } catch (err) {
-      setError(err.message || "Ошибка загрузки главной.");
-      setDashboard(null);
+      setError(err.message || "Не удалось загрузить главную.");
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   }
 
@@ -117,202 +75,45 @@ export default function AdminDashboard() {
   const categoryStats = dashboard?.categoryStats || [];
 
   return (
-    <main className="adminDashboardPage">
-      <section className="dashboardHead">
+    <main className="dashPage">
+      <section className="dashHead">
         <div>
           <h1>Главная</h1>
-          <p>
-            Общая статистика по организациям: поликлиники, больницы и частные
-            клиники.
-          </p>
+          <p>Статистика по организациям и заявкам.</p>
         </div>
 
-        <button type="button" onClick={loadDashboard} disabled={isLoading}>
-          {isLoading ? "Загрузка..." : "Обновить"}
+        <button onClick={loadDashboard}>
+          {loading ? "Загрузка..." : "Обновить"}
         </button>
       </section>
 
-      {error ? <div className="dashboardError">{error}</div> : null}
+      {error ? <div className="dashError">{error}</div> : null}
 
-      <section className="dashboardCharts">
-        {categoryStats.length ? (
-          categoryStats.map((item) => (
-            <PieChart key={item.key} title={item.title} stats={item.stats} />
-          ))
-        ) : (
-          <>
-            <PieChart
-              title="Государственные поликлиники"
-              stats={{
-                total: 0,
-                opened: 0,
-                notOpened: 0,
-                inProcess: 0,
-                waitingEds: 0,
-                rejected: 0,
-              }}
-            />
-            <PieChart
-              title="Государственные больницы"
-              stats={{
-                total: 0,
-                opened: 0,
-                notOpened: 0,
-                inProcess: 0,
-                waitingEds: 0,
-                rejected: 0,
-              }}
-            />
-            <PieChart
-              title="Частные клиники"
-              stats={{
-                total: 0,
-                opened: 0,
-                notOpened: 0,
-                inProcess: 0,
-                waitingEds: 0,
-                rejected: 0,
-              }}
-            />
-          </>
-        )}
+      <section className="charts">
+        {categoryStats.map((item) => (
+          <PieChart key={item.key} title={item.title} stats={item.stats} />
+        ))}
       </section>
 
       <style>{`
-        .adminDashboardPage {
-          min-height: 100vh;
-          padding: 40px;
-          color: #fff;
-        }
-
-        .dashboardHead {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          gap: 16px;
-          margin-bottom: 26px;
-        }
-
-        .dashboardHead h1 {
-          margin: 0 0 10px;
-          font-size: 42px;
-          font-weight: 950;
-        }
-
-        .dashboardHead p {
-          margin: 0;
-          color: #9fb2c8;
-        }
-
-        .dashboardHead button {
-          border: 0;
-          border-radius: 14px;
-          background: #10f3df;
-          color: #06202e;
-          padding: 12px 18px;
-          font-weight: 950;
-          cursor: pointer;
-        }
-
-        .dashboardError {
-          margin-bottom: 18px;
-          padding: 16px;
-          border-radius: 16px;
-          color: #fecaca;
-          background: rgba(127, 29, 29, 0.38);
-          border: 1px solid rgba(248, 113, 113, 0.4);
-          font-weight: 800;
-        }
-
-        .dashboardCharts {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 22px;
-        }
-
-        .dashboardChartCard {
-          background: rgba(15, 23, 42, 0.78);
-          border: 1px solid rgba(148, 163, 184, 0.14);
-          border-radius: 26px;
-          padding: 22px;
-        }
-
-        .dashboardChartCard h2 {
-          margin: 0 0 20px;
-          font-size: 20px;
-        }
-
-        .pieChart {
-          width: 210px;
-          height: 210px;
-          border-radius: 50%;
-          margin: 0 auto 22px;
-          display: grid;
-          place-items: center;
-        }
-
-        .pieChart div {
-          width: 112px;
-          height: 112px;
-          border-radius: 50%;
-          background: #020617;
-          display: grid;
-          place-items: center;
-          text-align: center;
-        }
-
-        .pieChart strong {
-          font-size: 28px;
-          line-height: 1;
-        }
-
-        .pieChart span {
-          color: #9fb2c8;
-          font-size: 12px;
-          font-weight: 900;
-        }
-
-        .chartLegend {
-          display: grid;
-          gap: 10px;
-        }
-
-        .chartLegend div {
-          display: flex;
-          justify-content: space-between;
-          gap: 12px;
-          border-radius: 12px;
-          background: rgba(2, 6, 23, 0.34);
-          padding: 10px 12px;
-        }
-
-        .chartLegend span {
-          color: #cbd5e1;
-        }
-
-        @media (max-width: 1100px) {
-          .dashboardCharts {
-            grid-template-columns: 1fr;
-          }
-        }
-
-        @media (max-width: 700px) {
-          .adminDashboardPage {
-            padding: 20px 14px;
-          }
-
-          .dashboardHead {
-            display: block;
-          }
-
-          .dashboardHead h1 {
-            font-size: 32px;
-          }
-
-          .dashboardHead button {
-            margin-top: 16px;
-          }
-        }
+        .dashPage { min-height: 100vh; padding: 40px; color: #fff; }
+        .dashHead { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 26px; }
+        .dashHead h1 { margin: 0 0 10px; font-size: 42px; font-weight: 950; }
+        .dashHead p { margin: 0; color: #9fb2c8; }
+        .dashHead button { border: 0; border-radius: 14px; background: #10f3df; color: #06202e; padding: 12px 18px; font-weight: 950; cursor: pointer; }
+        .dashError { margin-bottom: 18px; padding: 16px; border-radius: 16px; color: #fecaca; background: rgba(127,29,29,.38); border: 1px solid rgba(248,113,113,.4); font-weight: 800; }
+        .charts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+        .chartCard { background: rgba(15,23,42,.78); border: 1px solid rgba(148,163,184,.14); border-radius: 26px; padding: 22px; }
+        .chartCard h2 { margin: 0 0 20px; }
+        .pie { width: 210px; height: 210px; border-radius: 50%; margin: 0 auto 22px; display: grid; place-items: center; }
+        .pie div { width: 112px; height: 112px; border-radius: 50%; background: #020617; display: grid; place-items: center; text-align: center; }
+        .pie b { font-size: 28px; }
+        .pie span { color: #9fb2c8; font-size: 12px; }
+        .legend { display: grid; gap: 10px; }
+        .legend p { margin: 0; display: flex; justify-content: space-between; background: rgba(2,6,23,.34); border-radius: 12px; padding: 10px 12px; }
+        .legend span { color: #cbd5e1; }
+        @media (max-width: 1100px) { .charts { grid-template-columns: 1fr; } }
+        @media (max-width: 760px) { .dashPage { padding: 20px 14px; } .dashHead { display: block; } .dashHead h1 { font-size: 32px; } .dashHead button { margin-top: 16px; } }
       `}</style>
     </main>
   );
