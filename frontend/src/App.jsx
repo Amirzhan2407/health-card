@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import MainLayout from "./layout/MainLayout";
 
@@ -24,54 +24,52 @@ import AdminChannels from "./pages/AdminChannels";
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<HomePage />} />
-          <Route path="search" element={<Search />} />
-          <Route path="health" element={<HealthPage />} />
-          <Route path="documents" element={<DocumentsPage />} />
-          <Route path="documents-cloud" element={<DocumentsCloudPage />} />
-          <Route path="my-documents" element={<DocumentsPage />} />
-          <Route path="ai-assistant" element={<AiAssistantPage />} />
-          <Route path="login" element={<Login />} />
-          <Route path="passport" element={<Passport />} />
-          <Route
-            path="organization-application"
-            element={<OrganizationApplication />}
-          />
-        </Route>
-
-        <Route path="/admin" element={<AdminLogin />} />
-
-        <Route path="/admin-panel" element={<AdminLayout />}>
-          <Route index element={<AdminDashboard />} />
-          <Route path="staff" element={<AdminStaff />} />
-          <Route path="applications" element={<AdminApplications />} />
-          <Route path="orgs" element={<AdminOrganizations />} />
-          <Route path="channels" element={<AdminChannels />} />
-          <Route path="logs" element={<AdminAuditLogs />} />
-          <Route path="roles" element={<AdminRoles />} />
-        </Route>
-
+    <Routes>
+      <Route path="/" element={<MainLayout />}>
+        <Route index element={<HomePage />} />
+        <Route path="search" element={<Search />} />
+        <Route path="health" element={<HealthPage />} />
+        <Route path="documents" element={<DocumentsPage />} />
+        <Route path="documents-cloud" element={<DocumentsCloudPage />} />
+        <Route path="my-documents" element={<DocumentsPage />} />
+        <Route path="ai-assistant" element={<AiAssistantPage />} />
+        <Route path="login" element={<Login />} />
+        <Route path="passport" element={<Passport />} />
         <Route
-          path="/admin-panel/organizations"
-          element={<Navigate to="/admin-panel/orgs" replace />}
+          path="organization-application"
+          element={<OrganizationApplication />}
         />
+      </Route>
 
-        <Route
-          path="/admin-panel/applications-old"
-          element={<Navigate to="/admin-panel/applications" replace />}
-        />
+      <Route path="/admin" element={<AdminLogin />} />
 
-        <Route
-          path="/admin-panel/orgs-old"
-          element={<Navigate to="/admin-panel/orgs" replace />}
-        />
+      <Route path="/admin-panel" element={<AdminLayout />}>
+        <Route index element={<AdminDashboard />} />
+        <Route path="staff" element={<AdminStaff />} />
+        <Route path="applications" element={<AdminApplications />} />
+        <Route path="orgs" element={<AdminOrganizations />} />
+        <Route path="channels" element={<AdminChannels />} />
+        <Route path="logs" element={<AdminAuditLogs />} />
+        <Route path="roles" element={<AdminRoles />} />
+      </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+      <Route
+        path="/admin-panel/organizations"
+        element={<Navigate to="/admin-panel/orgs" replace />}
+      />
+
+      <Route
+        path="/admin-panel/applications-old"
+        element={<Navigate to="/admin-panel/applications" replace />}
+      />
+
+      <Route
+        path="/admin-panel/orgs-old"
+        element={<Navigate to="/admin-panel/orgs" replace />}
+      />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 
