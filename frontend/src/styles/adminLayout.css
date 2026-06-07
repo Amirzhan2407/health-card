@@ -1347,3 +1347,110 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+
+
+
+/* FIX: страница заявлений — чтобы кнопка "Открыть" не уходила вправо */
+
+.adminWorkGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 520px;
+  gap: 22px;
+  align-items: start;
+}
+
+.adminTable {
+  width: 100%;
+  overflow-x: visible;
+}
+
+.adminRow {
+  min-width: 0 !important;
+  width: 100%;
+  display: grid;
+  grid-template-columns:
+    minmax(105px, 0.9fr)
+    minmax(130px, 1.15fr)
+    minmax(145px, 1.2fr)
+    minmax(105px, 0.9fr)
+    minmax(95px, 0.8fr)
+    minmax(95px, 0.85fr)
+    92px;
+  gap: 10px;
+  align-items: center;
+  padding: 14px 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  color: #dbeafe;
+}
+
+.adminRow span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.adminRow .miniBtn {
+  width: 100%;
+  padding: 10px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.adminRowHead {
+  background: rgba(30, 41, 59, 0.72);
+  border-radius: 16px;
+  color: #9fb2c8;
+  font-weight: 950;
+}
+
+.adminRowHead span {
+  white-space: normal;
+}
+
+.adminCard {
+  min-width: 0;
+}
+
+.adminContentPage {
+  overflow-x: hidden;
+}
+
+/* На средних экранах правую карточку переносим вниз */
+@media (max-width: 1350px) {
+  .adminWorkGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .adminTable {
+    overflow-x: auto;
+  }
+
+  .adminRow {
+    min-width: 900px !important;
+  }
+}
+
+/* На телефоне делаем таблицу карточками */
+@media (max-width: 760px) {
+  .adminRow,
+  .adminRowHead {
+    min-width: 0 !important;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .adminRowHead {
+    display: none;
+  }
+
+  .adminRow {
+    background: rgba(15, 23, 42, 0.72);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    border-radius: 18px;
+    margin-bottom: 12px;
+  }
+
+  .adminRow .miniBtn {
+    width: 100%;
+  }
+}

@@ -22,8 +22,14 @@ const CATEGORY_LABELS = {
   state_polyclinic: "Гос. поликлиника",
   state_hospital: "Гос. больница",
   private_clinic: "Частная клиника",
+
   gov_polyclinic: "Гос. поликлиника",
+  gov_polyclinics: "Гос. поликлиника",
+
   gov_hospital: "Гос. больница",
+  gov_hospitals: "Гос. больница",
+
+  private_clinics: "Частная клиника",
 };
 
 const STATUS_FILTERS = [
