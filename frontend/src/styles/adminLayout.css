@@ -1478,3 +1478,32 @@ textarea {
 .messageItem.mine .messageHeader b {
   color: #10f3df;
 }
+
+
+
+.messageHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.messageHeader b {
+  color: #10f3df;
+  font-weight: 950;
+  overflow-wrap: anywhere;
+}
+
+.messageHeader small {
+  color: #8aa0b8;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.messageItem p {
+  margin: 0;
+  color: #dbeafe;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}

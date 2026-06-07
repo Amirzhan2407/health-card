@@ -22,6 +22,43 @@ function normalizeCategory(value) {
   return map[value] || value;
 }
 
+function roleLabel(role) {
+  if (role === "super_admin") return "главный админ";
+  if (role === "site_support") return "обычный админ";
+  if (role === "support_admin") return "обычный админ";
+
+  return "админ";
+}
+
+function getAdminLogin(admin) {
+  return (
+    admin?.username ||
+    admin?.login ||
+    admin?.email ||
+    "admin"
+  );
+}
+
+function getAdminFullName(admin) {
+  return (
+    admin?.full_name ||
+    admin?.fullName ||
+    admin?.name ||
+    admin?.fio ||
+    "Без ФИО"
+  );
+}
+
+function getAdminDisplayLabel(admin) {
+  if (!admin) return "Администратор";
+
+  const login = getAdminLogin(admin);
+  const fullName = getAdminFullName(admin);
+  const role = roleLabel(admin.role);
+
+  return `${login}, ${fullName} (${role})`;
+}
+
 function canAccess(admin, category) {
   if (admin.role === "super_admin") return true;
 
@@ -62,30 +99,23 @@ async function ensureChannels() {
   }
 }
 
-function getAdminDisplayName(admin) {
-  if (!admin) return "Администратор";
-
-  return (
-    admin.full_name ||
-    admin.fullName ||
-    admin.name ||
-    admin.username ||
-    admin.email ||
-    "Администратор"
-  );
-}
-
 async function getAdminsMap() {
-  const tables = ["admins", "admin_users"];
+  const possibleTables = ["admins", "admin_users"];
 
-  for (const table of tables) {
+  for (const table of possibleTables) {
     const { data, error } = await supabase.from(table).select("*");
 
     if (!error) {
       const map = new Map();
 
       for (const admin of data || []) {
-        map.set(admin.id, getAdminDisplayName(admin));
+        map.set(admin.id, {
+          id: admin.id,
+          label: getAdminDisplayLabel(admin),
+          username: getAdminLogin(admin),
+          fullName: getAdminFullName(admin),
+          role: admin.role,
+        });
       }
 
       return map;
@@ -168,13 +198,17 @@ router.get("/:category/messages", requireAdminAuth, async (req, res) => {
 
     const adminsMap = await getAdminsMap();
 
-    const enrichedMessages = (messages || []).map((message) => ({
-      ...message,
-      sender_name:
-        adminsMap.get(message.sender_admin_id) ||
-        message.sender_name ||
-        "Администратор",
-    }));
+    const enrichedMessages = (messages || []).map((message) => {
+      const sender = adminsMap.get(message.sender_admin_id);
+
+      return {
+        ...message,
+        sender_label: sender?.label || "Администратор",
+        sender_username: sender?.username || "",
+        sender_full_name: sender?.fullName || "",
+        sender_role: sender?.role || "",
+      };
+    });
 
     return res.status(200).json({
       success: true,
@@ -221,14 +255,11 @@ router.post("/:category/messages", requireAdminAuth, async (req, res) => {
       });
     }
 
-    const senderName = getAdminDisplayName(req.admin);
-
     const { data, error } = await supabase
       .from("admin_channel_messages")
       .insert({
         channel_id: channel.id,
         sender_admin_id: req.admin.id,
-        sender_name: senderName,
         message,
         application_id: req.body.applicationId || null,
         organization_id: req.body.organizationId || null,
@@ -243,13 +274,15 @@ router.post("/:category/messages", requireAdminAuth, async (req, res) => {
       });
     }
 
+    const senderLabel = getAdminDisplayLabel(req.admin);
+
     await createAuditLog({
       adminId: req.admin.id,
       action: "channel_message_sent",
       entityType: "admin_channel",
       entityId: channel.id,
       title: "Сообщение в канал",
-      details: `${senderName}: ${message}`,
+      details: `${senderLabel}: ${message}`,
       newData: data,
     });
 
@@ -257,7 +290,10 @@ router.post("/:category/messages", requireAdminAuth, async (req, res) => {
       success: true,
       message: {
         ...data,
-        sender_name: senderName,
+        sender_label: senderLabel,
+        sender_username: getAdminLogin(req.admin),
+        sender_full_name: getAdminFullName(req.admin),
+        sender_role: req.admin.role,
       },
     });
   } catch (error) {

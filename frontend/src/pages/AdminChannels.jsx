@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { adminRequest, getAdminData } from "../api/adminApi";
+import { adminRequest } from "../api/adminApi";
 
 function text(value) {
   if (value === null || value === undefined) return "";
@@ -9,6 +9,7 @@ function text(value) {
 
 function formatDate(value) {
   if (!value) return "";
+
   return new Date(value).toLocaleString("ru-RU", {
     day: "2-digit",
     month: "2-digit",
@@ -18,23 +19,16 @@ function formatDate(value) {
   });
 }
 
-function getSenderName(item, adminData) {
-  if (item.sender_admin_id === adminData?.id) {
-    return "Вы";
-  }
-
+function getSenderLabel(item) {
   return (
-    item.sender_name ||
+    item.sender_label ||
     item.sender_full_name ||
-    item.admin_name ||
-    item.admin_full_name ||
+    item.sender_username ||
     "Администратор"
   );
 }
 
 export default function AdminChannels() {
-  const adminData = getAdminData();
-
   const [channels, setChannels] = useState([]);
   const [activeChannel, setActiveChannel] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -163,23 +157,19 @@ export default function AdminChannels() {
                 {messages.length === 0 ? (
                   <p className="muted">Сообщений пока нет</p>
                 ) : (
-                  messages.map((item) => {
-                    const isMine = item.sender_admin_id === adminData?.id;
-
-                    return (
-                      <div
-                        key={item.id || item.created_at}
-                        className={isMine ? "messageItem mine" : "messageItem"}
-                      >
-                        <div className="messageHeader">
-                          <b>{getSenderName(item, adminData)}</b>
-                          <small>{formatDate(item.created_at)}</small>
-                        </div>
-
-                        <p>{text(item.message)}</p>
+                  messages.map((item) => (
+                    <div
+                      key={item.id || item.created_at}
+                      className="messageItem"
+                    >
+                      <div className="messageHeader">
+                        <b>{getSenderLabel(item)}</b>
+                        <small>{formatDate(item.created_at)}</small>
                       </div>
-                    );
-                  })
+
+                      <p>{text(item.message)}</p>
+                    </div>
+                  ))
                 )}
               </div>
 
@@ -189,6 +179,7 @@ export default function AdminChannels() {
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder="Напишите сообщение..."
                 />
+
                 <button type="button" onClick={sendMessage}>
                   Отправить
                 </button>
