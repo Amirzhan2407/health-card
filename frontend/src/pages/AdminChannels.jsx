@@ -20,12 +20,7 @@ function formatDate(value) {
 }
 
 function getSenderLabel(item) {
-  return (
-    item.sender_label ||
-    item.sender_full_name ||
-    item.sender_username ||
-    "Администратор"
-  );
+  return item.sender_label || "Неизвестный админ";
 }
 
 export default function AdminChannels() {
@@ -120,7 +115,9 @@ export default function AdminChannels() {
               <button
                 key={channel.id || channel.category}
                 type="button"
-                className={activeChannel?.category === channel.category ? "active" : ""}
+                className={
+                  activeChannel?.category === channel.category ? "active" : ""
+                }
                 onClick={() => selectChannel(channel)}
               >
                 <b>{text(channel.title || channel.category)}</b>
