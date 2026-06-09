@@ -28,6 +28,10 @@ function App() {
   return (
     <LanguageProvider>
       <Routes>
+        {/* Страница входа без верхней навигации */}
+        <Route path="/login" element={<Login />} />
+
+        {/* Основная клиентская часть с навигацией */}
         <Route path="/" element={<MainLayout />}>
           <Route index element={<HomePage />} />
           <Route path="search" element={<Search />} />
@@ -36,7 +40,6 @@ function App() {
           <Route path="documents-cloud" element={<DocumentsCloudPage />} />
           <Route path="my-documents" element={<DocumentsPage />} />
           <Route path="ai-assistant" element={<AiAssistantPage />} />
-          <Route path="login" element={<Login />} />
           <Route path="passport" element={<Passport />} />
           <Route
             path="organization-application"
@@ -44,8 +47,10 @@ function App() {
           />
         </Route>
 
+        {/* Админ вход */}
         <Route path="/admin" element={<AdminLogin />} />
 
+        {/* Админ панель */}
         <Route path="/admin-panel" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
           <Route path="staff" element={<AdminStaff />} />

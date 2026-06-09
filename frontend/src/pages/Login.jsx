@@ -7,6 +7,7 @@ import {
   parseCmsSignature,
   mapKeyInfo,
 } from "../services/ncalayer.js";
+import { useLanguage } from "../i18n/LanguageContext";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import "../styles/login.css";
 
@@ -34,6 +35,7 @@ function isValidFullName(name) {
 
 export default function Login() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   const [mode, setMode] = useState("ecp");
   const [theme, setTheme] = useState("light");
@@ -59,14 +61,14 @@ export default function Login() {
         setVersion(typeof v === "string" ? v : JSON.stringify(v));
         setStatus("ready");
       } catch (e) {
-        setVersion("NCALayer недоступен");
-        setErr(e?.message || "NCALayer недоступен");
+        setVersion(t("ncaUnavailable"));
+        setErr(e?.message || t("ncaUnavailable"));
         setStatus("error");
       }
     }
 
     checkNca();
-  }, []);
+  }, [t]);
 
   const saveUserData = (userData) => {
     localStorage.setItem("userData", JSON.stringify(userData));
@@ -102,17 +104,13 @@ export default function Login() {
           : cmsData.fullName || "—";
 
       if (!isValidIin(userIin)) {
-        setErr(
-          "Не удалось получить правильный ИИН из ЭЦП. Выберите ключ физического лица."
-        );
+        setErr(t("ecpWrongIin"));
         setStatus("error");
         return;
       }
 
       if (!isValidFullName(userFullName)) {
-        setErr(
-          "Не удалось получить ФИО из ЭЦП. Выберите правильный ключ физического лица."
-        );
+        setErr(t("ecpWrongFullName"));
         setStatus("error");
         return;
       }
@@ -156,7 +154,7 @@ export default function Login() {
         });
 
         setStatus("ok");
-        navigate("/home");
+        navigate("/");
         return;
       }
 
@@ -164,7 +162,7 @@ export default function Login() {
       setNeedPasswordCreate(true);
       setStatus("createPassword");
     } catch (e) {
-      setErr(e?.message || "Ошибка работы с ЭЦП");
+      setErr(e?.message || t("ecpError"));
       setStatus("error");
     }
   };
@@ -173,29 +171,27 @@ export default function Login() {
     setErr("");
 
     if (!ecpUserData?.iin) {
-      setErr("Сначала подтвердите личность через ЭЦП.");
+      setErr(t("confirmIdentityFirst"));
       return;
     }
 
     if (!isValidIin(ecpUserData.iin)) {
-      setErr("Неверный ИИН. Повторите вход через правильный ЭЦП.");
+      setErr(t("wrongIinRepeatEcp"));
       return;
     }
 
     if (!isValidFullName(ecpUserData.fullName)) {
-      setErr("Неверное ФИО. Повторите вход через правильный ЭЦП.");
+      setErr(t("wrongFullNameRepeatEcp"));
       return;
     }
 
     if (!isStrongPassword(newPassword)) {
-      setErr(
-        "Пароль должен быть минимум 8 символов, содержать большую букву, маленькую букву, цифру и спецсимвол."
-      );
+      setErr(t("weakPassword"));
       return;
     }
 
     if (newPassword !== repeatPassword) {
-      setErr("Пароли не совпадают.");
+      setErr(t("passwordsNotMatch"));
       return;
     }
 
@@ -212,7 +208,7 @@ export default function Login() {
     }
 
     if (!data?.success) {
-      setErr(data?.message || "Ошибка регистрации.");
+      setErr(data?.message || t("registrationError"));
       return;
     }
 
@@ -227,19 +223,19 @@ export default function Login() {
     });
 
     setStatus("ok");
-    navigate("/home");
+    navigate("/");
   };
 
   const loginByPassword = async () => {
     setErr("");
 
     if (!isValidIin(iinLogin)) {
-      setErr("ИИН должен содержать 12 цифр.");
+      setErr(t("iinMustBe12"));
       return;
     }
 
     if (!passwordLogin.trim()) {
-      setErr("Введите пароль.");
+      setErr(t("enterPassword"));
       return;
     }
 
@@ -254,7 +250,7 @@ export default function Login() {
     }
 
     if (!data?.success) {
-      setErr(data?.message || "Неверный ИИН или пароль.");
+      setErr(data?.message || t("wrongIinOrPassword"));
       return;
     }
 
@@ -268,7 +264,7 @@ export default function Login() {
       email: data.user.email || "",
     });
 
-    navigate("/home");
+    navigate("/");
   };
 
   return (
@@ -287,53 +283,54 @@ export default function Login() {
           </h1>
 
           <p className="brandText">
-            Ваш личный помощник
-            <br />в мире здоровья
+            {t("personalAssistant")}
+            <br />
+            {t("healthWorld")}
           </p>
 
           <div className="brandFeatures">
             <div className="brandFeature">
               <div className="featureIcon">💬</div>
               <div>
-                <b>ИИ помощник</b>
-                <p>Ответы на вопросы о здоровье</p>
+                <b>{t("aiHelper")}</b>
+                <p>{t("aiHelperText")}</p>
               </div>
             </div>
 
             <div className="brandFeature">
               <div className="featureIcon">🔎</div>
               <div>
-                <b>Поиск лекарств и аптек</b>
-                <p>Быстрый поиск и сравнение</p>
+                <b>{t("medicineSearch")}</b>
+                <p>{t("medicineSearchText")}</p>
               </div>
             </div>
 
             <div className="brandFeature">
               <div className="featureIcon">🛡</div>
               <div>
-                <b>Конфиденциальность</b>
-                <p>Ваши данные под защитой</p>
+                <b>{t("privacy")}</b>
+                <p>{t("privacyText")}</p>
               </div>
             </div>
           </div>
 
-          <div className="brandBottom">🔒 Ваше здоровье — наша забота</div>
+          <div className="brandBottom">{t("healthCareSlogan")}</div>
         </section>
 
         <section className="loginContent">
           <div className="loginTop">
             <button type="button" onClick={() => setTheme("light")}>
-              ☀ Светлый
+              {t("lightTheme")}
             </button>
             <button type="button" onClick={() => setTheme("dark")}>
-              🌙 Тёмный
+              {t("darkTheme")}
             </button>
             <LanguageSwitcher />
           </div>
 
           <div className="loginBox">
-            <h2>Добро пожаловать!</h2>
-            <p>Войдите в свой аккаунт, чтобы продолжить</p>
+            <h2>{t("welcome")}</h2>
+            <p>{t("loginSubtitle")}</p>
 
             <div className="loginTabs">
               <button
@@ -344,7 +341,7 @@ export default function Login() {
                   setErr("");
                 }}
               >
-                ЭЦП
+                {t("ecp")}
               </button>
 
               <button
@@ -355,7 +352,7 @@ export default function Login() {
                   setErr("");
                 }}
               >
-                ИИН + пароль
+                {t("iinPassword")}
               </button>
             </div>
 
@@ -367,8 +364,8 @@ export default function Login() {
                 className="loginBtn"
               >
                 {status === "reading" || status === "signing"
-                  ? "Обрабатываем..."
-                  : "Подписать и войти"}
+                  ? t("processing")
+                  : t("signAndLogin")}
               </button>
             )}
 
@@ -377,7 +374,7 @@ export default function Login() {
                 <input
                   className="loginInput"
                   type="password"
-                  placeholder="Новый пароль"
+                  placeholder={t("newPassword")}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                 />
@@ -385,22 +382,19 @@ export default function Login() {
                 <input
                   className="loginInput"
                   type="password"
-                  placeholder="Повторите пароль"
+                  placeholder={t("repeatPassword")}
                   value={repeatPassword}
                   onChange={(e) => setRepeatPassword(e.target.value)}
                 />
 
-                <div className="loginHint">
-                  Пароль: минимум 8 символов, большая и маленькая буква, цифра
-                  и спецсимвол.
-                </div>
+                <div className="loginHint">{t("passwordHint")}</div>
 
                 <button
                   type="button"
                   className="loginBtn"
                   onClick={createPasswordAfterEcp}
                 >
-                  Создать пароль и войти
+                  {t("createPasswordAndLogin")}
                 </button>
               </div>
             )}
@@ -410,7 +404,7 @@ export default function Login() {
                 <input
                   className="loginInput"
                   type="text"
-                  placeholder="ИИН"
+                  placeholder={t("iin")}
                   maxLength={12}
                   value={iinLogin}
                   onChange={(e) =>
@@ -421,7 +415,7 @@ export default function Login() {
                 <input
                   className="loginInput"
                   type="password"
-                  placeholder="Пароль"
+                  placeholder={t("password")}
                   value={passwordLogin}
                   onChange={(e) => setPasswordLogin(e.target.value)}
                 />
@@ -431,7 +425,7 @@ export default function Login() {
                   className="loginBtn"
                   onClick={loginByPassword}
                 >
-                  Войти
+                  {t("login")}
                 </button>
               </div>
             )}
