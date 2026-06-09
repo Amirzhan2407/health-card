@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
 const API_URL =
   import.meta.env.VITE_API_URL || "https://health-card.onrender.com";
@@ -63,8 +64,8 @@ function FileField({ label, name, required, multiple, files, onChange }) {
           {fileNames.length > 0
             ? fileNames.join(", ")
             : multiple
-              ? "Файлы не выбраны"
-              : "Файл не выбран"}
+            ? "Файлы не выбраны"
+            : "Файл не выбран"}
         </div>
       </div>
     </div>
@@ -206,6 +207,10 @@ export default function OrganizationApplication() {
   if (submittedApplication) {
     return (
       <main className="organization-application-page">
+        <div className="org-language-top">
+          <LanguageSwitcher />
+        </div>
+
         <section className="success-card">
           <div className="success-icon">✓</div>
 
@@ -238,6 +243,10 @@ export default function OrganizationApplication() {
 
   return (
     <main className="organization-application-page">
+      <div className="org-language-top">
+        <LanguageSwitcher />
+      </div>
+
       <section className="application-hero">
         <div className="page-badge">Заявка организации</div>
 
@@ -458,9 +467,7 @@ export default function OrganizationApplication() {
                 </div>
 
                 <div>
-                  <label className="org-label">
-                    Email нового главного врача
-                  </label>
+                  <label className="org-label">Email нового главного врача</label>
                   <input
                     className="org-input"
                     type="email"
@@ -476,7 +483,7 @@ export default function OrganizationApplication() {
         )}
 
         <section className="form-section">
-          <div className="section-number">{isNewOrganization ? "4" : "4"}</div>
+          <div className="section-number">4</div>
 
           <div className="section-content">
             <h2>Данные отправителя</h2>
@@ -672,6 +679,13 @@ function ApplicationPageStyles() {
           #07111f;
         color: #ffffff;
         padding: 42px 24px 90px;
+      }
+
+      .org-language-top {
+        width: min(1120px, 100%);
+        margin: 0 auto 18px;
+        display: flex;
+        justify-content: flex-end;
       }
 
       .application-hero {
@@ -943,6 +957,10 @@ function ApplicationPageStyles() {
       @media (max-width: 760px) {
         .organization-application-page {
           padding: 26px 14px 70px;
+        }
+
+        .org-language-top {
+          margin-bottom: 16px;
         }
 
         .application-hero h1 {

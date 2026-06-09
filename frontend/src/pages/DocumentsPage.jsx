@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "../services/supabase";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 import "../styles/documents.css";
 
 // ===== helpers =====
@@ -55,14 +56,14 @@ export default function DocumentsPage() {
   const userIin = userData?.iin || "";
 
   useEffect(() => {
-  loadCertificates();
-
-  const interval = setInterval(() => {
     loadCertificates();
-  }, 60000);
 
-  return () => clearInterval(interval);
-}, []);
+    const interval = setInterval(() => {
+      loadCertificates();
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!passedDate) return;
@@ -149,10 +150,8 @@ export default function DocumentsPage() {
         ? ext.toLowerCase().replace(/[^a-z0-9]/g, "")
         : "bin";
 
-      // ВАЖНО: путь делаем только технический, без кириллицы
       const filePath = `${userIin}/${Date.now()}.${safeExt}`;
 
-      // 1. загружаем файл в Storage
       const { error: uploadError } = await supabase.storage
         .from("certificates")
         .upload(filePath, file, {
@@ -162,7 +161,6 @@ export default function DocumentsPage() {
 
       if (uploadError) throw uploadError;
 
-      // 2. сохраняем запись в таблицу
       const { data, error: insertError } = await supabase
         .from("certificates")
         .insert([
@@ -248,9 +246,21 @@ export default function DocumentsPage() {
     <div className="documentsPage">
       <div className="documentsHeader">
         <h2>Справки</h2>
-        <button className="addButton" type="button" onClick={openModal}>
-          Добавить
-        </button>
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            flexWrap: "wrap",
+          }}
+        >
+          <LanguageSwitcher />
+
+          <button className="addButton" type="button" onClick={openModal}>
+            Добавить
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -260,48 +270,47 @@ export default function DocumentsPage() {
       ) : (
         <div className="documentsList">
           {items.map((it) => {
-  const isExpired = new Date(it.valid_until) < new Date();
+            const isExpired = new Date(it.valid_until) < new Date();
 
-  return (
-    <div
-      key={it.id}
-      className={`documentItem ${isExpired ? "expired" : ""}`}
-    >
-      <div className="documentTitle">{it.title}</div>
+            return (
+              <div
+                key={it.id}
+                className={`documentItem ${isExpired ? "expired" : ""}`}
+              >
+                <div className="documentTitle">{it.title}</div>
 
-      <div className="documentMeta">
-        <span>Прохождение: {formatDateRu(it.passed_date)}</span>
-        <span>Действует до: {formatDateRu(it.valid_until)}</span>
-        <span>{it.file_name}</span>
-      </div>
+                <div className="documentMeta">
+                  <span>Прохождение: {formatDateRu(it.passed_date)}</span>
+                  <span>Действует до: {formatDateRu(it.valid_until)}</span>
+                  <span>{it.file_name}</span>
+                </div>
 
-      {/* 🔴 ТЕКСТ ЕСЛИ ПРОСРОЧЕНО */}
-      {isExpired && (
-        <div className="expiredText">
-          Справка истекла, обновите в течение 2 дней
-        </div>
-      )}
+                {isExpired && (
+                  <div className="expiredText">
+                    Справка истекла, обновите в течение 2 дней
+                  </div>
+                )}
 
-      <div className="documentActions">
-        <button
-          className="actionButton"
-          type="button"
-          onClick={() => openFile(it.file_path)}
-        >
-          Открыть
-        </button>
+                <div className="documentActions">
+                  <button
+                    className="actionButton"
+                    type="button"
+                    onClick={() => openFile(it.file_path)}
+                  >
+                    Открыть
+                  </button>
 
-        <button
-          className="actionButton deleteButton"
-          type="button"
-          onClick={() => removeCertificate(it.id, it.file_path)}
-        >
-          Удалить
-        </button>
-      </div>
-    </div>
-  );
-})}
+                  <button
+                    className="actionButton deleteButton"
+                    type="button"
+                    onClick={() => removeCertificate(it.id, it.file_path)}
+                  >
+                    Удалить
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -318,7 +327,11 @@ export default function DocumentsPage() {
             <div className="modalContent">
               <div className="modalSection">
                 <label className="modalLabel">Файл</label>
-                <input className="modalInput" type="file" onChange={onPickFile} />
+                <input
+                  className="modalInput"
+                  type="file"
+                  onChange={onPickFile}
+                />
                 <div className="fileHint">
                   {file ? `Файл: ${file.name}` : "Файл не выбран"}
                 </div>

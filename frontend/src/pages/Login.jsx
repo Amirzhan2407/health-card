@@ -7,6 +7,7 @@ import {
   parseCmsSignature,
   mapKeyInfo,
 } from "../services/ncalayer.js";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 import "../styles/login.css";
 
 function isStrongPassword(password) {
@@ -327,7 +328,7 @@ export default function Login() {
             <button type="button" onClick={() => setTheme("dark")}>
               🌙 Тёмный
             </button>
-            <button type="button">RU</button>
+            <LanguageSwitcher />
           </div>
 
           <div className="loginBox">

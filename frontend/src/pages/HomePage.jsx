@@ -1,21 +1,33 @@
 import React from "react";
 import "../styles/home.css";
 import { useNavigate } from "react-router-dom";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
 export default function HomePage() {
   const navigate = useNavigate();
 
   const userData = JSON.parse(localStorage.getItem("userData") || "{}");
 
-const genderLabel =
-  userData?.gender === "male"
-    ? "Мужской"
-    : userData?.gender === "female"
-    ? "Женский"
-    : "Не определён";
+  const genderLabel =
+    userData?.gender === "male"
+      ? "Мужской"
+      : userData?.gender === "female"
+      ? "Женский"
+      : "Не определён";
 
   return (
     <div className="pageGrid">
+      <div
+        style={{
+          gridColumn: "1 / -1",
+          display: "flex",
+          justifyContent: "flex-end",
+          marginBottom: "8px",
+        }}
+      >
+        <LanguageSwitcher />
+      </div>
+
       <section className="cardWide">
         <div className="emergencyLeft">
           <div className="emergencyIcon">
@@ -24,9 +36,7 @@ const genderLabel =
 
           <div style={{ minWidth: 0 }}>
             <div className="cardTitle">Мед карта</div>
-            <div className="cardText">
-  ФИО • ИИН • Пол: {genderLabel}
-</div>
+            <div className="cardText">ФИО • ИИН • Пол: {genderLabel}</div>
           </div>
         </div>
 

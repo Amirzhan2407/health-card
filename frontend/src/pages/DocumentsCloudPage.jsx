@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../services/supabaseClient";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 import "../styles/history.css";
 
 const severityOptions = ["Лёгкая", "Средняя", "Тяжёлая", "Критическая"];
@@ -69,12 +70,13 @@ export default function DocumentsCloudPage() {
       setError("Выберите дату открытия.");
       return;
     }
+
     const today = new Date().toISOString().slice(0, 10);
 
-if (openedAt < today) {
-  setError("Дата открытия не может быть раньше сегодняшнего дня.");
-  return;
-}
+    if (openedAt < today) {
+      setError("Дата открытия не может быть раньше сегодняшнего дня.");
+      return;
+    }
 
     const { error } = await supabase.from("medical_cases").insert([
       {
@@ -203,12 +205,25 @@ if (openedAt < today) {
       <div className="historyHeader">
         <div>
           <h2 className="historyTitle">История болезни</h2>
-          <p className="historySub">Заболевания, травмы, операции и госпитализации</p>
+          <p className="historySub">
+            Заболевания, травмы, операции и госпитализации
+          </p>
         </div>
 
-        <button className="historyAddBtn" type="button" onClick={openAddCase}>
-          + Добавить больничный
-        </button>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            flexWrap: "wrap",
+          }}
+        >
+          <LanguageSwitcher />
+
+          <button className="historyAddBtn" type="button" onClick={openAddCase}>
+            + Добавить больничный
+          </button>
+        </div>
       </div>
 
       {error && <div className="errorText">{error}</div>}
@@ -281,13 +296,17 @@ if (openedAt < today) {
 
                       {rec.symptoms && <div>Симптомы: {rec.symptoms}</div>}
                       {rec.diagnosis && <div>Диагноз: {rec.diagnosis}</div>}
+
                       {rec.complications && (
                         <div>Осложнения: {rec.complications}</div>
                       )}
+
                       {rec.treatment && <div>Назначения: {rec.treatment}</div>}
+
                       {rec.recommendations && (
                         <div>Рекомендации: {rec.recommendations}</div>
                       )}
+
                       {rec.comment && <div>Комментарий: {rec.comment}</div>}
                       {rec.file_name && <div>Файл: {rec.file_name}</div>}
                     </div>
@@ -324,12 +343,12 @@ if (openedAt < today) {
               <div className="modalSection">
                 <label className="modalLabel">Дата открытия</label>
                 <input
-  className="modalInput"
-  type="date"
-  min={new Date().toISOString().slice(0, 10)}
-  value={openedAt}
-  onChange={(e) => setOpenedAt(e.target.value)}
-/>
+                  className="modalInput"
+                  type="date"
+                  min={new Date().toISOString().slice(0, 10)}
+                  value={openedAt}
+                  onChange={(e) => setOpenedAt(e.target.value)}
+                />
               </div>
 
               <div className="modalSection">
@@ -349,7 +368,10 @@ if (openedAt < today) {
             </div>
 
             <div className="modalButtons">
-              <button className="actionButton" onClick={() => setOpenCaseModal(false)}>
+              <button
+                className="actionButton"
+                onClick={() => setOpenCaseModal(false)}
+              >
                 Отмена
               </button>
               <button className="actionButton primaryBtn" onClick={saveCase}>
@@ -404,32 +426,56 @@ if (openedAt < today) {
 
               <div className="modalSection">
                 <label className="modalLabel">Симптомы</label>
-                <textarea className="modalInput textareaInput" value={symptoms} onChange={(e) => setSymptoms(e.target.value)} />
+                <textarea
+                  className="modalInput textareaInput"
+                  value={symptoms}
+                  onChange={(e) => setSymptoms(e.target.value)}
+                />
               </div>
 
               <div className="modalSection">
                 <label className="modalLabel">Диагноз / уточнение</label>
-                <textarea className="modalInput textareaInput" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} />
+                <textarea
+                  className="modalInput textareaInput"
+                  value={diagnosis}
+                  onChange={(e) => setDiagnosis(e.target.value)}
+                />
               </div>
 
               <div className="modalSection">
                 <label className="modalLabel">Осложнения</label>
-                <textarea className="modalInput textareaInput" value={complications} onChange={(e) => setComplications(e.target.value)} />
+                <textarea
+                  className="modalInput textareaInput"
+                  value={complications}
+                  onChange={(e) => setComplications(e.target.value)}
+                />
               </div>
 
               <div className="modalSection">
                 <label className="modalLabel">Назначения врача</label>
-                <textarea className="modalInput textareaInput" value={treatment} onChange={(e) => setTreatment(e.target.value)} />
+                <textarea
+                  className="modalInput textareaInput"
+                  value={treatment}
+                  onChange={(e) => setTreatment(e.target.value)}
+                />
               </div>
 
               <div className="modalSection">
                 <label className="modalLabel">Рекомендации</label>
-                <textarea className="modalInput textareaInput" value={recommendations} onChange={(e) => setRecommendations(e.target.value)} />
+                <textarea
+                  className="modalInput textareaInput"
+                  value={recommendations}
+                  onChange={(e) => setRecommendations(e.target.value)}
+                />
               </div>
 
               <div className="modalSection">
                 <label className="modalLabel">Название файла</label>
-                <input className="modalInput" value={fileName} onChange={(e) => setFileName(e.target.value)} />
+                <input
+                  className="modalInput"
+                  value={fileName}
+                  onChange={(e) => setFileName(e.target.value)}
+                />
               </div>
 
               <div className="modalSection">
@@ -444,12 +490,19 @@ if (openedAt < today) {
 
               <div className="modalSection">
                 <label className="modalLabel">Комментарий врача</label>
-                <textarea className="modalInput textareaInput" value={comment} onChange={(e) => setComment(e.target.value)} />
+                <textarea
+                  className="modalInput textareaInput"
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                />
               </div>
             </div>
 
             <div className="modalButtons">
-              <button className="actionButton" onClick={() => setOpenRecordModal(false)}>
+              <button
+                className="actionButton"
+                onClick={() => setOpenRecordModal(false)}
+              >
                 Отмена
               </button>
               <button className="actionButton primaryBtn" onClick={saveRecord}>

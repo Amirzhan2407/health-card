@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../services/supabaseClient";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 import "../styles/passport.css";
 
 export default function Passport() {
@@ -81,6 +82,8 @@ export default function Passport() {
           <div className="passportTitle">Мед карта</div>
           <div className="passportSub">Данные владельца и контакты</div>
         </div>
+
+        <LanguageSwitcher />
       </div>
 
       <section className="passportCard">
