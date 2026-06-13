@@ -7,14 +7,15 @@ const STATUS_LABELS = {
   in_progress: "В процессе",
   needs_fix: "Требует исправления",
   resent: "Отправлена повторно",
-  waiting_eds: "Ожидает ЭЦП",
-  approved: "Одобрена",
+  waiting_first_login: "Ожидание первого входа",
+  approved: "Подключено",
   rejected: "Отклонена",
 };
 
 const TYPE_LABELS = {
   new_organization: "Подключение новой организации",
   change_chief_doctor: "Изменение главного врача",
+  change_administrator: "Изменение администратора",
   change_organization_data: "Изменение данных организации",
 };
 
@@ -22,30 +23,21 @@ const CATEGORY_LABELS = {
   state_polyclinic: "Гос. поликлиника",
   state_hospital: "Гос. больница",
   private_clinic: "Частная клиника",
-
-  gov_polyclinic: "Гос. поликлиника",
-  gov_polyclinics: "Гос. поликлиника",
-
-  gov_hospital: "Гос. больница",
-  gov_hospitals: "Гос. больница",
-
-  private_clinics: "Частная клиника",
+  dentistry: "Стоматология",
+  laboratory: "Медицинская лаборатория",
 };
 
 const STATUS_FILTERS = [
   ["all", "Все"],
   ["new", "Новые"],
-  ["assigned", "Назначенные"],
   ["in_progress", "В процессе"],
-  ["needs_fix", "Требуют исправления"],
-  ["resent", "Отправлены повторно"],
-  ["waiting_eds", "Ожидают ЭЦП"],
-  ["approved", "Одобрены"],
+  ["waiting_first_login", "Ожидают первого входа"],
+  ["approved", "Подключены"],
   ["rejected", "Отклонены"],
 ];
 
 function text(value) {
-  if (value === null || value === undefined) return "—";
+  if (value === null || value === undefined || value === "") return "—";
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
@@ -53,6 +45,19 @@ function text(value) {
 function formatDate(value) {
   if (!value) return "—";
   return new Date(value).toLocaleString("ru-RU");
+}
+
+function parseAdmins(value) {
+  if (!value) return [];
+
+  if (Array.isArray(value)) return value;
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 export default function AdminApplications() {
@@ -109,7 +114,6 @@ export default function AdminApplications() {
 
   async function changeStatus(status) {
     const id = details?.application?.id || selected?.id;
-
     if (!id) return;
 
     if (status === "rejected" && !comment.trim()) {
@@ -150,13 +154,18 @@ export default function AdminApplications() {
   }, []);
 
   const application = details?.application || selected;
+  const administrators = parseAdmins(
+    application?.administrators || application?.admins
+  );
 
   return (
     <main className="adminContentPage">
       <section className="adminPageHead">
         <div>
           <h1>Заявления организаций</h1>
-          <p>Проверка заявок на подключение и изменение данных организации.</p>
+          <p>
+            Проверка заявок, создание доступов главного врача и администратора.
+          </p>
         </div>
 
         <button type="button" onClick={() => loadApplications(activeStatus)}>
@@ -208,19 +217,28 @@ export default function AdminApplications() {
                     <b>{text(item.application_number)}</b>
                     <small>{formatDate(item.created_at)}</small>
                   </span>
+
                   <span>{text(item.organization_name)}</span>
-                  <span>{TYPE_LABELS[item.application_type] || text(item.application_type)}</span>
+
+                  <span>
+                    {TYPE_LABELS[item.application_type] ||
+                      text(item.application_type)}
+                  </span>
+
                   <span>
                     {item.organization_type_label ||
                       CATEGORY_LABELS[item.organization_type] ||
                       text(item.organization_type)}
                   </span>
+
                   <span>{text(item.bin)}</span>
+
                   <span>
                     <b className={`pill ${item.status || ""}`}>
                       {STATUS_LABELS[item.status] || text(item.status)}
                     </b>
                   </span>
+
                   <span>
                     <button className="miniBtn" onClick={() => openApplication(item)}>
                       Открыть
@@ -245,8 +263,12 @@ export default function AdminApplications() {
               <div className="detailsTop">
                 <div>
                   <h2>{text(application.application_number)}</h2>
-                  <p>{TYPE_LABELS[application.application_type] || text(application.application_type)}</p>
+                  <p>
+                    {TYPE_LABELS[application.application_type] ||
+                      text(application.application_type)}
+                  </p>
                 </div>
+
                 <b className={`pill ${application.status || ""}`}>
                   {STATUS_LABELS[application.status] || text(application.status)}
                 </b>
@@ -254,29 +276,42 @@ export default function AdminApplications() {
 
               <div className="section">
                 <h3>Организация</h3>
-                <div className="infoGrid">
-                  <div><span>Название</span><b>{text(application.organization_name)}</b></div>
-                  <div><span>Категория</span><b>{application.organization_type_label || CATEGORY_LABELS[application.organization_type] || text(application.organization_type)}</b></div>
-                  <div><span>БИН</span><b>{text(application.bin)}</b></div>
-                  <div><span>Город</span><b>{text(application.city)}</b></div>
-                  <div><span>Адрес</span><b>{text(application.address)}</b></div>
-                  <div><span>Email</span><b>{text(application.sender_email)}</b></div>
-                </div>
-              </div>
 
-              <div className="section">
-                <h3>Главный врач</h3>
                 <div className="infoGrid">
                   <div>
-                    <span>Предыдущий</span>
-                    <b>{text(application.previous_chief_doctor_full_name)}</b>
+                    <span>Название</span>
+                    <b>{text(application.organization_name)}</b>
                   </div>
+
                   <div>
-                    <span>Новый</span>
+                    <span>Категория</span>
+                    <b>
+                      {application.organization_type_label ||
+                        CATEGORY_LABELS[application.organization_type] ||
+                        text(application.organization_type)}
+                    </b>
+                  </div>
+
+                  <div>
+                    <span>БИН</span>
+                    <b>{text(application.bin)}</b>
+                  </div>
+
+                  <div>
+                    <span>Город</span>
+                    <b>{text(application.city)}</b>
+                  </div>
+
+                  <div>
+                    <span>Адрес</span>
+                    <b>{text(application.address)}</b>
+                  </div>
+
+                  <div>
+                    <span>Корпоративная почта</span>
                     <b>
                       {text(
-                        application.new_chief_doctor_full_name ||
-                          application.chief_doctor_full_name
+                        application.organization_email || application.sender_email
                       )}
                     </b>
                   </div>
@@ -284,7 +319,109 @@ export default function AdminApplications() {
               </div>
 
               <div className="section">
+                <h3>Главный врач</h3>
+
+                <div className="infoGrid">
+                  <div>
+                    <span>Предыдущий</span>
+                    <b>{text(application.previous_chief_doctor_full_name)}</b>
+                  </div>
+
+                  <div>
+                    <span>ФИО</span>
+                    <b>
+                      {text(
+                        application.new_chief_doctor_full_name ||
+                          application.chief_doctor_full_name
+                      )}
+                    </b>
+                  </div>
+
+                  <div>
+                    <span>Телефон</span>
+                    <b>
+                      {text(
+                        application.new_chief_doctor_phone ||
+                          application.chief_doctor_phone
+                      )}
+                    </b>
+                  </div>
+
+                  <div>
+                    <span>Email для входа</span>
+                    <b>
+                      {text(
+                        application.organization_email || application.sender_email
+                      )}
+                    </b>
+                  </div>
+                </div>
+              </div>
+
+              <div className="section">
+                <h3>Администраторы</h3>
+
+                {administrators.length > 0 ? (
+                  <div className="adminUsersList">
+                    {administrators.map((admin, index) => (
+                      <div className="adminUserBox" key={index}>
+                        <h4>Администратор #{index + 1}</h4>
+
+                        <div className="infoGrid">
+                          <div>
+                            <span>ФИО</span>
+                            <b>{text(admin.full_name)}</b>
+                          </div>
+
+                          <div>
+                            <span>Телефон</span>
+                            <b>{text(admin.phone)}</b>
+                          </div>
+
+                          <div>
+                            <span>Email для входа</span>
+                            <b>
+                              {text(
+                                application.organization_email ||
+                                  application.sender_email
+                              )}
+                            </b>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="muted">
+                    Администраторы не указаны или старый формат заявки.
+                  </p>
+                )}
+              </div>
+
+              <div className="section">
+                <h3>Данные отправителя</h3>
+
+                <div className="infoGrid">
+                  <div>
+                    <span>ФИО</span>
+                    <b>{text(application.sender_full_name)}</b>
+                  </div>
+
+                  <div>
+                    <span>Телефон</span>
+                    <b>{text(application.sender_phone)}</b>
+                  </div>
+
+                  <div>
+                    <span>Email</span>
+                    <b>{text(application.sender_email)}</b>
+                  </div>
+                </div>
+              </div>
+
+              <div className="section">
                 <h3>Документы</h3>
+
                 {details?.documents?.length ? (
                   <div className="docList">
                     {details.documents.map((doc) => (
@@ -304,7 +441,8 @@ export default function AdminApplications() {
               </div>
 
               <div className="section">
-                <h3>Решение</h3>
+                <h3>Решение техподдержки</h3>
+
                 <textarea
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
@@ -312,16 +450,33 @@ export default function AdminApplications() {
                 />
 
                 <div className="actions">
-                  <button className="process" onClick={() => changeStatus("in_progress")}>
+                  <button
+                    className="process"
+                    onClick={() => changeStatus("in_progress")}
+                  >
                     В процесс
                   </button>
-                  <button className="approve" onClick={() => changeStatus("approved")}>
-                    Одобрить
+
+                  <button
+                    className="approve"
+                    onClick={() => changeStatus("waiting_first_login")}
+                  >
+                    Одобрить и создать доступы
                   </button>
-                  <button className="reject" onClick={() => changeStatus("rejected")}>
+
+                  <button
+                    className="reject"
+                    onClick={() => changeStatus("rejected")}
+                  >
                     Отклонить
                   </button>
                 </div>
+
+                <p className="muted" style={{ marginTop: 12 }}>
+                  После одобрения система должна создать доступы для главного
+                  врача и администратора. Пароль они создают сами при первом
+                  входе.
+                </p>
               </div>
             </>
           )}

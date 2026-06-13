@@ -40,8 +40,15 @@ function App() {
   return (
     <LanguageProvider>
       <Routes>
+        {/* Отдельные страницы без клиентской навигации */}
         <Route path="/login" element={<Login />} />
+        <Route
+          path="/organization-application"
+          element={<OrganizationApplication />}
+        />
+        <Route path="/organization-login" element={<OrganizationLogin />} />
 
+        {/* Основная клиентская часть с навигацией */}
         <Route path="/" element={<MainLayout />}>
           <Route index element={<HomePage />} />
           <Route path="search" element={<Search />} />
@@ -51,14 +58,12 @@ function App() {
           <Route path="my-documents" element={<DocumentsPage />} />
           <Route path="ai-assistant" element={<AiAssistantPage />} />
           <Route path="passport" element={<Passport />} />
-          <Route
-            path="organization-application"
-            element={<OrganizationApplication />}
-          />
         </Route>
 
+        {/* Админ вход */}
         <Route path="/admin" element={<AdminLogin />} />
 
+        {/* Админ панель */}
         <Route path="/admin-panel" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
           <Route path="staff" element={<AdminStaff />} />
@@ -84,8 +89,7 @@ function App() {
           element={<Navigate to="/admin-panel/applications" replace />}
         />
 
-        <Route path="/organization-login" element={<OrganizationLogin />} />
-
+        {/* Кабинет государственной поликлиники */}
         <Route path="/organization/gov-clinic" element={<GovClinicLayout />}>
           <Route index element={<GovClinicDashboard />} />
           <Route path="chief-doctor" element={<GovClinicChiefDoctor />} />
