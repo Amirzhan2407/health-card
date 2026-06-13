@@ -38,38 +38,6 @@ function normalizeApplicationType(type) {
   return "new_organization";
 }
 
-router.post("/", upload.any(), async (req, res) => {
-  try {
-    const files = {};
-
-    (req.files || []).forEach((file) => {
-      if (!files[file.fieldname]) {
-        files[file.fieldname] = [];
-      }
-
-      files[file.fieldname].push(file);
-    });
-
-    const result = await createOrganizationApplication({
-      body: req.body,
-      files,
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: "Заявка успешно отправлена.",
-      ...result,
-    });
-  } catch (error) {
-    console.error("CREATE ORGANIZATION APPLICATION ERROR:", error.message);
-
-    return res.status(400).json({
-      success: false,
-      message: error.message || "Ошибка отправки заявки.",
-    });
-  }
-});
-
 async function getDocuments(applicationId) {
   const tables = [
     "organization_application_documents",
@@ -179,6 +147,38 @@ async function createOrganizationFromApplication(application, adminId) {
 
   return data;
 }
+
+router.post("/", upload.any(), async (req, res) => {
+  try {
+    const files = {};
+
+    (req.files || []).forEach((file) => {
+      if (!files[file.fieldname]) {
+        files[file.fieldname] = [];
+      }
+
+      files[file.fieldname].push(file);
+    });
+
+    const result = await createOrganizationApplication({
+      body: req.body,
+      files,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Заявка успешно отправлена.",
+      ...result,
+    });
+  } catch (error) {
+    console.error("CREATE ORGANIZATION APPLICATION ERROR:", error.message);
+
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Ошибка отправки заявки.",
+    });
+  }
+});
 
 router.get("/", requireAdminAuth, async (req, res) => {
   try {
