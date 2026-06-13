@@ -1,9 +1,18 @@
 import express from "express";
+import multer from "multer";
 import { supabase } from "../lib/supabaseAdmin.js";
 import { requireAdminAuth } from "../middleware/requireAdminAuth.js";
 import { createAuditLog } from "../services/adminAuditService.js";
+import { createOrganizationApplication } from "../services/organizationApplicationService.js";
 
 const router = express.Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 30 * 1024 * 1024,
+  },
+});
 
 const ALLOWED_STATUSES = [
   "new",
@@ -12,6 +21,7 @@ const ALLOWED_STATUSES = [
   "needs_fix",
   "resent",
   "waiting_eds",
+  "waiting_first_login",
   "approved",
   "rejected",
 ];
@@ -23,9 +33,42 @@ function normalizeStatus(status) {
 
 function normalizeApplicationType(type) {
   if (type === "change_chief_doctor") return "change_chief_doctor";
+  if (type === "change_administrator") return "change_administrator";
   if (type === "change_organization_data") return "change_organization_data";
   return "new_organization";
 }
+
+router.post("/", upload.any(), async (req, res) => {
+  try {
+    const files = {};
+
+    (req.files || []).forEach((file) => {
+      if (!files[file.fieldname]) {
+        files[file.fieldname] = [];
+      }
+
+      files[file.fieldname].push(file);
+    });
+
+    const result = await createOrganizationApplication({
+      body: req.body,
+      files,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Заявка успешно отправлена.",
+      ...result,
+    });
+  } catch (error) {
+    console.error("CREATE ORGANIZATION APPLICATION ERROR:", error.message);
+
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Ошибка отправки заявки.",
+    });
+  }
+});
 
 async function getDocuments(applicationId) {
   const tables = [
@@ -105,17 +148,13 @@ async function createOrganizationFromApplication(application, adminId) {
     chief_doctor_full_name:
       application.new_chief_doctor_full_name ||
       application.chief_doctor_full_name,
-    chief_doctor_email:
-      application.new_chief_doctor_email || application.chief_doctor_email,
     chief_doctor_phone:
       application.new_chief_doctor_phone || application.chief_doctor_phone,
-    organization_email:
-      application.organization_email || application.sender_email,
-    organization_phone:
-      application.organization_phone || application.sender_phone,
-    status: "waiting_eds",
+    organization_email: application.organization_email || application.sender_email,
+    organization_phone: application.organization_phone || application.sender_phone,
+    status: "waiting_first_login",
     assigned_admin_id: application.assigned_admin_id || adminId || null,
-    eds_status: "not_confirmed",
+    eds_status: "not_required",
     updated_at: new Date().toISOString(),
   };
 
@@ -134,7 +173,7 @@ async function createOrganizationFromApplication(application, adminId) {
     .from("organization_applications")
     .update({
       organization_id: data.id,
-      status: "waiting_eds",
+      status: "waiting_first_login",
     })
     .eq("id", application.id);
 
@@ -308,14 +347,12 @@ router.patch("/:id/status", requireAdminAuth, async (req, res) => {
       });
     }
 
-    const updatePayload = {
-      status,
-      review_comment: comment || null,
-    };
-
     const { data: updated, error: updateError } = await supabase
       .from("organization_applications")
-      .update(updatePayload)
+      .update({
+        status,
+        review_comment: comment || null,
+      })
       .eq("id", id)
       .select("*")
       .single();
@@ -349,7 +386,7 @@ router.patch("/:id/status", requireAdminAuth, async (req, res) => {
 
     let organization = null;
 
-    if (status === "approved") {
+    if (status === "approved" || status === "waiting_first_login") {
       organization = await createOrganizationFromApplication(updated, req.admin.id);
     }
 
