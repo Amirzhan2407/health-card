@@ -7,21 +7,15 @@ const API_URL =
 const APPLICATION_TYPES = {
   NEW_ORGANIZATION: "new_organization",
   CHANGE_CHIEF_DOCTOR: "change_chief_doctor",
+  CHANGE_ADMINISTRATOR: "change_administrator",
 };
 
 const ORGANIZATION_TYPES = [
-  {
-    value: "state_polyclinic",
-    label: "Государственная поликлиника",
-  },
-  {
-    value: "state_hospital",
-    label: "Государственная больница",
-  },
-  {
-    value: "private_clinic",
-    label: "Частная клиника",
-  },
+  { value: "state_polyclinic", label: "Государственная поликлиника" },
+  { value: "state_hospital", label: "Государственная больница" },
+  { value: "private_clinic", label: "Частная клиника" },
+  { value: "dentistry", label: "Стоматология" },
+  { value: "laboratory", label: "Медицинская лаборатория" },
 ];
 
 function FileField({ label, name, required, multiple, files, onChange }) {
@@ -29,15 +23,10 @@ function FileField({ label, name, required, multiple, files, onChange }) {
 
   const fileNames = useMemo(() => {
     if (!selectedFiles) return [];
-
     if (selectedFiles instanceof FileList) {
       return Array.from(selectedFiles).map((file) => file.name);
     }
-
-    if (selectedFiles instanceof File) {
-      return [selectedFiles.name];
-    }
-
+    if (selectedFiles instanceof File) return [selectedFiles.name];
     return [];
   }, [selectedFiles]);
 
@@ -83,13 +72,14 @@ export default function OrganizationApplication() {
     bin: "",
     city: "",
     address: "",
+    organization_email: "",
 
     chief_doctor_full_name: "",
+    chief_doctor_phone: "",
 
     previous_chief_doctor_full_name: "",
     new_chief_doctor_full_name: "",
     new_chief_doctor_phone: "",
-    new_chief_doctor_email: "",
 
     sender_full_name: "",
     sender_phone: "",
@@ -97,6 +87,13 @@ export default function OrganizationApplication() {
 
     comment: "",
   });
+
+  const [admins, setAdmins] = useState([
+    {
+      full_name: "",
+      phone: "",
+    },
+  ]);
 
   const [files, setFiles] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -109,18 +106,32 @@ export default function OrganizationApplication() {
   const isChiefDoctorChange =
     applicationType === APPLICATION_TYPES.CHANGE_CHIEF_DOCTOR;
 
+  const isAdministratorChange =
+    applicationType === APPLICATION_TYPES.CHANGE_ADMINISTRATOR;
+
   function updateField(event) {
     const { name, value } = event.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  }
 
-    setForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+  function updateAdmin(index, field, value) {
+    setAdmins((prev) =>
+      prev.map((admin, adminIndex) =>
+        adminIndex === index ? { ...admin, [field]: value } : admin
+      )
+    );
+  }
+
+  function addAdmin() {
+    setAdmins((prev) => [...prev, { full_name: "", phone: "" }]);
+  }
+
+  function removeAdmin(index) {
+    setAdmins((prev) => prev.filter((_, adminIndex) => adminIndex !== index));
   }
 
   function updateFile(event) {
     const { name, files: inputFiles, multiple } = event.target;
-
     setFiles((prev) => ({
       ...prev,
       [name]: multiple ? inputFiles : inputFiles?.[0] || null,
@@ -135,13 +146,14 @@ export default function OrganizationApplication() {
       bin: "",
       city: "",
       address: "",
+      organization_email: "",
 
       chief_doctor_full_name: "",
+      chief_doctor_phone: "",
 
       previous_chief_doctor_full_name: "",
       new_chief_doctor_full_name: "",
       new_chief_doctor_phone: "",
-      new_chief_doctor_email: "",
 
       sender_full_name: "",
       sender_phone: "",
@@ -149,6 +161,7 @@ export default function OrganizationApplication() {
 
       comment: "",
     });
+    setAdmins([{ full_name: "", phone: "" }]);
     setFiles({});
     setSubmittedApplication(null);
     setError("");
@@ -156,7 +169,6 @@ export default function OrganizationApplication() {
 
   async function submitApplication(event) {
     event.preventDefault();
-
     setError("");
     setIsSubmitting(true);
 
@@ -164,6 +176,7 @@ export default function OrganizationApplication() {
       const formData = new FormData();
 
       formData.append("application_type", applicationType);
+      formData.append("administrators", JSON.stringify(admins));
 
       Object.entries(form).forEach(([key, value]) => {
         formData.append(key, value || "");
@@ -173,9 +186,7 @@ export default function OrganizationApplication() {
         if (!value) return;
 
         if (value instanceof FileList) {
-          Array.from(value).forEach((file) => {
-            formData.append(key, file);
-          });
+          Array.from(value).forEach((file) => formData.append(key, file));
         } else {
           formData.append(key, value);
         }
@@ -213,7 +224,6 @@ export default function OrganizationApplication() {
 
         <section className="success-card">
           <div className="success-icon">✓</div>
-
           <h1>Заявка отправлена</h1>
 
           <div className="application-number">
@@ -226,9 +236,9 @@ export default function OrganizationApplication() {
           </div>
 
           <p>
-            Ваша заявка принята в обработку. После проверки данных
-            администратор изменит статус заявки. Ответ придёт на указанную
-            электронную почту.
+            Заявка отправлена в техническую поддержку Clinic OS. После одобрения
+            будут созданы учетные записи главного врача и администратора. Пароль
+            они создадут самостоятельно при первом входе.
           </p>
 
           <button type="button" className="primary-button" onClick={resetForm}>
@@ -249,13 +259,10 @@ export default function OrganizationApplication() {
 
       <section className="application-hero">
         <div className="page-badge">Заявка организации</div>
-
         <h1>Подать заявку на подключение</h1>
-
         <p>
-          Заполните данные медицинской организации и прикрепите документы. После
-          отправки заявка попадёт в админ-панель, где её проверит ответственный
-          сотрудник.
+          Заполните данные организации, главного врача и администратора. После
+          проверки техническая поддержка создаст доступы для первого входа.
         </p>
       </section>
 
@@ -268,7 +275,6 @@ export default function OrganizationApplication() {
             <p>Выберите, для чего организация отправляет заявление.</p>
 
             <label className="org-label">Тип заявки</label>
-
             <select
               className="org-input"
               value={applicationType}
@@ -278,7 +284,10 @@ export default function OrganizationApplication() {
                 Подключение новой организации
               </option>
               <option value={APPLICATION_TYPES.CHANGE_CHIEF_DOCTOR}>
-                Изменение главного врача организации
+                Изменение главного врача
+              </option>
+              <option value={APPLICATION_TYPES.CHANGE_ADMINISTRATOR}>
+                Изменение администратора
               </option>
             </select>
           </div>
@@ -289,10 +298,7 @@ export default function OrganizationApplication() {
 
           <div className="section-content">
             <h2>Данные организации</h2>
-            <p>
-              Эти данные будут использоваться администраторами для проверки
-              организации.
-            </p>
+            <p>Основная информация о медицинской организации.</p>
 
             <div className="form-grid one-column">
               <div>
@@ -305,7 +311,7 @@ export default function OrganizationApplication() {
                   value={form.organization_name}
                   onChange={updateField}
                   required
-                  placeholder="Например: Городская поликлиника №3 акимата города Астаны"
+                  placeholder="Например: Городская поликлиника №3"
                 />
               </div>
             </div>
@@ -371,37 +377,104 @@ export default function OrganizationApplication() {
                   value={form.address}
                   onChange={updateField}
                   required
-                  placeholder="Например: проспект Кабанбай батыра 46"
+                  placeholder="Например: Кабанбай батыра 46"
+                />
+              </div>
+            </div>
+
+            <div className="form-grid one-column">
+              <div>
+                <label className="org-label">
+                  Корпоративная почта организации
+                  <span className="required-star">*</span>
+                </label>
+                <input
+                  className="org-input"
+                  type="email"
+                  name="organization_email"
+                  value={form.organization_email}
+                  onChange={updateField}
+                  required
+                  placeholder="Например: info@clinic.kz"
                 />
               </div>
             </div>
           </div>
         </section>
 
-        {isNewOrganization && (
+        {(isNewOrganization || isChiefDoctorChange) && (
           <section className="form-section">
             <div className="section-number">3</div>
 
             <div className="section-content">
-              <h2>Данные главного врача</h2>
-              <p>
-                После одобрения заявки организация будет создана со статусом
-                ожидания подтверждения ЭЦП главного врача.
-              </p>
+              <h2>
+                {isNewOrganization
+                  ? "Данные главного врача"
+                  : "Изменение главного врача"}
+              </h2>
 
-              <div className="form-grid one-column">
+              {isChiefDoctorChange && (
+                <div className="form-grid one-column">
+                  <div>
+                    <label className="org-label">
+                      ФИО предыдущего главного врача
+                      <span className="required-star">*</span>
+                    </label>
+                    <input
+                      className="org-input"
+                      name="previous_chief_doctor_full_name"
+                      value={form.previous_chief_doctor_full_name}
+                      onChange={updateField}
+                      required={isChiefDoctorChange}
+                      placeholder="Например: Иванов Иван Иванович"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="form-grid two-columns">
                 <div>
                   <label className="org-label">
-                    ФИО главного врача
+                    ФИО главного врача<span className="required-star">*</span>
+                  </label>
+                  <input
+                    className="org-input"
+                    name={
+                      isNewOrganization
+                        ? "chief_doctor_full_name"
+                        : "new_chief_doctor_full_name"
+                    }
+                    value={
+                      isNewOrganization
+                        ? form.chief_doctor_full_name
+                        : form.new_chief_doctor_full_name
+                    }
+                    onChange={updateField}
+                    required
+                    placeholder="Например: Иванов Иван Иванович"
+                  />
+                </div>
+
+                <div>
+                  <label className="org-label">
+                    Телефон главного врача
                     <span className="required-star">*</span>
                   </label>
                   <input
                     className="org-input"
-                    name="chief_doctor_full_name"
-                    value={form.chief_doctor_full_name}
+                    name={
+                      isNewOrganization
+                        ? "chief_doctor_phone"
+                        : "new_chief_doctor_phone"
+                    }
+                    value={
+                      isNewOrganization
+                        ? form.chief_doctor_phone
+                        : form.new_chief_doctor_phone
+                    }
                     onChange={updateField}
-                    required={isNewOrganization}
-                    placeholder="Например: Иванов Иван Иванович"
+                    required
+                    placeholder="+7 777 000 00 00"
                   />
                 </div>
               </div>
@@ -409,81 +482,78 @@ export default function OrganizationApplication() {
           </section>
         )}
 
-        {isChiefDoctorChange && (
+        {(isNewOrganization || isAdministratorChange) && (
           <section className="form-section">
-            <div className="section-number">3</div>
+            <div className="section-number">4</div>
 
             <div className="section-content">
-              <h2>Изменение главного врача</h2>
+              <h2>Данные администратора</h2>
               <p>
-                Укажите предыдущего и нового главного врача. После одобрения
-                администратор обновит данные организации.
+                Укажите администратора организации. При необходимости можно
+                добавить несколько администраторов.
               </p>
 
-              <div className="form-grid two-columns">
-                <div>
-                  <label className="org-label">
-                    ФИО предыдущего главного врача
-                    <span className="required-star">*</span>
-                  </label>
-                  <input
-                    className="org-input"
-                    name="previous_chief_doctor_full_name"
-                    value={form.previous_chief_doctor_full_name}
-                    onChange={updateField}
-                    required={isChiefDoctorChange}
-                    placeholder="Например: Иванов Иван Иванович"
-                  />
-                </div>
+              {admins.map((admin, index) => (
+                <div className="admin-box" key={index}>
+                  <div className="admin-box-top">
+                    <h3>Администратор #{index + 1}</h3>
 
-                <div>
-                  <label className="org-label">
-                    ФИО нового главного врача
-                    <span className="required-star">*</span>
-                  </label>
-                  <input
-                    className="org-input"
-                    name="new_chief_doctor_full_name"
-                    value={form.new_chief_doctor_full_name}
-                    onChange={updateField}
-                    required={isChiefDoctorChange}
-                    placeholder="Например: Петров Пётр Петрович"
-                  />
-                </div>
-              </div>
+                    {admins.length > 1 && (
+                      <button
+                        type="button"
+                        className="small-danger-button"
+                        onClick={() => removeAdmin(index)}
+                      >
+                        Удалить
+                      </button>
+                    )}
+                  </div>
 
-              <div className="form-grid two-columns">
-                <div>
-                  <label className="org-label">
-                    Телефон нового главного врача
-                  </label>
-                  <input
-                    className="org-input"
-                    name="new_chief_doctor_phone"
-                    value={form.new_chief_doctor_phone}
-                    onChange={updateField}
-                    placeholder="+7 777 000 00 00"
-                  />
-                </div>
+                  <div className="form-grid two-columns">
+                    <div>
+                      <label className="org-label">
+                        ФИО администратора
+                        <span className="required-star">*</span>
+                      </label>
+                      <input
+                        className="org-input"
+                        value={admin.full_name}
+                        onChange={(event) =>
+                          updateAdmin(index, "full_name", event.target.value)
+                        }
+                        required
+                        placeholder="Например: Сидоров Сергей Сергеевич"
+                      />
+                    </div>
 
-                <div>
-                  <label className="org-label">Email нового главного врача</label>
-                  <input
-                    className="org-input"
-                    type="email"
-                    name="new_chief_doctor_email"
-                    value={form.new_chief_doctor_email}
-                    onChange={updateField}
-                    placeholder="doctor@example.com"
-                  />
+                    <div>
+                      <label className="org-label">
+                        Телефон администратора
+                        <span className="required-star">*</span>
+                      </label>
+                      <input
+                        className="org-input"
+                        value={admin.phone}
+                        onChange={(event) =>
+                          updateAdmin(index, "phone", event.target.value)
+                        }
+                        required
+                        placeholder="+7 777 000 00 00"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ))}
+
+              <button type="button" className="secondary-button" onClick={addAdmin}>
+                + Добавить администратора
+              </button>
             </div>
           </section>
         )}
 
         <section className="form-section">
-          <div className="section-number">4</div>
+          <div className="section-number">5</div>
 
           <div className="section-content">
             <h2>Данные отправителя</h2>
@@ -539,113 +609,65 @@ export default function OrganizationApplication() {
         </section>
 
         <section className="form-section">
-          <div className="section-number">5</div>
+          <div className="section-number">6</div>
 
           <div className="section-content">
             <h2>Документы</h2>
 
-            {isNewOrganization ? (
-              <p>
-                Прикрепите документы для подключения новой медицинской
-                организации.
-              </p>
-            ) : (
-              <p>
-                Прикрепите документы, подтверждающие изменение главного врача.
-              </p>
-            )}
+            <FileField
+              label="Лицензия на медицинскую деятельность"
+              name="medical_license"
+              required={isNewOrganization}
+              files={files}
+              onChange={updateFile}
+            />
 
-            {isNewOrganization && (
-              <>
-                <FileField
-                  label="Лицензия на медицинскую деятельность"
-                  name="medical_license"
-                  required
-                  files={files}
-                  onChange={updateFile}
-                />
+            <FileField
+              label="Документ о регистрации организации"
+              name="registration_document"
+              required={isNewOrganization}
+              files={files}
+              onChange={updateFile}
+            />
 
-                <FileField
-                  label="Документ о регистрации организации"
-                  name="registration_document"
-                  required
-                  files={files}
-                  onChange={updateFile}
-                />
+            <FileField
+              label="Документ о назначении главного врача"
+              name="chief_doctor_order"
+              required={isNewOrganization || isChiefDoctorChange}
+              files={files}
+              onChange={updateFile}
+            />
 
-                <FileField
-                  label="Документ о назначении главного врача"
-                  name="chief_doctor_order"
-                  required
-                  files={files}
-                  onChange={updateFile}
-                />
+            <FileField
+              label="Документ о назначении администратора"
+              name="administrator_order"
+              required={isNewOrganization || isAdministratorChange}
+              files={files}
+              onChange={updateFile}
+            />
 
-                <FileField
-                  label="Дополнительные документы"
-                  name="additional_documents"
-                  multiple
-                  files={files}
-                  onChange={updateFile}
-                />
-              </>
-            )}
-
-            {isChiefDoctorChange && (
-              <>
-                <FileField
-                  label="Приказ об освобождении предыдущего главного врача"
-                  name="previous_chief_doctor_order"
-                  required
-                  files={files}
-                  onChange={updateFile}
-                />
-
-                <FileField
-                  label="Приказ о назначении нового главного врача"
-                  name="new_chief_doctor_order"
-                  required
-                  files={files}
-                  onChange={updateFile}
-                />
-
-                <FileField
-                  label="Документ, подтверждающий личность нового главного врача"
-                  name="new_chief_doctor_identity"
-                  required
-                  files={files}
-                  onChange={updateFile}
-                />
-
-                <FileField
-                  label="Дополнительные документы"
-                  name="additional_documents"
-                  multiple
-                  files={files}
-                  onChange={updateFile}
-                />
-              </>
-            )}
+            <FileField
+              label="Дополнительные документы"
+              name="additional_documents"
+              multiple
+              files={files}
+              onChange={updateFile}
+            />
           </div>
         </section>
 
         <section className="form-section">
-          <div className="section-number">6</div>
+          <div className="section-number">7</div>
 
           <div className="section-content">
             <h2>Комментарий</h2>
-            <p>Здесь можно указать дополнительную информацию для администратора.</p>
 
             <textarea
               className="org-textarea"
               name="comment"
               value={form.comment}
               onChange={updateField}
-              placeholder={
-                isNewOrganization
-                  ? "Например: просим подключить организацию к системе clinisOS"
-                  : "Например: просим заменить главного врача в данных организации"
-              }
+              placeholder="Например: просим подключить организацию к системе Clinic OS"
             />
 
             {error ? <div className="error-message">{error}</div> : null}
@@ -681,21 +703,26 @@ function ApplicationPageStyles() {
         padding: 42px 24px 90px;
       }
 
-      .org-language-top {
+      .org-language-top,
+      .application-hero,
+      .application-form {
         width: min(1120px, 100%);
-        margin: 0 auto 18px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .org-language-top {
+        margin-bottom: 18px;
         display: flex;
         justify-content: flex-end;
       }
 
       .application-hero {
-        width: min(1120px, 100%);
-        margin: 0 auto 28px;
+        margin-bottom: 28px;
       }
 
       .page-badge {
         display: inline-flex;
-        align-items: center;
         padding: 9px 16px;
         border-radius: 999px;
         background: rgba(0, 255, 170, 0.1);
@@ -711,20 +738,15 @@ function ApplicationPageStyles() {
         line-height: 1.05;
         margin: 0 0 18px;
         font-weight: 900;
-        letter-spacing: -1.2px;
       }
 
-      .application-hero p {
-        max-width: 720px;
+      .application-hero p,
+      .section-content p {
         color: #9fb2c8;
-        font-size: 16px;
         line-height: 1.7;
-        margin: 0;
       }
 
       .application-form {
-        width: min(1120px, 100%);
-        margin: 0 auto;
         display: grid;
         gap: 22px;
       }
@@ -737,7 +759,6 @@ function ApplicationPageStyles() {
         border: 1px solid rgba(148, 163, 184, 0.16);
         border-radius: 28px;
         padding: 28px;
-        box-shadow: 0 24px 90px rgba(0, 0, 0, 0.18);
       }
 
       .section-number {
@@ -745,7 +766,6 @@ function ApplicationPageStyles() {
         height: 42px;
         border-radius: 14px;
         background: #00c853;
-        color: #ffffff;
         display: grid;
         place-items: center;
         font-size: 18px;
@@ -756,23 +776,12 @@ function ApplicationPageStyles() {
         margin: 0 0 8px;
         font-size: 25px;
         font-weight: 900;
-        letter-spacing: -0.4px;
-      }
-
-      .section-content p {
-        color: #9fb2c8;
-        line-height: 1.6;
-        margin: 0 0 22px;
       }
 
       .form-grid {
         display: grid;
         gap: 18px;
         margin-bottom: 18px;
-      }
-
-      .form-grid:last-child {
-        margin-bottom: 0;
       }
 
       .one-column {
@@ -806,23 +815,51 @@ function ApplicationPageStyles() {
         padding: 15px 16px;
         outline: none;
         font-size: 15px;
-        transition: 0.2s ease;
-      }
-
-      .org-input:focus,
-      .org-textarea:focus {
-        border-color: rgba(45, 212, 191, 0.8);
-        box-shadow: 0 0 0 4px rgba(45, 212, 191, 0.08);
-      }
-
-      .org-input::placeholder,
-      .org-textarea::placeholder {
-        color: #64748b;
       }
 
       .org-textarea {
         min-height: 116px;
         resize: vertical;
+      }
+
+      .admin-box {
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 20px;
+        padding: 18px;
+        margin-bottom: 16px;
+        background: rgba(2, 6, 23, 0.22);
+      }
+
+      .admin-box-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+
+      .admin-box-top h3 {
+        margin: 0;
+      }
+
+      .secondary-button,
+      .small-danger-button,
+      .primary-button {
+        border: 0;
+        border-radius: 16px;
+        color: white;
+        font-weight: 900;
+        cursor: pointer;
+      }
+
+      .secondary-button {
+        background: rgba(34, 211, 238, 0.18);
+        border: 1px solid rgba(34, 211, 238, 0.3);
+        padding: 13px 18px;
+      }
+
+      .small-danger-button {
+        background: #dc2626;
+        padding: 10px 14px;
       }
 
       .org-file-box {
@@ -840,11 +877,10 @@ function ApplicationPageStyles() {
       }
 
       .org-file-button {
-        flex-shrink: 0;
         display: inline-flex;
+        min-height: 44px;
         align-items: center;
         justify-content: center;
-        min-height: 44px;
         padding: 0 18px;
         border-radius: 13px;
         background: #00a84f;
@@ -860,7 +896,6 @@ function ApplicationPageStyles() {
       .org-file-name {
         color: #cbd5e1;
         font-size: 14px;
-        word-break: break-word;
       }
 
       .form-actions {
@@ -870,27 +905,9 @@ function ApplicationPageStyles() {
       }
 
       .primary-button {
-        border: 0;
-        border-radius: 18px;
         background: #00c853;
-        color: #ffffff;
-        font-weight: 900;
         font-size: 16px;
         padding: 16px 30px;
-        cursor: pointer;
-        box-shadow: 0 20px 48px rgba(0, 200, 83, 0.22);
-        transition: 0.2s ease;
-      }
-
-      .primary-button:hover {
-        transform: translateY(-1px);
-        background: #00b84c;
-      }
-
-      .primary-button:disabled {
-        opacity: 0.65;
-        cursor: not-allowed;
-        transform: none;
       }
 
       .error-message {
@@ -907,7 +924,6 @@ function ApplicationPageStyles() {
         width: min(680px, 100%);
         margin: 80px auto 0;
         background: rgba(15, 23, 42, 0.9);
-        border: 1px solid rgba(148, 163, 184, 0.18);
         border-radius: 32px;
         padding: 42px;
         text-align: center;
@@ -925,58 +941,14 @@ function ApplicationPageStyles() {
         font-weight: 900;
       }
 
-      .success-card h1 {
-        margin: 0 0 18px;
-        font-size: 34px;
-        font-weight: 900;
-      }
-
-      .application-number {
-        display: inline-flex;
-        align-items: center;
-        padding: 12px 18px;
-        border-radius: 16px;
-        background: rgba(34, 211, 238, 0.11);
-        border: 1px solid rgba(34, 211, 238, 0.2);
-        color: #dffcff;
-        margin-bottom: 20px;
-        font-weight: 800;
-      }
-
-      .application-number strong {
-        color: #22d3ee;
-      }
-
-      .success-card p {
-        color: #d4e2f1;
-        line-height: 1.7;
-        margin: 0 auto 28px;
-        max-width: 560px;
-      }
-
       @media (max-width: 760px) {
         .organization-application-page {
           padding: 26px 14px 70px;
         }
 
-        .org-language-top {
-          margin-bottom: 16px;
-        }
-
-        .application-hero h1 {
-          font-size: 34px;
-        }
-
         .form-section {
           grid-template-columns: 1fr;
           padding: 20px;
-          border-radius: 22px;
-        }
-
-        .section-number {
-          width: 38px;
-          height: 38px;
-          font-size: 16px;
         }
 
         .two-columns {
@@ -984,30 +956,13 @@ function ApplicationPageStyles() {
         }
 
         .org-file-control {
-          align-items: stretch;
           flex-direction: column;
+          align-items: stretch;
         }
 
-        .org-file-button {
-          width: 100%;
-        }
-
-        .form-actions {
-          justify-content: stretch;
-        }
-
+        .org-file-button,
         .primary-button {
           width: 100%;
-        }
-
-        .success-card {
-          margin-top: 38px;
-          padding: 26px 18px;
-          border-radius: 24px;
-        }
-
-        .success-card h1 {
-          font-size: 28px;
         }
       }
     `}</style>
