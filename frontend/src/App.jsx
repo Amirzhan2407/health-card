@@ -24,14 +24,24 @@ import AdminChannels from "./pages/AdminChannels";
 import AdminAuditLogs from "./pages/AdminAuditLogs";
 import AdminRoles from "./pages/AdminRoles";
 
+import OrganizationLogin from "./pages/OrganizationLogin";
+
+import GovClinicLayout from "./organization/govClinic/GovClinicLayout";
+import GovClinicDashboard from "./organization/govClinic/GovClinicDashboard";
+import GovClinicChiefDoctor from "./organization/govClinic/GovClinicChiefDoctor";
+import GovClinicDeputyChief from "./organization/govClinic/GovClinicDeputyChief";
+import GovClinicHR from "./organization/govClinic/GovClinicHR";
+import GovClinicAccounting from "./organization/govClinic/GovClinicAccounting";
+import GovClinicDepartmentHead from "./organization/govClinic/GovClinicDepartmentHead";
+import GovClinicSystemAdmin from "./organization/govClinic/GovClinicSystemAdmin";
+import GovClinicDoctor from "./organization/govClinic/GovClinicDoctor";
+
 function App() {
   return (
     <LanguageProvider>
       <Routes>
-        {/* Страница входа без верхней навигации */}
         <Route path="/login" element={<Login />} />
 
-        {/* Основная клиентская часть с навигацией */}
         <Route path="/" element={<MainLayout />}>
           <Route index element={<HomePage />} />
           <Route path="search" element={<Search />} />
@@ -47,10 +57,8 @@ function App() {
           />
         </Route>
 
-        {/* Админ вход */}
         <Route path="/admin" element={<AdminLogin />} />
 
-        {/* Админ панель */}
         <Route path="/admin-panel" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
           <Route path="staff" element={<AdminStaff />} />
@@ -75,6 +83,19 @@ function App() {
           path="/admin-panel/applications-old"
           element={<Navigate to="/admin-panel/applications" replace />}
         />
+
+        <Route path="/organization-login" element={<OrganizationLogin />} />
+
+        <Route path="/organization/gov-clinic" element={<GovClinicLayout />}>
+          <Route index element={<GovClinicDashboard />} />
+          <Route path="chief-doctor" element={<GovClinicChiefDoctor />} />
+          <Route path="deputy-chief" element={<GovClinicDeputyChief />} />
+          <Route path="hr" element={<GovClinicHR />} />
+          <Route path="accounting" element={<GovClinicAccounting />} />
+          <Route path="department-head" element={<GovClinicDepartmentHead />} />
+          <Route path="system-admin" element={<GovClinicSystemAdmin />} />
+          <Route path="doctor" element={<GovClinicDoctor />} />
+        </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
