@@ -1837,3 +1837,30 @@ textarea {
     width: 100%;
   }
 }
+
+
+
+
+.pill.waiting_eds,
+.pill.waiting_first_login {
+  background: rgba(34, 211, 238, 0.16);
+  color: #22d3ee;
+}
+
+.adminUsersList {
+  display: grid;
+  gap: 14px;
+}
+
+.adminUserBox {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.adminUserBox h4 {
+  margin: 0 0 12px;
+  color: #ffffff;
+  font-weight: 950;
+}

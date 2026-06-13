@@ -7,6 +7,7 @@ const STATUS_LABELS = {
   in_progress: "В процессе",
   needs_fix: "Требует исправления",
   resent: "Отправлена повторно",
+  waiting_eds: "Ожидание первого входа",
   waiting_first_login: "Ожидание первого входа",
   approved: "Подключено",
   rejected: "Отклонена",
@@ -31,6 +32,7 @@ const STATUS_FILTERS = [
   ["all", "Все"],
   ["new", "Новые"],
   ["in_progress", "В процессе"],
+  ["waiting_eds", "Ожидают первого входа"],
   ["waiting_first_login", "Ожидают первого входа"],
   ["approved", "Подключены"],
   ["rejected", "Отклонены"],
@@ -114,6 +116,7 @@ export default function AdminApplications() {
 
   async function changeStatus(status) {
     const id = details?.application?.id || selected?.id;
+
     if (!id) return;
 
     if (status === "rejected" && !comment.trim()) {
@@ -134,6 +137,7 @@ export default function AdminApplications() {
       });
 
       await loadApplications(activeStatus);
+
       await openApplication({
         ...(details?.application || selected),
         status,
@@ -154,6 +158,7 @@ export default function AdminApplications() {
   }, []);
 
   const application = details?.application || selected;
+
   const administrators = parseAdmins(
     application?.administrators || application?.admins
   );
@@ -240,7 +245,10 @@ export default function AdminApplications() {
                   </span>
 
                   <span>
-                    <button className="miniBtn" onClick={() => openApplication(item)}>
+                    <button
+                      className="miniBtn"
+                      onClick={() => openApplication(item)}
+                    >
                       Открыть
                     </button>
                   </span>
@@ -311,7 +319,8 @@ export default function AdminApplications() {
                     <span>Корпоративная почта</span>
                     <b>
                       {text(
-                        application.organization_email || application.sender_email
+                        application.organization_email ||
+                          application.sender_email
                       )}
                     </b>
                   </div>
@@ -351,7 +360,8 @@ export default function AdminApplications() {
                     <span>Email для входа</span>
                     <b>
                       {text(
-                        application.organization_email || application.sender_email
+                        application.organization_email ||
+                          application.sender_email
                       )}
                     </b>
                   </div>
@@ -431,7 +441,11 @@ export default function AdminApplications() {
                         target="_blank"
                         rel="noreferrer"
                       >
-                        {text(doc.document_name || doc.document_type || "Документ")}
+                        {text(
+                          doc.document_name ||
+                            doc.document_type ||
+                            "Документ"
+                        )}
                       </a>
                     ))}
                   </div>
