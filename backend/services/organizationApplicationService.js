@@ -14,7 +14,6 @@ const BUCKET_NAME = "organization-documents";
 function generateApplicationNumber() {
   const year = new Date().getFullYear();
   const randomPart = Math.floor(100000 + Math.random() * 900000);
-
   return `APP-${year}-${randomPart}`;
 }
 
@@ -28,17 +27,13 @@ function safeFileName(originalName = "document") {
 
 function normalizeText(value) {
   if (value === undefined || value === null) return null;
-
   const text = String(value).trim();
-
   return text.length > 0 ? text : null;
 }
 
 function normalizeApplicationType(value) {
-  if (value === "change_chief_doctor") {
-    return "change_chief_doctor";
-  }
-
+  if (value === "change_chief_doctor") return "change_chief_doctor";
+  if (value === "change_administrator") return "change_administrator";
   return "new_organization";
 }
 
@@ -47,20 +42,11 @@ function getOrganizationTypeLabel(type) {
     state_polyclinic: "Государственная поликлиника",
     state_hospital: "Государственная больница",
     private_clinic: "Частная клиника",
-
-    gov_polyclinic: "Государственная поликлиника",
-    gov_hospital: "Государственная больница",
+    dentistry: "Стоматология",
+    laboratory: "Медицинская лаборатория",
   };
 
   return map[type] || type || "Не указано";
-}
-
-function getApplicationTypeLabel(type) {
-  if (type === "change_chief_doctor") {
-    return "Изменение главного врача организации";
-  }
-
-  return "Подключение новой организации";
 }
 
 function normalizeFiles(files) {
@@ -70,15 +56,29 @@ function normalizeFiles(files) {
 
   Object.entries(files).forEach(([key, value]) => {
     if (!value) return;
-
-    if (Array.isArray(value)) {
-      normalized[key] = value;
-    } else {
-      normalized[key] = [value];
-    }
+    normalized[key] = Array.isArray(value) ? value : [value];
   });
 
   return normalized;
+}
+
+function normalizeAdministrators(value) {
+  if (!value) return [];
+
+  try {
+    const parsed = typeof value === "string" ? JSON.parse(value) : value;
+
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((admin) => ({
+        full_name: normalizeText(admin.full_name),
+        phone: normalizeText(admin.phone),
+      }))
+      .filter((admin) => admin.full_name || admin.phone);
+  } catch {
+    return [];
+  }
 }
 
 async function saveApplicationHistory({
@@ -97,9 +97,7 @@ async function saveApplicationHistory({
     comment: normalizeText(comment),
   };
 
-  if (adminId) {
-    payload.admin_id = adminId;
-  }
+  if (adminId) payload.admin_id = adminId;
 
   const { error } = await supabase
     .from("organization_application_history")
@@ -157,6 +155,7 @@ async function uploadApplicationFile(applicationId, documentType, file, index = 
 export async function createOrganizationApplication({ body, files }) {
   const applicationType = normalizeApplicationType(body.application_type);
   const applicationNumber = generateApplicationNumber();
+  const administrators = normalizeAdministrators(body.administrators);
 
   const payload = {
     application_number: applicationNumber,
@@ -168,15 +167,18 @@ export async function createOrganizationApplication({ body, files }) {
     bin: normalizeText(body.bin),
     city: normalizeText(body.city),
     address: normalizeText(body.address),
+    organization_email: normalizeText(body.organization_email),
 
     chief_doctor_full_name: normalizeText(body.chief_doctor_full_name),
+    chief_doctor_phone: normalizeText(body.chief_doctor_phone),
 
     previous_chief_doctor_full_name: normalizeText(
       body.previous_chief_doctor_full_name
     ),
     new_chief_doctor_full_name: normalizeText(body.new_chief_doctor_full_name),
     new_chief_doctor_phone: normalizeText(body.new_chief_doctor_phone),
-    new_chief_doctor_email: normalizeText(body.new_chief_doctor_email),
+
+    administrators,
 
     sender_full_name: normalizeText(body.sender_full_name),
     sender_phone: normalizeText(body.sender_phone),
@@ -186,41 +188,27 @@ export async function createOrganizationApplication({ body, files }) {
     status: "new",
   };
 
-  if (!payload.organization_name) {
-    throw new Error("Название организации обязательно.");
-  }
-
-  if (!payload.organization_type) {
-    throw new Error("Тип организации обязателен.");
-  }
-
-  if (!payload.bin) {
-    throw new Error("БИН организации обязателен.");
-  }
-
-  if (!payload.city) {
-    throw new Error("Город обязателен.");
-  }
-
-  if (!payload.address) {
-    throw new Error("Адрес организации обязателен.");
-  }
-
-  if (!payload.sender_full_name) {
-    throw new Error("ФИО отправителя обязательно.");
-  }
-
-  if (!payload.sender_phone) {
-    throw new Error("Телефон отправителя обязателен.");
-  }
-
-  if (!payload.sender_email) {
-    throw new Error("Email для ответа обязателен.");
-  }
+  if (!payload.organization_name) throw new Error("Название организации обязательно.");
+  if (!payload.organization_type) throw new Error("Тип организации обязателен.");
+  if (!payload.bin) throw new Error("БИН организации обязателен.");
+  if (!payload.city) throw new Error("Город обязателен.");
+  if (!payload.address) throw new Error("Адрес организации обязателен.");
+  if (!payload.organization_email) throw new Error("Корпоративная почта обязательна.");
+  if (!payload.sender_full_name) throw new Error("ФИО отправителя обязательно.");
+  if (!payload.sender_phone) throw new Error("Телефон отправителя обязателен.");
+  if (!payload.sender_email) throw new Error("Email для ответа обязателен.");
 
   if (applicationType === "new_organization") {
     if (!payload.chief_doctor_full_name) {
       throw new Error("ФИО главного врача обязательно.");
+    }
+
+    if (!payload.chief_doctor_phone) {
+      throw new Error("Телефон главного врача обязателен.");
+    }
+
+    if (administrators.length === 0) {
+      throw new Error("Нужно указать хотя бы одного администратора.");
     }
   }
 
@@ -231,6 +219,10 @@ export async function createOrganizationApplication({ body, files }) {
 
     if (!payload.new_chief_doctor_full_name) {
       throw new Error("ФИО нового главного врача обязательно.");
+    }
+
+    if (!payload.new_chief_doctor_phone) {
+      throw new Error("Телефон нового главного врача обязателен.");
     }
   }
 
@@ -256,9 +248,7 @@ export async function createOrganizationApplication({ body, files }) {
         index
       );
 
-      if (document) {
-        uploadedDocuments.push(document);
-      }
+      if (document) uploadedDocuments.push(document);
     }
   }
 
@@ -266,10 +256,7 @@ export async function createOrganizationApplication({ body, files }) {
     applicationId: application.id,
     action: "application_created",
     newStatus: "new",
-    comment:
-      applicationType === "change_chief_doctor"
-        ? "Заявка на изменение главного врача отправлена организацией."
-        : "Заявка на подключение организации отправлена организацией.",
+    comment: "Заявка отправлена организацией.",
   });
 
   return {
@@ -278,128 +265,13 @@ export async function createOrganizationApplication({ body, files }) {
   };
 }
 
-export async function getOrganizationApplications({ admin } = {}) {
-  let query = supabase
-    .from("organization_applications")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (admin?.role !== "super_admin" && admin?.category) {
-    query = query.eq("organization_type", admin.category);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    throw new Error(`Ошибка получения заявок: ${error.message}`);
-  }
-
-  return data || [];
-}
-
-export async function getOrganizationApplicationById(id) {
-  const { data: application, error } = await supabase
-    .from("organization_applications")
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (error) {
-    throw new Error(`Ошибка получения заявки: ${error.message}`);
-  }
-
-  const { data: documents, error: documentsError } = await supabase
-    .from("organization_application_documents")
-    .select("*")
-    .eq("application_id", id)
-    .order("created_at", { ascending: true });
-
-  if (documentsError) {
-    throw new Error(`Ошибка получения документов: ${documentsError.message}`);
-  }
-
-  const { data: history, error: historyError } = await supabase
-    .from("organization_application_history")
-    .select("*")
-    .eq("application_id", id)
-    .order("created_at", { ascending: false });
-
-  if (historyError) {
-    throw new Error(`Ошибка получения истории заявки: ${historyError.message}`);
-  }
-
-  return {
-    application,
-    documents: documents || [],
-    history: history || [],
-  };
-}
-
-export async function assignApplicationAdmin({
-  id,
-  assignedAdminId,
-  adminId,
-  comment,
-}) {
-  const { data: currentApplication, error: currentError } = await supabase
-    .from("organization_applications")
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (currentError) {
-    throw new Error(`Заявка не найдена: ${currentError.message}`);
-  }
-
-  const oldStatus = currentApplication.status;
-
-  const { data: updatedApplication, error } = await supabase
-    .from("organization_applications")
-    .update({
-      assigned_admin_id: assignedAdminId || null,
-      status: "in_progress",
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .select("*")
-    .single();
-
-  if (error) {
-    throw new Error(`Ошибка назначения администратора: ${error.message}`);
-  }
-
-  await saveApplicationHistory({
-    applicationId: id,
-    adminId,
-    action: "application_admin_assigned",
-    oldStatus,
-    newStatus: "in_progress",
-    comment:
-      normalizeText(comment) ||
-      `Заявка назначена администратору: ${assignedAdminId || "не указан"}`,
-  });
-
-  return updatedApplication;
-}
-
-export async function updateOrganizationApplicationStatus({
+export async function updateApplicationStatus({
   id,
   status,
   reviewComment,
+  comment,
   adminId,
 }) {
-  const allowedStatuses = [
-    "new",
-    "in_progress",
-    "approved",
-    "rejected",
-    "waiting_eds",
-  ];
-
-  if (!allowedStatuses.includes(status)) {
-    throw new Error("Недопустимый статус заявки.");
-  }
-
   const { data: currentApplication, error: currentError } = await supabase
     .from("organization_applications")
     .select("*")
@@ -409,14 +281,12 @@ export async function updateOrganizationApplicationStatus({
   if (currentError) {
     throw new Error(`Заявка не найдена: ${currentError.message}`);
   }
-
-  const oldStatus = currentApplication.status;
 
   const { data: updatedApplication, error } = await supabase
     .from("organization_applications")
     .update({
       status,
-      review_comment: normalizeText(reviewComment),
+      review_comment: normalizeText(reviewComment || comment),
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
@@ -431,126 +301,10 @@ export async function updateOrganizationApplicationStatus({
     applicationId: id,
     adminId,
     action: "application_status_changed",
-    oldStatus,
+    oldStatus: currentApplication.status,
     newStatus: status,
-    comment: normalizeText(reviewComment),
+    comment: normalizeText(reviewComment || comment),
   });
 
   return updatedApplication;
-}
-
-export async function saveApplicationEmailHistory({
-  applicationId,
-  status,
-  success,
-  message,
-}) {
-  await saveApplicationHistory({
-    applicationId,
-    action: success ? "application_email_sent" : "application_email_failed",
-    oldStatus: status,
-    newStatus: status,
-    comment: message,
-  });
-}
-
-export async function getSupportAdminsForApplications() {
-  const possibleTables = ["admins", "admin_users"];
-
-  for (const tableName of possibleTables) {
-    const { data, error } = await supabase
-      .from(tableName)
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error(
-        `GET SUPPORT ADMINS ERROR FROM ${tableName}:`,
-        error.message
-      );
-      continue;
-    }
-
-    const admins = (data || [])
-      .filter((admin) => {
-        const role = admin.role || admin.admin_role || "";
-        const status = admin.status || "";
-        const isActive = admin.is_active;
-
-        const isNotMainAdmin =
-          role !== "super_admin" &&
-          role !== "main_admin" &&
-          role !== "chief_admin";
-
-        const isNotBlocked =
-          status !== "blocked" &&
-          status !== "inactive" &&
-          isActive !== false;
-
-        return isNotMainAdmin && isNotBlocked;
-      })
-      .map((admin) => ({
-        id: admin.id,
-        full_name:
-          admin.full_name ||
-          admin.name ||
-          admin.username ||
-          admin.login ||
-          "Администратор",
-        username: admin.username || admin.login || null,
-        email: admin.email || null,
-        role: admin.role || admin.admin_role || "admin",
-        category: admin.category || admin.responsibility_category || null,
-        status: admin.status || "active",
-        is_active: admin.is_active !== false,
-      }));
-
-    return admins;
-  }
-
-  return [];
-}
-
-export function formatApplicationForAdmin(application) {
-  return {
-    ...application,
-    application_type_label: getApplicationTypeLabel(
-      application.application_type
-    ),
-    organization_type_label: getOrganizationTypeLabel(
-      application.organization_type
-    ),
-  };
-}
-
-export function getApplicationLabels() {
-  return {
-    applicationTypes: {
-      new_organization: "Подключение новой организации",
-      change_chief_doctor: "Изменение главного врача организации",
-    },
-    organizationTypes: {
-      state_polyclinic: "Государственная поликлиника",
-      state_hospital: "Государственная больница",
-      private_clinic: "Частная клиника",
-      gov_polyclinic: "Государственная поликлиника",
-      gov_hospital: "Государственная больница",
-    },
-  };
-}
-
-
-export async function updateApplicationStatus({
-  id,
-  status,
-  reviewComment,
-  comment,
-  adminId,
-}) {
-  return updateOrganizationApplicationStatus({
-    id,
-    status,
-    reviewComment: reviewComment || comment,
-    adminId,
-  });
 }
