@@ -5,130 +5,71 @@ import "../styles/organizationLogin.css";
 export default function OrganizationLogin() {
   const navigate = useNavigate();
 
-  const [iinOrLogin, setIinOrLogin] = useState("");
+  const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
-  const [organizationType, setOrganizationType] = useState("gov_clinic");
-  const [role, setRole] = useState("chief_doctor");
-  const [error, setError] = useState("");
 
-  const roleRoutes = {
-    gov_clinic: {
-      chief_doctor: "/organization/gov-clinic/chief-doctor",
-      deputy_chief: "/organization/gov-clinic/deputy-chief",
-      hr: "/organization/gov-clinic/hr",
-      accounting: "/organization/gov-clinic/accounting",
-      department_head: "/organization/gov-clinic/department-head",
-      system_admin: "/organization/gov-clinic/system-admin",
-      doctor: "/organization/gov-clinic/doctor",
-    },
-  };
-
-  function handleLogin(e) {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    setError("");
 
-    if (!iinOrLogin.trim()) {
-      setError("Введите ИИН или логин.");
-      return;
-    }
-
-    if (!password.trim()) {
-      setError("Введите пароль.");
-      return;
-    }
-
-    const targetRoute = roleRoutes?.[organizationType]?.[role];
-
-    if (!targetRoute) {
-      setError("Для выбранной роли пока не создан кабинет.");
-      return;
-    }
-
-    navigate(targetRoute);
-  }
+    // временно отправляем в кабинет гос. поликлиники
+    navigate("/organization/gov-clinic");
+  };
 
   return (
     <div className="org-login-page">
       <div className="org-login-card">
-        <div className="org-login-info">
-          <div className="org-login-badge">Clinic OS</div>
+        <div className="org-login-left">
+          <div className="org-login-logo">
+            <h1>Clinic OS</h1>
+            <p>Вход для медицинских организаций</p>
+          </div>
 
-          <h1>Вход для организаций</h1>
+          <div className="org-login-info">
+            <h2>Единая система управления медицинской организацией</h2>
 
-          <p>
-            Единая авторизация для государственных поликлиник, больниц, частных
-            клиник, стоматологий и медицинских лабораторий.
-          </p>
-
-          <div className="org-login-points">
-            <span>Без ЭЦП на странице входа</span>
-            <span>Роли сотрудников</span>
-            <span>Отдельные кабинеты организаций</span>
+            <ul>
+              <li>Государственные поликлиники</li>
+              <li>Государственные больницы</li>
+              <li>Частные клиники</li>
+              <li>Стоматологии</li>
+              <li>Медицинские лаборатории</li>
+            </ul>
           </div>
         </div>
 
-        <form className="org-login-form" onSubmit={handleLogin}>
-          <h2>Авторизация сотрудника</h2>
+        <div className="org-login-right">
+          <form onSubmit={handleSubmit}>
+            <h2>Авторизация</h2>
 
-          <label>
-            ИИН или логин
-            <input
-              type="text"
-              value={iinOrLogin}
-              onChange={(e) => setIinOrLogin(e.target.value)}
-              placeholder="Введите ИИН или логин"
-            />
-          </label>
+            <div className="form-group">
+              <label>ИИН или логин</label>
 
-          <label>
-            Пароль
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Введите пароль"
-            />
-          </label>
+              <input
+                type="text"
+                placeholder="Введите ИИН или логин"
+                value={login}
+                onChange={(e) => setLogin(e.target.value)}
+                required
+              />
+            </div>
 
-          <label>
-            Тип организации
-            <select
-              value={organizationType}
-              onChange={(e) => setOrganizationType(e.target.value)}
-            >
-              <option value="gov_clinic">Государственная поликлиника</option>
-              <option value="gov_hospital" disabled>
-                Государственная больница
-              </option>
-              <option value="private_clinic" disabled>
-                Частная клиника
-              </option>
-              <option value="dentistry" disabled>
-                Стоматология
-              </option>
-              <option value="laboratory" disabled>
-                Медицинская лаборатория
-              </option>
-            </select>
-          </label>
+            <div className="form-group">
+              <label>Пароль</label>
 
-          <label>
-            Роль
-            <select value={role} onChange={(e) => setRole(e.target.value)}>
-              <option value="chief_doctor">Главный врач</option>
-              <option value="deputy_chief">Заместитель главного врача</option>
-              <option value="hr">Отдел кадров</option>
-              <option value="accounting">Бухгалтерия</option>
-              <option value="department_head">Руководитель отделения</option>
-              <option value="system_admin">Администратор системы</option>
-              <option value="doctor">Врач</option>
-            </select>
-          </label>
+              <input
+                type="password"
+                placeholder="Введите пароль"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
 
-          {error && <div className="org-login-error">{error}</div>}
-
-          <button type="submit">Войти</button>
-        </form>
+            <button type="submit" className="login-btn">
+              Войти
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
