@@ -18,6 +18,12 @@ const ORGANIZATION_TYPES = [
   { value: "laboratory", label: "Медицинская лаборатория" },
 ];
 
+const MAX_ADMINS = 3;
+
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
 function FileField({ label, name, required, multiple, files, onChange }) {
   const selectedFiles = files?.[name];
 
@@ -76,15 +82,24 @@ export default function OrganizationApplication() {
 
     chief_doctor_full_name: "",
     chief_doctor_phone: "",
+    chief_doctor_email: "",
 
     previous_chief_doctor_full_name: "",
     new_chief_doctor_full_name: "",
     new_chief_doctor_phone: "",
+    new_chief_doctor_email: "",
 
     comment: "",
   });
 
-  const [admins, setAdmins] = useState([{ full_name: "", phone: "" }]);
+  const [admins, setAdmins] = useState([
+    {
+      full_name: "",
+      phone: "",
+      email: "",
+    },
+  ]);
+
   const [files, setFiles] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedApplication, setSubmittedApplication] = useState(null);
@@ -113,7 +128,12 @@ export default function OrganizationApplication() {
   }
 
   function addAdmin() {
-    setAdmins((prev) => [...prev, { full_name: "", phone: "" }]);
+    if (admins.length >= MAX_ADMINS) {
+      setError("Можно добавить максимум 3 администратора.");
+      return;
+    }
+
+    setAdmins((prev) => [...prev, { full_name: "", phone: "", email: "" }]);
   }
 
   function removeAdmin(index) {
@@ -130,6 +150,7 @@ export default function OrganizationApplication() {
 
   function resetForm() {
     setApplicationType(APPLICATION_TYPES.NEW_ORGANIZATION);
+
     setForm({
       organization_name: "",
       organization_type: "state_polyclinic",
@@ -140,22 +161,69 @@ export default function OrganizationApplication() {
 
       chief_doctor_full_name: "",
       chief_doctor_phone: "",
+      chief_doctor_email: "",
 
       previous_chief_doctor_full_name: "",
       new_chief_doctor_full_name: "",
       new_chief_doctor_phone: "",
+      new_chief_doctor_email: "",
 
       comment: "",
     });
-    setAdmins([{ full_name: "", phone: "" }]);
+
+    setAdmins([{ full_name: "", phone: "", email: "" }]);
     setFiles({});
     setSubmittedApplication(null);
     setError("");
   }
 
+  function validateEmails() {
+    const organizationEmail = normalizeEmail(form.organization_email);
+
+    const chiefEmail = normalizeEmail(
+      isNewOrganization ? form.chief_doctor_email : form.new_chief_doctor_email
+    );
+
+    const adminEmails = admins.map((admin) => normalizeEmail(admin.email));
+
+    if (!organizationEmail) {
+      return "Укажите корпоративную почту организации.";
+    }
+
+    if ((isNewOrganization || isChiefDoctorChange) && !chiefEmail) {
+      return "Укажите почту главного врача.";
+    }
+
+    if ((isNewOrganization || isAdministratorChange) && adminEmails.some((email) => !email)) {
+      return "У каждого администратора должна быть своя почта.";
+    }
+
+    const allEmails = [
+      organizationEmail,
+      ...(chiefEmail ? [chiefEmail] : []),
+      ...adminEmails.filter(Boolean),
+    ];
+
+    const uniqueEmails = new Set(allEmails);
+
+    if (uniqueEmails.size !== allEmails.length) {
+      return "Почты не должны повторяться: корпоративная почта, почта главного врача и почты администраторов должны быть разными.";
+    }
+
+    return "";
+  }
+
   async function submitApplication(event) {
     event.preventDefault();
     setError("");
+
+    const emailError = validateEmails();
+
+    if (emailError) {
+      setError(emailError);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -222,8 +290,8 @@ export default function OrganizationApplication() {
           </div>
 
           <p>
-            Заявка отправлена в техническую поддержку Clinic OS. Ответ придёт на
-            корпоративную почту организации.
+            Заявка отправлена в техническую поддержку Clinic OS. Ответ по заявке
+            придёт на корпоративную почту организации.
           </p>
 
           <button type="button" className="primary-button" onClick={resetForm}>
@@ -246,8 +314,8 @@ export default function OrganizationApplication() {
         <div className="page-badge">Заявка организации</div>
         <h1>Подать заявку на подключение</h1>
         <p>
-          Заполните данные организации, главного врача и администратора. Ответ
-          от технической поддержки придёт на корпоративную почту организации.
+          Заполните данные организации, главного врача и основных
+          администраторов. Администраторов можно указать максимум 3.
         </p>
       </section>
 
@@ -417,7 +485,7 @@ export default function OrganizationApplication() {
                 </div>
               )}
 
-              <div className="form-grid two-columns">
+              <div className="form-grid three-columns">
                 <div>
                   <label className="org-label">
                     ФИО главного врача<span className="required-star">*</span>
@@ -442,8 +510,7 @@ export default function OrganizationApplication() {
 
                 <div>
                   <label className="org-label">
-                    Телефон главного врача
-                    <span className="required-star">*</span>
+                    Телефон<span className="required-star">*</span>
                   </label>
                   <input
                     className="org-input"
@@ -462,6 +529,29 @@ export default function OrganizationApplication() {
                     placeholder="+7 777 000 00 00"
                   />
                 </div>
+
+                <div>
+                  <label className="org-label">
+                    Почта главного врача<span className="required-star">*</span>
+                  </label>
+                  <input
+                    className="org-input"
+                    type="email"
+                    name={
+                      isNewOrganization
+                        ? "chief_doctor_email"
+                        : "new_chief_doctor_email"
+                    }
+                    value={
+                      isNewOrganization
+                        ? form.chief_doctor_email
+                        : form.new_chief_doctor_email
+                    }
+                    onChange={updateField}
+                    required
+                    placeholder="doctor@clinic.kz"
+                  />
+                </div>
               </div>
             </div>
           </section>
@@ -472,10 +562,10 @@ export default function OrganizationApplication() {
             <div className="section-number">4</div>
 
             <div className="section-content">
-              <h2>Данные администратора</h2>
+              <h2>Данные администраторов</h2>
               <p>
-                Укажите администратора организации. При необходимости можно
-                добавить несколько администраторов.
+                Укажите основных администраторов организации. Максимум можно
+                добавить 3 администратора.
               </p>
 
               {admins.map((admin, index) => (
@@ -494,7 +584,7 @@ export default function OrganizationApplication() {
                     )}
                   </div>
 
-                  <div className="form-grid two-columns">
+                  <div className="form-grid three-columns">
                     <div>
                       <label className="org-label">
                         ФИО администратора
@@ -513,8 +603,7 @@ export default function OrganizationApplication() {
 
                     <div>
                       <label className="org-label">
-                        Телефон администратора
-                        <span className="required-star">*</span>
+                        Телефон<span className="required-star">*</span>
                       </label>
                       <input
                         className="org-input"
@@ -526,13 +615,41 @@ export default function OrganizationApplication() {
                         placeholder="+7 777 000 00 00"
                       />
                     </div>
+
+                    <div>
+                      <label className="org-label">
+                        Почта администратора
+                        <span className="required-star">*</span>
+                      </label>
+                      <input
+                        className="org-input"
+                        type="email"
+                        value={admin.email}
+                        onChange={(event) =>
+                          updateAdmin(index, "email", event.target.value)
+                        }
+                        required
+                        placeholder="admin@clinic.kz"
+                      />
+                    </div>
                   </div>
                 </div>
               ))}
 
-              <button type="button" className="secondary-button" onClick={addAdmin}>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={addAdmin}
+                disabled={admins.length >= MAX_ADMINS}
+              >
                 + Добавить администратора
               </button>
+
+              {admins.length >= MAX_ADMINS && (
+                <p className="limit-text">
+                  Достигнут лимит: максимум 3 администратора.
+                </p>
+              )}
             </div>
           </section>
         )}
@@ -721,6 +838,10 @@ function ApplicationPageStyles() {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
+      .three-columns {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
       .org-label {
         display: block;
         font-size: 14px;
@@ -744,6 +865,7 @@ function ApplicationPageStyles() {
         padding: 15px 16px;
         outline: none;
         font-size: 15px;
+        box-sizing: border-box;
       }
 
       .org-textarea {
@@ -786,9 +908,20 @@ function ApplicationPageStyles() {
         padding: 13px 18px;
       }
 
+      .secondary-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
       .small-danger-button {
         background: #dc2626;
         padding: 10px 14px;
+      }
+
+      .limit-text {
+        margin: 12px 0 0;
+        color: #facc15;
+        font-weight: 800;
       }
 
       .org-file-box {
@@ -868,6 +1001,12 @@ function ApplicationPageStyles() {
         place-items: center;
         font-size: 42px;
         font-weight: 900;
+      }
+
+      @media (max-width: 1000px) {
+        .three-columns {
+          grid-template-columns: 1fr;
+        }
       }
 
       @media (max-width: 760px) {

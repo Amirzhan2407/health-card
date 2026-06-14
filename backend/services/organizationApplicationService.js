@@ -14,7 +14,6 @@ const BUCKET_NAME = "organization-documents";
 function generateApplicationNumber() {
   const year = new Date().getFullYear();
   const randomPart = Math.floor(100000 + Math.random() * 900000);
-
   return `APP-${year}-${randomPart}`;
 }
 
@@ -28,17 +27,19 @@ function safeFileName(originalName = "document") {
 
 function normalizeText(value) {
   if (value === undefined || value === null) return null;
-
   const text = String(value).trim();
-
   return text.length > 0 ? text : null;
+}
+
+function normalizeEmail(value) {
+  const email = normalizeText(value);
+  return email ? email.toLowerCase() : null;
 }
 
 function normalizeApplicationType(value) {
   if (value === "change_chief_doctor") return "change_chief_doctor";
   if (value === "change_administrator") return "change_administrator";
   if (value === "change_organization_data") return "change_organization_data";
-
   return "new_organization";
 }
 
@@ -49,7 +50,6 @@ function getOrganizationTypeLabel(type) {
     private_clinic: "Частная клиника",
     dentistry: "Стоматология",
     laboratory: "Медицинская лаборатория",
-
     gov_polyclinic: "Государственная поликлиника",
     gov_hospital: "Государственная больница",
     private_clinics: "Частная клиника",
@@ -87,17 +87,33 @@ function normalizeAdministrators(value) {
 
   try {
     const parsed = typeof value === "string" ? JSON.parse(value) : value;
-
     if (!Array.isArray(parsed)) return [];
 
     return parsed
       .map((admin) => ({
         full_name: normalizeText(admin.full_name),
         phone: normalizeText(admin.phone),
+        email: normalizeEmail(admin.email),
       }))
-      .filter((admin) => admin.full_name || admin.phone);
+      .filter((admin) => admin.full_name || admin.phone || admin.email);
   } catch {
     return [];
+  }
+}
+
+function validateUniqueEmails({ organizationEmail, chiefEmail, administrators }) {
+  const emails = [
+    organizationEmail,
+    chiefEmail,
+    ...administrators.map((admin) => admin.email),
+  ].filter(Boolean);
+
+  const uniqueEmails = new Set(emails);
+
+  if (uniqueEmails.size !== emails.length) {
+    throw new Error(
+      "Почты не должны повторяться: корпоративная почта, почта главного врача и почты администраторов должны быть разными."
+    );
   }
 }
 
@@ -176,10 +192,23 @@ export async function createOrganizationApplication({ body, files }) {
   const applicationNumber = generateApplicationNumber();
   const administrators = normalizeAdministrators(body.administrators);
 
-  const organizationEmail = normalizeText(body.organization_email);
+  const organizationEmail = normalizeEmail(body.organization_email);
+
+  const chiefDoctorEmail = normalizeEmail(
+    applicationType === "new_organization"
+      ? body.chief_doctor_email
+      : body.new_chief_doctor_email
+  );
+
   const chiefDoctorPhone = normalizeText(
     body.chief_doctor_phone || body.new_chief_doctor_phone
   );
+
+  validateUniqueEmails({
+    organizationEmail,
+    chiefEmail: chiefDoctorEmail,
+    administrators,
+  });
 
   const payload = {
     application_number: applicationNumber,
@@ -195,12 +224,14 @@ export async function createOrganizationApplication({ body, files }) {
 
     chief_doctor_full_name: normalizeText(body.chief_doctor_full_name),
     chief_doctor_phone: normalizeText(body.chief_doctor_phone),
+    chief_doctor_email: normalizeEmail(body.chief_doctor_email),
 
     previous_chief_doctor_full_name: normalizeText(
       body.previous_chief_doctor_full_name
     ),
     new_chief_doctor_full_name: normalizeText(body.new_chief_doctor_full_name),
     new_chief_doctor_phone: normalizeText(body.new_chief_doctor_phone),
+    new_chief_doctor_email: normalizeEmail(body.new_chief_doctor_email),
 
     administrators,
 
@@ -212,42 +243,25 @@ export async function createOrganizationApplication({ body, files }) {
     status: "new",
   };
 
-  if (!payload.organization_name) {
-    throw new Error("Название организации обязательно.");
-  }
-
-  if (!payload.organization_type) {
-    throw new Error("Тип организации обязателен.");
-  }
-
-  if (!payload.bin) {
-    throw new Error("БИН организации обязателен.");
-  }
-
-  if (!payload.city) {
-    throw new Error("Город обязателен.");
-  }
-
-  if (!payload.address) {
-    throw new Error("Адрес организации обязателен.");
-  }
-
-  if (!payload.organization_email) {
-    throw new Error("Корпоративная почта организации обязательна.");
-  }
+  if (!payload.organization_name) throw new Error("Название организации обязательно.");
+  if (!payload.organization_type) throw new Error("Тип организации обязателен.");
+  if (!payload.bin) throw new Error("БИН организации обязателен.");
+  if (!payload.city) throw new Error("Город обязателен.");
+  if (!payload.address) throw new Error("Адрес организации обязателен.");
+  if (!payload.organization_email) throw new Error("Корпоративная почта организации обязательна.");
 
   if (applicationType === "new_organization") {
-    if (!payload.chief_doctor_full_name) {
-      throw new Error("ФИО главного врача обязательно.");
-    }
+    if (!payload.chief_doctor_full_name) throw new Error("ФИО главного врача обязательно.");
+    if (!payload.chief_doctor_phone) throw new Error("Телефон главного врача обязателен.");
+    if (!payload.chief_doctor_email) throw new Error("Почта главного врача обязательна.");
+    if (administrators.length === 0) throw new Error("Нужно указать хотя бы одного администратора.");
+    if (administrators.length > 3) throw new Error("Можно указать максимум 3 администратора.");
 
-    if (!payload.chief_doctor_phone) {
-      throw new Error("Телефон главного врача обязателен.");
-    }
-
-    if (administrators.length === 0) {
-      throw new Error("Нужно указать хотя бы одного администратора.");
-    }
+    administrators.forEach((admin, index) => {
+      if (!admin.full_name) throw new Error(`ФИО администратора #${index + 1} обязательно.`);
+      if (!admin.phone) throw new Error(`Телефон администратора #${index + 1} обязателен.`);
+      if (!admin.email) throw new Error(`Почта администратора #${index + 1} обязательна.`);
+    });
   }
 
   if (applicationType === "change_chief_doctor") {
@@ -262,6 +276,26 @@ export async function createOrganizationApplication({ body, files }) {
     if (!payload.new_chief_doctor_phone) {
       throw new Error("Телефон нового главного врача обязателен.");
     }
+
+    if (!payload.new_chief_doctor_email) {
+      throw new Error("Почта нового главного врача обязательна.");
+    }
+  }
+
+  if (applicationType === "change_administrator") {
+    if (administrators.length === 0) {
+      throw new Error("Нужно указать хотя бы одного администратора.");
+    }
+
+    if (administrators.length > 3) {
+      throw new Error("Можно указать максимум 3 администратора.");
+    }
+
+    administrators.forEach((admin, index) => {
+      if (!admin.full_name) throw new Error(`ФИО администратора #${index + 1} обязательно.`);
+      if (!admin.phone) throw new Error(`Телефон администратора #${index + 1} обязателен.`);
+      if (!admin.email) throw new Error(`Почта администратора #${index + 1} обязательна.`);
+    });
   }
 
   const { data: application, error } = await supabase
@@ -286,9 +320,7 @@ export async function createOrganizationApplication({ body, files }) {
         index
       );
 
-      if (document) {
-        uploadedDocuments.push(document);
-      }
+      if (document) uploadedDocuments.push(document);
     }
   }
 
@@ -495,10 +527,7 @@ export async function getSupportAdminsForApplications() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error(
-        `GET SUPPORT ADMINS ERROR FROM ${tableName}:`,
-        error.message
-      );
+      console.error(`GET SUPPORT ADMINS ERROR FROM ${tableName}:`, error.message);
       continue;
     }
 
