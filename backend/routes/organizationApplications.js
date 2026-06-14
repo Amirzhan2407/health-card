@@ -4,7 +4,10 @@ import { supabase } from "../lib/supabaseAdmin.js";
 import { requireAdminAuth } from "../middleware/requireAdminAuth.js";
 import { createAuditLog } from "../services/adminAuditService.js";
 import { createOrganizationApplication } from "../services/organizationApplicationService.js";
-import { sendApplicationStatusEmail } from "../services/emailService.js";
+import {
+  sendApplicationStatusEmail,
+  sendOrganizationAccessEmail,
+} from "../services/emailService.js";
 
 const router = express.Router();
 
@@ -112,9 +115,7 @@ async function createOrganizationFromApplication(application, adminId) {
     .eq("application_id", application.id)
     .maybeSingle();
 
-  if (existing.data) {
-    return existing.data;
-  }
+  if (existing.data) return existing.data;
 
   const payload = {
     application_id: application.id,
@@ -129,6 +130,8 @@ async function createOrganizationFromApplication(application, adminId) {
       application.chief_doctor_full_name,
     chief_doctor_phone:
       application.new_chief_doctor_phone || application.chief_doctor_phone,
+    chief_doctor_email:
+      application.new_chief_doctor_email || application.chief_doctor_email,
     organization_email: application.organization_email || application.sender_email,
     organization_phone: application.organization_phone || application.sender_phone,
     status: "waiting_first_login",
@@ -230,10 +233,7 @@ router.post("/", upload.any(), async (req, res) => {
     const files = {};
 
     (req.files || []).forEach((file) => {
-      if (!files[file.fieldname]) {
-        files[file.fieldname] = [];
-      }
-
+      if (!files[file.fieldname]) files[file.fieldname] = [];
       files[file.fieldname].push(file);
     });
 
@@ -266,9 +266,7 @@ router.get("/", requireAdminAuth, async (req, res) => {
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (status) {
-      query = query.eq("status", status);
-    }
+    if (status) query = query.eq("status", status);
 
     if (req.admin.role !== "super_admin") {
       query = query.or(
@@ -573,6 +571,95 @@ router.patch("/:id/assign", requireAdminAuth, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: error.message || "Ошибка назначения заявки.",
+    });
+  }
+});
+
+router.post("/:id/send-access", requireAdminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role, index, fullName, email, login, tempPassword } = req.body;
+
+    if (!["chief", "admin"].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: "Неверная роль доступа.",
+      });
+    }
+
+    if (!email || !login || !tempPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Email, логин и одноразовый пароль обязательны.",
+      });
+    }
+
+    const { data: application, error } = await supabase
+      .from("organization_applications")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error || !application) {
+      return res.status(404).json({
+        success: false,
+        message: "Заявка не найдена.",
+      });
+    }
+
+    if (
+      !["approved", "waiting_first_login", "waiting_eds"].includes(
+        application.status
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Доступы можно отправлять только после одобрения заявки.",
+      });
+    }
+
+    const roleLabel =
+      role === "chief" ? "Главный врач" : `Администратор #${Number(index) + 1}`;
+
+    const emailResult = await sendOrganizationAccessEmail({
+      to: email,
+      application,
+      fullName,
+      roleLabel,
+      login,
+      tempPassword,
+    });
+
+    await insertHistory({
+      applicationId: id,
+      adminId: req.admin.id,
+      action: emailResult.success
+        ? "organization_access_email_sent"
+        : "organization_access_email_failed",
+      oldStatus: application.status,
+      newStatus: application.status,
+      comment: emailResult.success
+        ? `Доступ отправлен: ${roleLabel}, ${email}`
+        : `Ошибка отправки доступа: ${emailResult.message}`,
+    });
+
+    if (!emailResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: emailResult.message,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Доступ успешно отправлен.",
+    });
+  } catch (error) {
+    console.error("SEND ACCESS ERROR:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Ошибка отправки доступа.",
     });
   }
 });

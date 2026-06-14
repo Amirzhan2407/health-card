@@ -40,18 +40,28 @@ function getStatusText(status) {
 }
 
 function getStatusColor(status) {
-  if (status === "approved" || status === "waiting_first_login" || status === "waiting_eds") {
+  if (
+    status === "approved" ||
+    status === "waiting_first_login" ||
+    status === "waiting_eds"
+  ) {
     return "#16a34a";
   }
+
   if (status === "rejected") return "#dc2626";
   if (status === "in_progress") return "#2563eb";
   return "#2563eb";
 }
 
 function getStatusBackground(status) {
-  if (status === "approved" || status === "waiting_first_login" || status === "waiting_eds") {
+  if (
+    status === "approved" ||
+    status === "waiting_first_login" ||
+    status === "waiting_eds"
+  ) {
     return "#dcfce7";
   }
+
   if (status === "rejected") return "#fee2e2";
   if (status === "in_progress") return "#dbeafe";
   return "#dbeafe";
@@ -84,8 +94,7 @@ function buildApplicationStatusEmail({ application, status, reviewComment }) {
       ? `
         <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:16px;margin-top:18px;">
           <div style="color:#166534;font-size:15px;line-height:1.6;font-weight:600;">
-            Заявка успешно прошла проверку. Доступы для главного врача и администратора будут активированы через первый вход в систему.
-            Пароль не отправляется по почте — его нужно создать самостоятельно при первом входе.
+            Заявка успешно прошла проверку. Доступы главного врача и администраторов будут выданы технической поддержкой отдельно.
           </div>
 
           <a href="${loginUrl}" style="display:inline-block;margin-top:16px;background:#16a34a;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:12px;font-weight:800;">
@@ -211,16 +220,144 @@ function buildApplicationStatusEmail({ application, status, reviewComment }) {
           reviewComment || application?.review_comment || "Причина не указана."
         }`
       : "",
-    status === "approved" ||
-    status === "waiting_first_login" ||
-    status === "waiting_eds"
-      ? `Первый вход: ${loginUrl}`
-      : "",
     "",
     "Это автоматическое письмо от сервиса Clinic OS.",
   ]
     .filter(Boolean)
     .join("\n");
+
+  return {
+    subject,
+    html,
+    text,
+  };
+}
+
+function buildOrganizationAccessEmail({
+  application,
+  fullName,
+  roleLabel,
+  login,
+  tempPassword,
+}) {
+  const organizationName = escapeHtml(
+    application?.organization_name || "Медицинская организация"
+  );
+
+  const applicationNumber = escapeHtml(
+    application?.application_number || "не указан"
+  );
+
+  const safeFullName = escapeHtml(fullName || "Не указано");
+  const safeRoleLabel = escapeHtml(roleLabel || "Пользователь организации");
+  const safeLogin = escapeHtml(login);
+  const safeTempPassword = escapeHtml(tempPassword);
+  const loginUrl = `${FRONTEND_URL}/organization-login`;
+
+  const subject = `Clinic OS — доступ для ${safeRoleLabel}`;
+
+  const html = `
+    <!doctype html>
+    <html lang="ru">
+      <head>
+        <meta charset="UTF-8" />
+        <title>${subject}</title>
+      </head>
+      <body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
+        <div style="max-width:660px;margin:28px auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:24px;overflow:hidden;">
+          <div style="padding:26px 30px;background:#07111f;">
+            <div style="color:#ffffff;font-size:28px;font-weight:900;">
+              Clinic OS
+            </div>
+            <div style="color:#94a3b8;font-size:13px;margin-top:6px;">
+              Доступ к кабинету медицинской организации
+            </div>
+          </div>
+
+          <div style="padding:30px;">
+            <h1 style="color:#0f172a;font-size:24px;margin:0 0 14px;">
+              Доступ предоставлен
+            </h1>
+
+            <p style="color:#475569;font-size:15px;line-height:1.7;margin:0;">
+              ${safeRoleLabel} гос. поликлиники / медицинской организации
+              <b>«${organizationName}»</b> по уникальному номеру заявки
+              <b>${applicationNumber}</b> предоставляется доступ к веб-системе Clinic OS.
+            </p>
+
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;padding:20px;margin-top:20px;">
+              <div style="margin-bottom:14px;">
+                <div style="color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase;">
+                  ФИО
+                </div>
+                <div style="color:#0f172a;font-size:16px;font-weight:800;margin-top:5px;">
+                  ${safeFullName}
+                </div>
+              </div>
+
+              <div style="margin-bottom:14px;">
+                <div style="color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase;">
+                  Роль
+                </div>
+                <div style="color:#0f172a;font-size:16px;font-weight:800;margin-top:5px;">
+                  ${safeRoleLabel}
+                </div>
+              </div>
+
+              <div style="margin-bottom:14px;">
+                <div style="color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase;">
+                  Логин
+                </div>
+                <div style="color:#0369a1;font-size:20px;font-weight:900;margin-top:5px;">
+                  ${safeLogin}
+                </div>
+              </div>
+
+              <div>
+                <div style="color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase;">
+                  Одноразовый пароль
+                </div>
+                <div style="color:#16a34a;font-size:22px;font-weight:900;margin-top:5px;">
+                  ${safeTempPassword}
+                </div>
+              </div>
+            </div>
+
+            <div style="background:#ecfdf5;border:1px solid #bbf7d0;border-radius:18px;padding:18px;margin-top:20px;">
+              <p style="margin:0;color:#166534;font-size:15px;font-weight:800;line-height:1.7;">
+                При первом входе обязательно смените одноразовый пароль на постоянный.
+              </p>
+            </div>
+
+            <a href="${loginUrl}" style="display:inline-block;margin-top:22px;background:#16a34a;color:#ffffff;text-decoration:none;padding:13px 20px;border-radius:14px;font-weight:900;">
+              Перейти ко входу
+            </a>
+
+            <p style="color:#64748b;font-size:13px;line-height:1.6;margin-top:24px;">
+              От лучшей веб-системы <b>Clinic OS</b>.
+            </p>
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `
+Clinic OS
+
+${roleLabel} организации "${application?.organization_name || "Медицинская организация"}" по заявке ${application?.application_number || "не указан"} предоставляется доступ.
+
+ФИО: ${fullName || "Не указано"}
+Роль: ${roleLabel}
+Логин: ${login}
+Одноразовый пароль: ${tempPassword}
+
+При первом входе обязательно смените одноразовый пароль на постоянный.
+
+Вход: ${loginUrl}
+
+От лучшей веб-системы Clinic OS.
+`;
 
   return {
     subject,
@@ -374,6 +511,68 @@ export async function sendApplicationStatusEmail({
     return {
       success: false,
       message: error.message || "Ошибка отправки письма.",
+    };
+  }
+}
+
+export async function sendOrganizationAccessEmail({
+  to,
+  application,
+  fullName,
+  roleLabel,
+  login,
+  tempPassword,
+}) {
+  if (!to) {
+    return {
+      success: false,
+      message: "Email получателя не указан.",
+    };
+  }
+
+  if (!login || !tempPassword) {
+    return {
+      success: false,
+      message: "Логин и одноразовый пароль обязательны.",
+    };
+  }
+
+  if (!GMAIL_FROM) {
+    return {
+      success: false,
+      message: "GMAIL_FROM не настроен на сервере.",
+    };
+  }
+
+  const email = buildOrganizationAccessEmail({
+    application,
+    fullName,
+    roleLabel,
+    login,
+    tempPassword,
+  });
+
+  try {
+    await sendGmailMessage({
+      to,
+      subject: email.subject,
+      text: email.text,
+      html: email.html,
+    });
+
+    return {
+      success: true,
+      message: "Доступ отправлен.",
+    };
+  } catch (error) {
+    console.error("SEND ACCESS EMAIL ERROR:", {
+      message: error.message,
+      stack: error.stack,
+    });
+
+    return {
+      success: false,
+      message: error.message || "Ошибка отправки доступа.",
     };
   }
 }
