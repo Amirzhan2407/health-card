@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabaseAdmin.js";
 import { requireAdminAuth } from "../middleware/requireAdminAuth.js";
 import { createAuditLog } from "../services/adminAuditService.js";
 import { createOrganizationApplication } from "../services/organizationApplicationService.js";
+import { sendApplicationStatusEmail } from "../services/emailService.js";
 
 const router = express.Router();
 
@@ -105,6 +106,16 @@ async function insertHistory({
 }
 
 async function createOrganizationFromApplication(application, adminId) {
+  const existing = await supabase
+    .from("organizations")
+    .select("*")
+    .eq("application_id", application.id)
+    .maybeSingle();
+
+  if (existing.data) {
+    return existing.data;
+  }
+
   const payload = {
     application_id: application.id,
     organization_name: application.organization_name,
@@ -146,6 +157,53 @@ async function createOrganizationFromApplication(application, adminId) {
     .eq("id", application.id);
 
   return data;
+}
+
+async function sendStatusEmailAndSaveHistory({
+  applicationId,
+  adminId,
+  application,
+  current,
+  status,
+  comment,
+}) {
+  const emailTo =
+    application.organization_email ||
+    application.sender_email ||
+    current?.organization_email ||
+    current?.sender_email;
+
+  if (
+    ![
+      "in_progress",
+      "approved",
+      "rejected",
+      "waiting_eds",
+      "waiting_first_login",
+    ].includes(status)
+  ) {
+    return;
+  }
+
+  const emailResult = await sendApplicationStatusEmail({
+    to: emailTo,
+    application,
+    status,
+    reviewComment: comment,
+  });
+
+  await insertHistory({
+    applicationId,
+    adminId,
+    action: emailResult.success
+      ? "application_email_sent"
+      : "application_email_failed",
+    oldStatus: status,
+    newStatus: status,
+    comment: emailResult.success
+      ? `Email отправлен на ${emailTo}`
+      : emailResult.message,
+  });
 }
 
 router.post("/", upload.any(), async (req, res) => {
@@ -389,6 +447,15 @@ router.patch("/:id/status", requireAdminAuth, async (req, res) => {
     if (status === "approved" || status === "waiting_first_login") {
       organization = await createOrganizationFromApplication(updated, req.admin.id);
     }
+
+    await sendStatusEmailAndSaveHistory({
+      applicationId: id,
+      adminId: req.admin.id,
+      application: updated,
+      current,
+      status,
+      comment,
+    });
 
     return res.status(200).json({
       success: true,

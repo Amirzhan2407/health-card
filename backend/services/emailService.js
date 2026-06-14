@@ -6,6 +6,8 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const GOOGLE_REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN;
 const GMAIL_FROM = process.env.GMAIL_FROM || process.env.EMAIL_USER;
+const FRONTEND_URL =
+  process.env.FRONTEND_URL || "https://health-card-rose.vercel.app";
 
 function escapeHtml(value = "") {
   return String(value)
@@ -30,19 +32,28 @@ function encodeMimeSubject(subject) {
 
 function getStatusText(status) {
   if (status === "approved") return "одобрена";
+  if (status === "waiting_first_login") return "одобрена, ожидается первый вход";
+  if (status === "waiting_eds") return "одобрена, ожидается первый вход";
   if (status === "rejected") return "отклонена";
+  if (status === "in_progress") return "в обработке";
   return "обновлена";
 }
 
 function getStatusColor(status) {
-  if (status === "approved") return "#16a34a";
+  if (status === "approved" || status === "waiting_first_login" || status === "waiting_eds") {
+    return "#16a34a";
+  }
   if (status === "rejected") return "#dc2626";
+  if (status === "in_progress") return "#2563eb";
   return "#2563eb";
 }
 
 function getStatusBackground(status) {
-  if (status === "approved") return "#dcfce7";
+  if (status === "approved" || status === "waiting_first_login" || status === "waiting_eds") {
+    return "#dcfce7";
+  }
   if (status === "rejected") return "#fee2e2";
+  if (status === "in_progress") return "#dbeafe";
   return "#dbeafe";
 }
 
@@ -62,16 +73,24 @@ function buildApplicationStatusEmail({ application, status, reviewComment }) {
   const statusText = getStatusText(status);
   const statusColor = getStatusColor(status);
   const statusBackground = getStatusBackground(status);
+  const loginUrl = `${FRONTEND_URL}/organization-login`;
 
-  const subject = `Ответ по заявке ${applicationNumber}`;
+  const subject = `Clinic OS — ответ по заявке ${applicationNumber}`;
 
   const approvedBlock =
-    status === "approved"
+    status === "approved" ||
+    status === "waiting_first_login" ||
+    status === "waiting_eds"
       ? `
         <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:16px;margin-top:18px;">
           <div style="color:#166534;font-size:15px;line-height:1.6;font-weight:600;">
-            Заявка успешно прошла проверку. Следующий этап — подтверждение доступа главного врача через ЭЦП.
+            Заявка успешно прошла проверку. Доступы для главного врача и администратора будут активированы через первый вход в систему.
+            Пароль не отправляется по почте — его нужно создать самостоятельно при первом входе.
           </div>
+
+          <a href="${loginUrl}" style="display:inline-block;margin-top:16px;background:#16a34a;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:12px;font-weight:800;">
+            Перейти ко входу
+          </a>
         </div>
       `
       : "";
@@ -90,6 +109,17 @@ function buildApplicationStatusEmail({ application, status, reviewComment }) {
       `
       : "";
 
+  const progressBlock =
+    status === "in_progress"
+      ? `
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:14px;padding:16px;margin-top:18px;">
+          <div style="color:#1e40af;font-size:15px;line-height:1.6;font-weight:600;">
+            Ваша заявка принята в обработку технической поддержкой.
+          </div>
+        </div>
+      `
+      : "";
+
   const html = `
     <!doctype html>
     <html lang="ru">
@@ -101,7 +131,7 @@ function buildApplicationStatusEmail({ application, status, reviewComment }) {
         <div style="max-width:640px;margin:28px auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:22px;overflow:hidden;">
           <div style="padding:24px 28px;background:#07111f;">
             <div style="color:#ffffff;font-size:26px;font-weight:800;">
-              clinisOS
+              Clinic OS
             </div>
             <div style="color:#94a3b8;font-size:13px;margin-top:6px;">
               Система подключения медицинских организаций
@@ -114,7 +144,7 @@ function buildApplicationStatusEmail({ application, status, reviewComment }) {
             </h1>
 
             <p style="color:#475569;font-size:15px;line-height:1.6;margin:0;">
-              Ваша заявка была рассмотрена. Ниже указаны данные по заявке и итоговый статус проверки.
+              Ваша заявка была рассмотрена. Ниже указаны данные по заявке и текущий статус.
             </p>
 
             <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:18px;margin-top:18px;">
@@ -140,11 +170,27 @@ function buildApplicationStatusEmail({ application, status, reviewComment }) {
               </div>
             </div>
 
+            ${progressBlock}
             ${approvedBlock}
             ${rejectedBlock}
 
+            ${
+              reviewComment && status !== "rejected"
+                ? `
+                  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:16px;margin-top:18px;">
+                    <div style="color:#64748b;font-size:13px;font-weight:700;margin-bottom:8px;">
+                      Комментарий
+                    </div>
+                    <div style="color:#334155;font-size:15px;line-height:1.6;">
+                      ${safeReviewComment}
+                    </div>
+                  </div>
+                `
+                : ""
+            }
+
             <p style="color:#64748b;font-size:13px;line-height:1.6;margin-top:22px;">
-              Это автоматическое письмо от сервиса <b>clinisOS</b>. Пожалуйста, не отвечайте на него.
+              Это автоматическое письмо от сервиса <b>Clinic OS</b>. Пожалуйста, не отвечайте на него.
             </p>
           </div>
         </div>
@@ -165,11 +211,13 @@ function buildApplicationStatusEmail({ application, status, reviewComment }) {
           reviewComment || application?.review_comment || "Причина не указана."
         }`
       : "",
-    status === "approved"
-      ? "Заявка успешно прошла проверку. Следующий этап — подтверждение доступа главного врача через ЭЦП."
+    status === "approved" ||
+    status === "waiting_first_login" ||
+    status === "waiting_eds"
+      ? `Первый вход: ${loginUrl}`
       : "",
     "",
-    "Это автоматическое письмо от сервиса clinisOS.",
+    "Это автоматическое письмо от сервиса Clinic OS.",
   ]
     .filter(Boolean)
     .join("\n");
@@ -214,10 +262,10 @@ async function getGmailAccessToken() {
 }
 
 function buildRawMimeEmail({ from, to, subject, text, html }) {
-  const boundary = `clinisos_boundary_${Date.now()}`;
+  const boundary = `clinic_os_boundary_${Date.now()}`;
 
   const message = [
-    `From: clinisOS <${from}>`,
+    `From: Clinic OS <${from}>`,
     `To: ${to}`,
     `Subject: ${encodeMimeSubject(subject)}`,
     "MIME-Version: 1.0",
@@ -260,9 +308,7 @@ async function sendGmailMessage({ to, subject, text, html }) {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        raw,
-      }),
+      body: JSON.stringify({ raw }),
     }
   );
 
