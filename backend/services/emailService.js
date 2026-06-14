@@ -139,9 +139,7 @@ function buildApplicationStatusEmail({ application, status, reviewComment }) {
       <body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
         <div style="max-width:640px;margin:28px auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:22px;overflow:hidden;">
           <div style="padding:24px 28px;background:#07111f;">
-            <div style="color:#ffffff;font-size:26px;font-weight:800;">
-              Clinic OS
-            </div>
+            <div style="color:#ffffff;font-size:26px;font-weight:800;">Clinic OS</div>
             <div style="color:#94a3b8;font-size:13px;margin-top:6px;">
               Система подключения медицинских организаций
             </div>
@@ -254,21 +252,19 @@ function buildOrganizationAccessEmail({
   const safeTempPassword = escapeHtml(tempPassword);
   const loginUrl = `${FRONTEND_URL}/organization-login`;
 
-  const subject = `Clinic OS — доступ для ${safeRoleLabel}`;
+  const subject = `Clinic OS — доступ для ${roleLabel}`;
 
   const html = `
     <!doctype html>
     <html lang="ru">
       <head>
         <meta charset="UTF-8" />
-        <title>${subject}</title>
+        <title>${escapeHtml(subject)}</title>
       </head>
       <body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
         <div style="max-width:660px;margin:28px auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:24px;overflow:hidden;">
           <div style="padding:26px 30px;background:#07111f;">
-            <div style="color:#ffffff;font-size:28px;font-weight:900;">
-              Clinic OS
-            </div>
+            <div style="color:#ffffff;font-size:28px;font-weight:900;">Clinic OS</div>
             <div style="color:#94a3b8;font-size:13px;margin-top:6px;">
               Доступ к кабинету медицинской организации
             </div>
@@ -280,46 +276,30 @@ function buildOrganizationAccessEmail({
             </h1>
 
             <p style="color:#475569;font-size:15px;line-height:1.7;margin:0;">
-              ${safeRoleLabel} гос. поликлиники / медицинской организации
-              <b>«${organizationName}»</b> по уникальному номеру заявки
-              <b>${applicationNumber}</b> предоставляется доступ к веб-системе Clinic OS.
+              ${safeRoleLabel} медицинской организации <b>«${organizationName}»</b>
+              по уникальному номеру заявки <b>${applicationNumber}</b>
+              предоставляется доступ к веб-системе Clinic OS.
             </p>
 
             <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;padding:20px;margin-top:20px;">
               <div style="margin-bottom:14px;">
-                <div style="color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase;">
-                  ФИО
-                </div>
-                <div style="color:#0f172a;font-size:16px;font-weight:800;margin-top:5px;">
-                  ${safeFullName}
-                </div>
+                <div style="color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase;">ФИО</div>
+                <div style="color:#0f172a;font-size:16px;font-weight:800;margin-top:5px;">${safeFullName}</div>
               </div>
 
               <div style="margin-bottom:14px;">
-                <div style="color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase;">
-                  Роль
-                </div>
-                <div style="color:#0f172a;font-size:16px;font-weight:800;margin-top:5px;">
-                  ${safeRoleLabel}
-                </div>
+                <div style="color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase;">Роль</div>
+                <div style="color:#0f172a;font-size:16px;font-weight:800;margin-top:5px;">${safeRoleLabel}</div>
               </div>
 
               <div style="margin-bottom:14px;">
-                <div style="color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase;">
-                  Логин
-                </div>
-                <div style="color:#0369a1;font-size:20px;font-weight:900;margin-top:5px;">
-                  ${safeLogin}
-                </div>
+                <div style="color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase;">Логин</div>
+                <div style="color:#0369a1;font-size:20px;font-weight:900;margin-top:5px;">${safeLogin}</div>
               </div>
 
               <div>
-                <div style="color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase;">
-                  Одноразовый пароль
-                </div>
-                <div style="color:#16a34a;font-size:22px;font-weight:900;margin-top:5px;">
-                  ${safeTempPassword}
-                </div>
+                <div style="color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase;">Одноразовый пароль</div>
+                <div style="color:#16a34a;font-size:22px;font-weight:900;margin-top:5px;">${safeTempPassword}</div>
               </div>
             </div>
 
@@ -399,26 +379,35 @@ async function getGmailAccessToken() {
 }
 
 function buildRawMimeEmail({ from, to, subject, text, html }) {
-  const boundary = `clinic_os_boundary_${Date.now()}`;
+  const boundary = `clinic_os_boundary_${Date.now()}_${Math.random()
+    .toString(36)
+    .slice(2)}`;
+
+  const textBase64 = Buffer.from(text || "", "utf8").toString("base64");
+  const htmlBase64 = Buffer.from(html || "", "utf8").toString("base64");
 
   const message = [
     `From: Clinic OS <${from}>`,
     `To: ${to}`,
     `Subject: ${encodeMimeSubject(subject)}`,
+    `Date: ${new Date().toUTCString()}`,
+    `Message-ID: <${Date.now()}.${Math.random()
+      .toString(36)
+      .slice(2)}@clinic-os.kz>`,
     "MIME-Version: 1.0",
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
     "",
     `--${boundary}`,
     'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: 7bit",
+    "Content-Transfer-Encoding: base64",
     "",
-    text,
+    textBase64,
     "",
     `--${boundary}`,
     'Content-Type: text/html; charset="UTF-8"',
-    "Content-Transfer-Encoding: 7bit",
+    "Content-Transfer-Encoding: base64",
     "",
-    html,
+    htmlBase64,
     "",
     `--${boundary}--`,
   ].join("\r\n");
@@ -450,6 +439,14 @@ async function sendGmailMessage({ to, subject, text, html }) {
   );
 
   const result = await response.json().catch(() => null);
+
+  console.log("GMAIL SEND RESULT:", {
+    to,
+    subject,
+    ok: response.ok,
+    status: response.status,
+    result,
+  });
 
   if (!response.ok) {
     console.error("GMAIL SEND ERROR:", result);
