@@ -167,12 +167,6 @@ async function sendStatusEmailAndSaveHistory({
   status,
   comment,
 }) {
-  const emailTo =
-    application.organization_email ||
-    application.sender_email ||
-    current?.organization_email ||
-    current?.sender_email;
-
   if (
     ![
       "in_progress",
@@ -185,25 +179,50 @@ async function sendStatusEmailAndSaveHistory({
     return;
   }
 
-  const emailResult = await sendApplicationStatusEmail({
-    to: emailTo,
-    application,
-    status,
-    reviewComment: comment,
-  });
+  const emails = [
+    application.organization_email,
+    application.sender_email,
+    current?.organization_email,
+    current?.sender_email,
+  ]
+    .filter(Boolean)
+    .map((email) => String(email).trim().toLowerCase())
+    .filter((email, index, array) => email && array.indexOf(email) === index);
 
-  await insertHistory({
-    applicationId,
-    adminId,
-    action: emailResult.success
-      ? "application_email_sent"
-      : "application_email_failed",
-    oldStatus: status,
-    newStatus: status,
-    comment: emailResult.success
-      ? `Email отправлен на ${emailTo}`
-      : emailResult.message,
-  });
+  if (emails.length === 0) {
+    await insertHistory({
+      applicationId,
+      adminId,
+      action: "application_email_failed",
+      oldStatus: status,
+      newStatus: status,
+      comment: "Email получателя не указан.",
+    });
+
+    return;
+  }
+
+  for (const emailTo of emails) {
+    const emailResult = await sendApplicationStatusEmail({
+      to: emailTo,
+      application,
+      status,
+      reviewComment: comment,
+    });
+
+    await insertHistory({
+      applicationId,
+      adminId,
+      action: emailResult.success
+        ? "application_email_sent"
+        : "application_email_failed",
+      oldStatus: status,
+      newStatus: status,
+      comment: emailResult.success
+        ? `Email отправлен на ${emailTo}`
+        : `Ошибка отправки на ${emailTo}: ${emailResult.message}`,
+    });
+  }
 }
 
 router.post("/", upload.any(), async (req, res) => {
