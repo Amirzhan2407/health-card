@@ -32,7 +32,6 @@ const STATUS_FILTERS = [
   ["all", "Все"],
   ["new", "Новые"],
   ["in_progress", "В процессе"],
-  ["waiting_eds", "Ожидают первого входа"],
   ["waiting_first_login", "Ожидают первого входа"],
   ["approved", "Подключены"],
   ["rejected", "Отклонены"],
@@ -51,7 +50,6 @@ function formatDate(value) {
 
 function parseAdmins(value) {
   if (!value) return [];
-
   if (Array.isArray(value)) return value;
 
   try {
@@ -60,6 +58,16 @@ function parseAdmins(value) {
   } catch {
     return [];
   }
+}
+
+function canShowAccessBlocks(status) {
+  return ["approved", "waiting_first_login", "waiting_eds"].includes(status);
+}
+
+function generateTempCode() {
+  const part1 = Math.random().toString(36).slice(2, 6).toUpperCase();
+  const part2 = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `${part1}-${part2}`;
 }
 
 export default function AdminApplications() {
@@ -71,6 +79,8 @@ export default function AdminApplications() {
   const [loading, setLoading] = useState(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [accessForms, setAccessForms] = useState({ chief: null, admins: [] });
+  const [accessMessage, setAccessMessage] = useState("");
 
   async function loadApplications(status = activeStatus) {
     setLoading(true);
@@ -88,10 +98,36 @@ export default function AdminApplications() {
     }
   }
 
+  function buildAccessForms(application) {
+    const admins = parseAdmins(application?.administrators || application?.admins);
+
+    return {
+      chief: {
+        fullName:
+          application?.new_chief_doctor_full_name ||
+          application?.chief_doctor_full_name ||
+          "",
+        email:
+          application?.new_chief_doctor_email ||
+          application?.chief_doctor_email ||
+          "",
+        login: "",
+        tempPassword: "",
+      },
+      admins: admins.map((admin) => ({
+        fullName: admin.full_name || "",
+        email: admin.email || "",
+        login: "",
+        tempPassword: "",
+      })),
+    };
+  }
+
   async function openApplication(application) {
     setSelected(application);
     setDetails(null);
     setComment(application.review_comment || "");
+    setAccessMessage("");
     setDetailsLoading(true);
     setError("");
 
@@ -102,12 +138,14 @@ export default function AdminApplications() {
 
       setDetails(result);
       setComment(result.application?.review_comment || "");
+      setAccessForms(buildAccessForms(result.application));
     } catch (err) {
       setDetails({
         application,
         documents: [],
         history: [],
       });
+      setAccessForms(buildAccessForms(application));
       setError(err.message || "Не удалось открыть заявку.");
     } finally {
       setDetailsLoading(false);
@@ -125,6 +163,7 @@ export default function AdminApplications() {
     }
 
     setError("");
+    setAccessMessage("");
 
     try {
       await adminRequest(`/api/organization-applications/${id}/status`, {
@@ -153,6 +192,74 @@ export default function AdminApplications() {
     loadApplications(status);
   }
 
+  function updateChiefAccess(field, value) {
+    setAccessForms((prev) => ({
+      ...prev,
+      chief: {
+        ...prev.chief,
+        [field]: value,
+      },
+    }));
+  }
+
+  function updateAdminAccess(index, field, value) {
+    setAccessForms((prev) => ({
+      ...prev,
+      admins: prev.admins.map((admin, adminIndex) =>
+        adminIndex === index ? { ...admin, [field]: value } : admin
+      ),
+    }));
+  }
+
+  async function sendAccess(role, index = null) {
+    const application = details?.application || selected;
+
+    if (!application?.id) return;
+
+    const access =
+      role === "chief" ? accessForms.chief : accessForms.admins[index];
+
+    if (!access?.email) {
+      setError("Email для отправки доступа не указан.");
+      return;
+    }
+
+    if (!access?.login.trim()) {
+      setError("Укажите логин.");
+      return;
+    }
+
+    if (!access?.tempPassword.trim()) {
+      setError("Укажите одноразовый пароль.");
+      return;
+    }
+
+    setError("");
+    setAccessMessage("");
+
+    try {
+      await adminRequest(`/api/organization-applications/${application.id}/send-access`, {
+        method: "POST",
+        body: JSON.stringify({
+          role,
+          index,
+          fullName: access.fullName,
+          email: access.email,
+          login: access.login,
+          tempPassword: access.tempPassword,
+        }),
+      });
+
+      setAccessMessage(
+        role === "chief"
+          ? "Доступ главного врача отправлен."
+          : `Доступ администратора #${index + 1} отправлен.`
+      );
+    } catch (err) {
+      setError(err.message || "Не удалось отправить доступ.");
+    }
+  }
+
   useEffect(() => {
     loadApplications("all");
   }, []);
@@ -163,13 +270,15 @@ export default function AdminApplications() {
     application?.administrators || application?.admins
   );
 
+  const showAccessBlocks = canShowAccessBlocks(application?.status);
+
   return (
     <main className="adminContentPage">
       <section className="adminPageHead">
         <div>
           <h1>Заявления организаций</h1>
           <p>
-            Проверка заявок, создание доступов главного врача и администратора.
+            Проверка заявок, создание доступов главного врача и администраторов.
           </p>
         </div>
 
@@ -192,6 +301,7 @@ export default function AdminApplications() {
       </section>
 
       {error ? <div className="adminError">{error}</div> : null}
+      {accessMessage ? <div className="adminSuccess">{accessMessage}</div> : null}
 
       <section className="adminWorkGrid">
         <div className="adminCard">
@@ -317,12 +427,7 @@ export default function AdminApplications() {
 
                   <div>
                     <span>Корпоративная почта</span>
-                    <b>
-                      {text(
-                        application.organization_email ||
-                          application.sender_email
-                      )}
-                    </b>
+                    <b>{text(application.organization_email)}</b>
                   </div>
                 </div>
               </div>
@@ -331,11 +436,6 @@ export default function AdminApplications() {
                 <h3>Главный врач</h3>
 
                 <div className="infoGrid">
-                  <div>
-                    <span>Предыдущий</span>
-                    <b>{text(application.previous_chief_doctor_full_name)}</b>
-                  </div>
-
                   <div>
                     <span>ФИО</span>
                     <b>
@@ -357,11 +457,11 @@ export default function AdminApplications() {
                   </div>
 
                   <div>
-                    <span>Email для входа</span>
+                    <span>Почта главного врача</span>
                     <b>
                       {text(
-                        application.organization_email ||
-                          application.sender_email
+                        application.new_chief_doctor_email ||
+                          application.chief_doctor_email
                       )}
                     </b>
                   </div>
@@ -389,13 +489,8 @@ export default function AdminApplications() {
                           </div>
 
                           <div>
-                            <span>Email для входа</span>
-                            <b>
-                              {text(
-                                application.organization_email ||
-                                  application.sender_email
-                              )}
-                            </b>
+                            <span>Почта администратора</span>
+                            <b>{text(admin.email)}</b>
                           </div>
                         </div>
                       </div>
@@ -406,27 +501,6 @@ export default function AdminApplications() {
                     Администраторы не указаны или старый формат заявки.
                   </p>
                 )}
-              </div>
-
-              <div className="section">
-                <h3>Данные отправителя</h3>
-
-                <div className="infoGrid">
-                  <div>
-                    <span>ФИО</span>
-                    <b>{text(application.sender_full_name)}</b>
-                  </div>
-
-                  <div>
-                    <span>Телефон</span>
-                    <b>{text(application.sender_phone)}</b>
-                  </div>
-
-                  <div>
-                    <span>Email</span>
-                    <b>{text(application.sender_email)}</b>
-                  </div>
-                </div>
               </div>
 
               <div className="section">
@@ -475,7 +549,7 @@ export default function AdminApplications() {
                     className="approve"
                     onClick={() => changeStatus("waiting_first_login")}
                   >
-                    Одобрить и создать доступы
+                    Одобрить заявку
                   </button>
 
                   <button
@@ -485,13 +559,117 @@ export default function AdminApplications() {
                     Отклонить
                   </button>
                 </div>
-
-                <p className="muted" style={{ marginTop: 12 }}>
-                  После одобрения система должна создать доступы для главного
-                  врача и администратора. Пароль они создают сами при первом
-                  входе.
-                </p>
               </div>
+
+              {showAccessBlocks && (
+                <div className="section accessSection">
+                  <h3>Доступы организации</h3>
+
+                  <div className="accessBox">
+                    <h4>Доступ главного врача</h4>
+
+                    <div className="infoGrid">
+                      <div>
+                        <span>Имя главного врача</span>
+                        <b>{text(accessForms.chief?.fullName)}</b>
+                      </div>
+
+                      <div>
+                        <span>Почта</span>
+                        <b>{text(accessForms.chief?.email)}</b>
+                      </div>
+                    </div>
+
+                    <div className="accessFormGrid">
+                      <input
+                        value={accessForms.chief?.login || ""}
+                        onChange={(e) => updateChiefAccess("login", e.target.value)}
+                        placeholder="Логин"
+                      />
+
+                      <input
+                        value={accessForms.chief?.tempPassword || ""}
+                        onChange={(e) =>
+                          updateChiefAccess("tempPassword", e.target.value)
+                        }
+                        placeholder="Одноразовый пароль"
+                      />
+
+                      <button
+                        type="button"
+                        className="miniBtn"
+                        onClick={() =>
+                          updateChiefAccess("tempPassword", generateTempCode())
+                        }
+                      >
+                        Сгенерировать
+                      </button>
+
+                      <button
+                        type="button"
+                        className="approve"
+                        onClick={() => sendAccess("chief")}
+                      >
+                        Отправить
+                      </button>
+                    </div>
+                  </div>
+
+                  {accessForms.admins.map((admin, index) => (
+                    <div className="accessBox" key={index}>
+                      <h4>Доступ администратора #{index + 1}</h4>
+
+                      <div className="infoGrid">
+                        <div>
+                          <span>Имя администратора</span>
+                          <b>{text(admin.fullName)}</b>
+                        </div>
+
+                        <div>
+                          <span>Почта</span>
+                          <b>{text(admin.email)}</b>
+                        </div>
+                      </div>
+
+                      <div className="accessFormGrid">
+                        <input
+                          value={admin.login}
+                          onChange={(e) =>
+                            updateAdminAccess(index, "login", e.target.value)
+                          }
+                          placeholder="Логин"
+                        />
+
+                        <input
+                          value={admin.tempPassword}
+                          onChange={(e) =>
+                            updateAdminAccess(index, "tempPassword", e.target.value)
+                          }
+                          placeholder="Одноразовый пароль"
+                        />
+
+                        <button
+                          type="button"
+                          className="miniBtn"
+                          onClick={() =>
+                            updateAdminAccess(index, "tempPassword", generateTempCode())
+                          }
+                        >
+                          Сгенерировать
+                        </button>
+
+                        <button
+                          type="button"
+                          className="approve"
+                          onClick={() => sendAccess("admin", index)}
+                        >
+                          Отправить
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </aside>
