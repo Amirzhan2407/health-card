@@ -81,20 +81,10 @@ export default function OrganizationApplication() {
     new_chief_doctor_full_name: "",
     new_chief_doctor_phone: "",
 
-    sender_full_name: "",
-    sender_phone: "",
-    sender_email: "",
-
     comment: "",
   });
 
-  const [admins, setAdmins] = useState([
-    {
-      full_name: "",
-      phone: "",
-    },
-  ]);
-
+  const [admins, setAdmins] = useState([{ full_name: "", phone: "" }]);
   const [files, setFiles] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedApplication, setSubmittedApplication] = useState(null);
@@ -154,10 +144,6 @@ export default function OrganizationApplication() {
       previous_chief_doctor_full_name: "",
       new_chief_doctor_full_name: "",
       new_chief_doctor_phone: "",
-
-      sender_full_name: "",
-      sender_phone: "",
-      sender_email: "",
 
       comment: "",
     });
@@ -236,9 +222,8 @@ export default function OrganizationApplication() {
           </div>
 
           <p>
-            Заявка отправлена в техническую поддержку Clinic OS. После одобрения
-            будут созданы учетные записи главного врача и администратора. Пароль
-            они создадут самостоятельно при первом входе.
+            Заявка отправлена в техническую поддержку Clinic OS. Ответ придёт на
+            корпоративную почту организации.
           </p>
 
           <button type="button" className="primary-button" onClick={resetForm}>
@@ -261,8 +246,8 @@ export default function OrganizationApplication() {
         <div className="page-badge">Заявка организации</div>
         <h1>Подать заявку на подключение</h1>
         <p>
-          Заполните данные организации, главного врача и администратора. После
-          проверки техническая поддержка создаст доступы для первого входа.
+          Заполните данные организации, главного врача и администратора. Ответ
+          от технической поддержки придёт на корпоративную почту организации.
         </p>
       </section>
 
@@ -425,7 +410,7 @@ export default function OrganizationApplication() {
                       name="previous_chief_doctor_full_name"
                       value={form.previous_chief_doctor_full_name}
                       onChange={updateField}
-                      required={isChiefDoctorChange}
+                      required
                       placeholder="Например: Иванов Иван Иванович"
                     />
                   </div>
@@ -556,62 +541,6 @@ export default function OrganizationApplication() {
           <div className="section-number">5</div>
 
           <div className="section-content">
-            <h2>Данные отправителя</h2>
-            <p>На эту почту организация получит ответ по заявке.</p>
-
-            <div className="form-grid two-columns">
-              <div>
-                <label className="org-label">
-                  ФИО отправителя<span className="required-star">*</span>
-                </label>
-                <input
-                  className="org-input"
-                  name="sender_full_name"
-                  value={form.sender_full_name}
-                  onChange={updateField}
-                  required
-                  placeholder="Например: Сидоров Сергей Сергеевич"
-                />
-              </div>
-
-              <div>
-                <label className="org-label">
-                  Телефон<span className="required-star">*</span>
-                </label>
-                <input
-                  className="org-input"
-                  name="sender_phone"
-                  value={form.sender_phone}
-                  onChange={updateField}
-                  required
-                  placeholder="+7 777 000 00 00"
-                />
-              </div>
-            </div>
-
-            <div className="form-grid one-column">
-              <div>
-                <label className="org-label">
-                  Email для ответа<span className="required-star">*</span>
-                </label>
-                <input
-                  className="org-input"
-                  type="email"
-                  name="sender_email"
-                  value={form.sender_email}
-                  onChange={updateField}
-                  required
-                  placeholder="organization@example.com"
-                />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="form-section">
-          <div className="section-number">6</div>
-
-          <div className="section-content">
             <h2>Документы</h2>
 
             <FileField
@@ -657,7 +586,7 @@ export default function OrganizationApplication() {
         </section>
 
         <section className="form-section">
-          <div className="section-number">7</div>
+          <div className="section-number">6</div>
 
           <div className="section-content">
             <h2>Комментарий</h2>

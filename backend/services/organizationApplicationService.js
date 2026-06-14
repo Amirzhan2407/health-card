@@ -14,6 +14,7 @@ const BUCKET_NAME = "organization-documents";
 function generateApplicationNumber() {
   const year = new Date().getFullYear();
   const randomPart = Math.floor(100000 + Math.random() * 900000);
+
   return `APP-${year}-${randomPart}`;
 }
 
@@ -27,7 +28,9 @@ function safeFileName(originalName = "document") {
 
 function normalizeText(value) {
   if (value === undefined || value === null) return null;
+
   const text = String(value).trim();
+
   return text.length > 0 ? text : null;
 }
 
@@ -35,6 +38,7 @@ function normalizeApplicationType(value) {
   if (value === "change_chief_doctor") return "change_chief_doctor";
   if (value === "change_administrator") return "change_administrator";
   if (value === "change_organization_data") return "change_organization_data";
+
   return "new_organization";
 }
 
@@ -45,6 +49,7 @@ function getOrganizationTypeLabel(type) {
     private_clinic: "Частная клиника",
     dentistry: "Стоматология",
     laboratory: "Медицинская лаборатория",
+
     gov_polyclinic: "Государственная поликлиника",
     gov_hospital: "Государственная больница",
     private_clinics: "Частная клиника",
@@ -171,6 +176,11 @@ export async function createOrganizationApplication({ body, files }) {
   const applicationNumber = generateApplicationNumber();
   const administrators = normalizeAdministrators(body.administrators);
 
+  const organizationEmail = normalizeText(body.organization_email);
+  const chiefDoctorPhone = normalizeText(
+    body.chief_doctor_phone || body.new_chief_doctor_phone
+  );
+
   const payload = {
     application_number: applicationNumber,
     application_type: applicationType,
@@ -181,7 +191,7 @@ export async function createOrganizationApplication({ body, files }) {
     bin: normalizeText(body.bin),
     city: normalizeText(body.city),
     address: normalizeText(body.address),
-    organization_email: normalizeText(body.organization_email),
+    organization_email: organizationEmail,
 
     chief_doctor_full_name: normalizeText(body.chief_doctor_full_name),
     chief_doctor_phone: normalizeText(body.chief_doctor_phone),
@@ -194,9 +204,9 @@ export async function createOrganizationApplication({ body, files }) {
 
     administrators,
 
-    sender_full_name: normalizeText(body.sender_full_name),
-    sender_phone: normalizeText(body.sender_phone),
-    sender_email: normalizeText(body.sender_email),
+    sender_full_name: normalizeText(body.organization_name),
+    sender_phone: chiefDoctorPhone,
+    sender_email: organizationEmail,
 
     comment: normalizeText(body.comment),
     status: "new",
@@ -224,18 +234,6 @@ export async function createOrganizationApplication({ body, files }) {
 
   if (!payload.organization_email) {
     throw new Error("Корпоративная почта организации обязательна.");
-  }
-
-  if (!payload.sender_full_name) {
-    throw new Error("ФИО отправителя обязательно.");
-  }
-
-  if (!payload.sender_phone) {
-    throw new Error("Телефон отправителя обязателен.");
-  }
-
-  if (!payload.sender_email) {
-    throw new Error("Email для ответа обязателен.");
   }
 
   if (applicationType === "new_organization") {
