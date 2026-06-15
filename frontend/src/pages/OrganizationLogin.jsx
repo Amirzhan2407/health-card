@@ -1,6 +1,5 @@
 import { useState } from "react";
 import "../styles/organizationLogin.css";
-import logo from "../assets/clinic-logo.png";
 
 export default function OrganizationLogin() {
   const [form, setForm] = useState({
@@ -24,7 +23,11 @@ export default function OrganizationLogin() {
     <main className="org-login-page">
       <section className="org-login-card">
         <div className="org-login-left">
-          <img src={logo} alt="Clinic OS" className="org-login-logo-img" />
+          <img
+            src="/логтип медицины.jpg"
+            alt="Clinic OS"
+            className="org-login-logo-img"
+          />
 
           <h1>Clinic OS</h1>
           <p>Вход в кабинет государственной поликлиники</p>
