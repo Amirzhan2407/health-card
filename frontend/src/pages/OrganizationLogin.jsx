@@ -1,13 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "../styles/organizationLogin.css";
 
 export default function OrganizationLogin() {
+  const [theme, setTheme] = useState(localStorage.getItem("orgTheme") || "light");
+
   const [form, setForm] = useState({
     city: "",
     bin: "",
     login: "",
     password: "",
   });
+
+  useEffect(() => {
+    localStorage.setItem("orgTheme", theme);
+  }, [theme]);
 
   function updateField(e) {
     const { name, value } = e.target;
@@ -20,7 +26,15 @@ export default function OrganizationLogin() {
   }
 
   return (
-    <main className="org-login-page">
+    <main className={`org-login-page ${theme === "dark" ? "dark" : "light"}`}>
+      <button
+        type="button"
+        className="org-theme-btn"
+        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+      >
+        {theme === "dark" ? "☀️ Светлая" : "🌙 Тёмная"}
+      </button>
+
       <section className="org-login-card">
         <div className="org-login-left">
           <img
