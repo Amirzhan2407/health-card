@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 const initialDepartments = [
   {
@@ -51,7 +52,9 @@ function generatePassword() {
 }
 
 export default function GovClinicSystemAdmin() {
-  const [tab, setTab] = useState("dashboard");
+  const [searchParams] = useSearchParams();
+  const tab = searchParams.get("tab") || "dashboard";
+
   const [departments, setDepartments] = useState(initialDepartments);
   const [employees, setEmployees] = useState(initialEmployees);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -80,6 +83,10 @@ export default function GovClinicSystemAdmin() {
     departmentId: "all",
   });
 
+  function getDepartmentName(id) {
+    return departments.find((dep) => dep.id === Number(id))?.name || "—";
+  }
+
   const filteredEmployees = useMemo(() => {
     return employees.filter((employee) => {
       const search = filters.search.toLowerCase();
@@ -106,10 +113,6 @@ export default function GovClinicSystemAdmin() {
       documentName: doc,
     }))
   );
-
-  function getDepartmentName(id) {
-    return departments.find((dep) => dep.id === Number(id))?.name || "—";
-  }
 
   function updateDepartmentForm(e) {
     const { name, value } = e.target;
@@ -189,36 +192,6 @@ export default function GovClinicSystemAdmin() {
             Создание отделений, сотрудников, кабинетов и документов поликлиники.
           </p>
         </div>
-      </div>
-
-      <div className="org-admin-tabs">
-        <button
-          className={tab === "dashboard" ? "active" : ""}
-          onClick={() => setTab("dashboard")}
-        >
-          Главная
-        </button>
-
-        <button
-          className={tab === "departments" ? "active" : ""}
-          onClick={() => setTab("departments")}
-        >
-          Отделения
-        </button>
-
-        <button
-          className={tab === "employees" ? "active" : ""}
-          onClick={() => setTab("employees")}
-        >
-          Сотрудники
-        </button>
-
-        <button
-          className={tab === "documents" ? "active" : ""}
-          onClick={() => setTab("documents")}
-        >
-          Документы сотрудников
-        </button>
       </div>
 
       {tab === "dashboard" && (
@@ -506,7 +479,9 @@ export default function GovClinicSystemAdmin() {
 
                   <div className="employee-card-info">
                     <span>Возраст: {employee.age || "—"}</span>
-                    <span>Отделение: {getDepartmentName(employee.departmentId)}</span>
+                    <span>
+                      Отделение: {getDepartmentName(employee.departmentId)}
+                    </span>
                     <span>Кабинет: {employee.cabinet || "—"}</span>
                   </div>
                 </div>

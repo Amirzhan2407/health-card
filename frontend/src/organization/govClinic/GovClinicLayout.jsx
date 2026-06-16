@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, Navigate } from "react-router-dom";
 import "./govClinic.css";
 
 export default function GovClinicLayout() {
@@ -6,8 +6,12 @@ export default function GovClinicLayout() {
 
   const user = JSON.parse(localStorage.getItem("organizationUser") || "null");
 
-  const isChiefDoctor = user?.role === "chief_doctor";
-  const isAdmin = user?.role === "organization_admin";
+  if (!user) {
+    return <Navigate to="/organization-login" replace />;
+  }
+
+  const isChiefDoctor = user.role === "chief_doctor";
+  const isAdmin = user.role === "organization_admin";
 
   function logout() {
     localStorage.removeItem("organizationUser");
@@ -15,8 +19,12 @@ export default function GovClinicLayout() {
     navigate("/organization-login");
   }
 
-  if (!user) {
-    return <Navigate to="/organization-login" replace />;
+  function goAdminTab(tab) {
+    navigate(`/organization/gov-clinic/system-admin?tab=${tab}`);
+  }
+
+  function goChiefTab(tab) {
+    navigate(`/organization/gov-clinic/chief-doctor?tab=${tab}`);
   }
 
   return (
@@ -32,40 +40,32 @@ export default function GovClinicLayout() {
         </div>
 
         <nav className="gov-clinic-nav">
-          {isChiefDoctor && (
+          {isAdmin && (
             <>
-              <NavLink to="/organization/gov-clinic/chief-doctor">
-                Главная
-              </NavLink>
-              <NavLink to="/organization/gov-clinic/chief-doctor">
-                Сотрудники
-              </NavLink>
-              <NavLink to="/organization/gov-clinic/chief-doctor">
+              <button onClick={() => goAdminTab("dashboard")}>Главная</button>
+              <button onClick={() => goAdminTab("departments")}>
                 Отделения
-              </NavLink>
-              <NavLink to="/organization/gov-clinic/chief-doctor">
-                Документы
-              </NavLink>
-              <NavLink to="/organization/gov-clinic/chief-doctor">
-                Отчёты
-              </NavLink>
+              </button>
+              <button onClick={() => goAdminTab("employees")}>
+                Сотрудники
+              </button>
+              <button onClick={() => goAdminTab("documents")}>
+                Документы сотрудников
+              </button>
             </>
           )}
 
-          {isAdmin && (
+          {isChiefDoctor && (
             <>
-              <NavLink to="/organization/gov-clinic/system-admin">
-                Главная
-              </NavLink>
-              <NavLink to="/organization/gov-clinic/system-admin">
-                Отделения
-              </NavLink>
-              <NavLink to="/organization/gov-clinic/system-admin">
+              <button onClick={() => goChiefTab("dashboard")}>Главная</button>
+              <button onClick={() => goChiefTab("employees")}>
                 Сотрудники
-              </NavLink>
-              <NavLink to="/organization/gov-clinic/system-admin">
-                Документы сотрудников
-              </NavLink>
+              </button>
+              <button onClick={() => goChiefTab("departments")}>
+                Отделения
+              </button>
+              <button onClick={() => goChiefTab("documents")}>Документы</button>
+              <button onClick={() => goChiefTab("reports")}>Отчёты</button>
             </>
           )}
         </nav>
@@ -83,7 +83,7 @@ export default function GovClinicLayout() {
                 ? "Кабинет главного врача"
                 : "Кабинет администратора"}
             </h1>
-            <p>{user?.full_name || "Пользователь организации"}</p>
+            <p>{user.full_name || "Пользователь организации"}</p>
           </div>
 
           <button className="gov-clinic-login-link" onClick={logout}>

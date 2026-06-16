@@ -31,19 +31,21 @@
   gap: 10px;
 }
 
-.gov-clinic-nav a {
+.gov-clinic-nav button {
+  width: 100%;
+  text-align: left;
+  border: 0;
   padding: 13px 15px;
   border-radius: 14px;
   color: #d1fae5;
-  text-decoration: none;
+  background: transparent;
   font-weight: 900;
+  cursor: pointer;
 }
 
-.gov-clinic-nav a:hover,
-.gov-clinic-nav a.active {
+.gov-clinic-nav button:hover {
   background: #00b85a;
   color: #ffffff;
-  box-shadow: 0 12px 28px rgba(0, 184, 90, 0.22);
 }
 
 .gov-clinic-main {
@@ -124,12 +126,6 @@
   margin-bottom: 22px;
 }
 
-.gov-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
-}
-
 .gov-card {
   border: 1px solid rgba(15, 23, 42, 0.1);
   border-radius: 20px;
@@ -146,30 +142,6 @@
 .gov-card p {
   margin: 0;
   color: #64748b;
-}
-
-.org-admin-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin: 24px 0;
-}
-
-.org-admin-tabs button {
-  border: 1px solid rgba(0, 184, 90, 0.22);
-  background: rgba(0, 184, 90, 0.08);
-  color: #047857;
-  padding: 13px 18px;
-  border-radius: 16px;
-  font-weight: 950;
-  cursor: pointer;
-}
-
-.org-admin-tabs button.active {
-  background: #00b85a;
-  color: #ffffff;
-  border-color: #00b85a;
-  box-shadow: 0 14px 30px rgba(0, 184, 90, 0.22);
 }
 
 .admin-stat-grid {
@@ -476,7 +448,7 @@
 
   .gov-clinic-nav {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
   }
 
   .gov-clinic-main {
@@ -518,15 +490,9 @@
 }
 
 @media (max-width: 650px) {
-  .gov-clinic-nav {
-    grid-template-columns: 1fr;
-  }
-
+  .gov-clinic-nav,
   .admin-stat-grid,
-  .employee-detail-grid {
-    grid-template-columns: 1fr;
-  }
-
+  .employee-detail-grid,
   .password-row {
     grid-template-columns: 1fr;
   }
