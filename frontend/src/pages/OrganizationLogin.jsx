@@ -58,7 +58,7 @@ export default function OrganizationLogin() {
         </div>
 
         <form className="org-login-right" onSubmit={handleSubmit}>
-          <span className="org-login-badge">Гос. поликлиника</span>
+          
 
           <h2>Вход для организации</h2>
           <p className="org-login-subtitle">

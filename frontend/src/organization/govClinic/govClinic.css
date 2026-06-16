@@ -339,3 +339,269 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+.org-admin-tabs {
+  display: flex;
+  gap: 12px;
+  margin: 24px 0;
+}
+
+.org-admin-tabs button {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.72);
+  color: #cbd5e1;
+  padding: 13px 18px;
+  border-radius: 16px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.org-admin-tabs button.active {
+  background: #00c853;
+  color: #ffffff;
+  border-color: #00c853;
+}
+
+.org-admin-grid {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 18px;
+}
+
+.org-admin-wide {
+  min-width: 0;
+}
+
+.org-admin-form {
+  display: grid;
+  gap: 14px;
+}
+
+.org-admin-form label {
+  display: grid;
+  gap: 8px;
+  color: #dbeafe;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.org-admin-form input,
+.org-admin-form select,
+.org-admin-form textarea,
+.employee-filters input,
+.employee-filters select {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(2, 6, 23, 0.35);
+  color: #ffffff;
+  border-radius: 14px;
+  padding: 13px 14px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.org-admin-form textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.org-admin-form button {
+  border: 0;
+  border-radius: 16px;
+  padding: 14px;
+  background: #00c853;
+  color: #ffffff;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.department-list,
+.employee-card-list {
+  display: grid;
+  gap: 14px;
+}
+
+.department-card,
+.employee-card {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(2, 6, 23, 0.28);
+  border-radius: 20px;
+  padding: 16px;
+}
+
+.department-head,
+.employee-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.department-head h4,
+.employee-card h4 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 17px;
+}
+
+.department-head p,
+.employee-card p,
+.department-desc {
+  margin: 6px 0 0;
+  color: #9fb2c8;
+}
+
+.department-head b {
+  color: #22c55e;
+  white-space: nowrap;
+}
+
+.department-people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.department-people span,
+.employee-docs span {
+  background: rgba(34, 211, 238, 0.12);
+  border: 1px solid rgba(34, 211, 238, 0.2);
+  color: #bae6fd;
+  border-radius: 999px;
+  padding: 8px 11px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.department-people em,
+.employee-docs em {
+  color: #94a3b8;
+  font-style: normal;
+}
+
+.employee-top {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.employee-filters {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: 12px;
+}
+
+.employee-card {
+  cursor: pointer;
+  transition: 0.18s;
+}
+
+.employee-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 200, 83, 0.4);
+}
+
+.employee-card-info {
+  display: grid;
+  gap: 7px;
+  text-align: right;
+  color: #cbd5e1;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.employee-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.72);
+  display: grid;
+  place-items: center;
+  z-index: 100;
+  padding: 20px;
+}
+
+.employee-modal-card {
+  width: min(720px, 100%);
+  background: #0f172a;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 26px;
+  padding: 26px;
+  position: relative;
+  color: #ffffff;
+}
+
+.employee-modal-card > button {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  border: 0;
+  background: rgba(239, 68, 68, 0.15);
+  color: #fecaca;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.employee-modal-card h3 {
+  margin: 0 0 6px;
+  font-size: 26px;
+}
+
+.employee-modal-card p {
+  margin: 0 0 20px;
+  color: #9fb2c8;
+}
+
+.employee-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.employee-detail-grid div {
+  background: rgba(2, 6, 23, 0.32);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.employee-detail-grid span {
+  display: block;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 900;
+  margin-bottom: 6px;
+}
+
+.employee-detail-grid b {
+  color: #ffffff;
+}
+
+.employee-docs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 1000px) {
+  .org-admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .employee-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .department-head,
+  .employee-card {
+    flex-direction: column;
+  }
+
+  .employee-card-info {
+    text-align: left;
+  }
+}
