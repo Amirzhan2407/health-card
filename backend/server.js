@@ -11,22 +11,32 @@ import adminChannelsRoutes from "./routes/adminChannels.js";
 import auditLogsRoutes from "./routes/auditLogs.js";
 import organizationsRoutes from "./routes/organizations.js";
 import adminDashboardRoutes from "./routes/adminDashboard.js";
+import organizationStructureRoutes from "./routes/organizationStructure.js";
 
 dotenv.config();
 
 const app = express();
 
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://health-card-rose.vercel.app",
+];
+
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:3000",
-      "https://health-card-rose.vercel.app",
-    ],
+    origin: allowedOrigins,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "x-organization-id",
+    ],
+    credentials: true,
   })
 );
+
+app.options("*", cors());
 
 app.use(express.json({ limit: "30mb" }));
 app.use(express.urlencoded({ extended: true, limit: "30mb" }));
@@ -60,6 +70,7 @@ app.use("/api/organization-applications", organizationApplicationRoutes);
 app.use("/api/admin-channels", adminChannelsRoutes);
 app.use("/api/audit-logs", auditLogsRoutes);
 app.use("/api/organizations", organizationsRoutes);
+app.use("/api/organization-structure", organizationStructureRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
