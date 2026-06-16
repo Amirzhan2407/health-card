@@ -49,9 +49,6 @@ export default function GovClinicLayout() {
               <button onClick={() => goAdminTab("employees")}>
                 Сотрудники
               </button>
-              <button onClick={() => goAdminTab("documents")}>
-                Документы сотрудников
-              </button>
             </>
           )}
 
@@ -64,7 +61,6 @@ export default function GovClinicLayout() {
               <button onClick={() => goChiefTab("departments")}>
                 Отделения
               </button>
-              <button onClick={() => goChiefTab("documents")}>Документы</button>
               <button onClick={() => goChiefTab("reports")}>Отчёты</button>
             </>
           )}

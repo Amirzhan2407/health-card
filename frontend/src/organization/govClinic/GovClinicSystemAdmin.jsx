@@ -118,13 +118,9 @@ export default function GovClinicSystemAdmin() {
     });
   }, [employees, filters]);
 
-  const employeeDocuments = employees.flatMap((employee) =>
-    (employee.documents || []).map((doc) => ({
-      employeeName: employee.fullName,
-      department: getDepartmentName(employee.departmentId),
-      documentName: doc,
-    }))
-  );
+  const documentsCount = employees.reduce((total, employee) => {
+    return total + (employee.documents?.length || 0);
+  }, 0);
 
   function updateDepartmentForm(e) {
     const { name, value } = e.target;
@@ -236,8 +232,8 @@ export default function GovClinicSystemAdmin() {
           </div>
 
           <div className="admin-stat-card">
-            <span>Документов</span>
-            <b>{employeeDocuments.length}</b>
+            <span>Документов в карточках</span>
+            <b>{documentsCount}</b>
           </div>
 
           <div className="admin-stat-card">
@@ -541,29 +537,6 @@ export default function GovClinicSystemAdmin() {
             </div>
           </section>
         </div>
-      )}
-
-      {tab === "documents" && (
-        <section className="gov-card">
-          <h3>Документы сотрудников</h3>
-
-          <div className="documents-table">
-            {employeeDocuments.length ? (
-              employeeDocuments.map((doc, index) => (
-                <div
-                  className="documents-row"
-                  key={`${doc.documentName}-${index}`}
-                >
-                  <span>{doc.documentName}</span>
-                  <b>{doc.employeeName}</b>
-                  <em>{doc.department}</em>
-                </div>
-              ))
-            ) : (
-              <p className="empty-text">Документы пока не добавлены.</p>
-            )}
-          </div>
-        </section>
       )}
 
       {selectedEmployee && (
