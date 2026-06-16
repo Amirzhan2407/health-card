@@ -17,26 +17,17 @@ dotenv.config();
 
 const app = express();
 
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:3000",
-  "https://health-card-rose.vercel.app",
-];
-
 app.use(
   cors({
-    origin: allowedOrigins,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "x-organization-id",
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:3000",
+      "https://health-card-rose.vercel.app",
     ],
-    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-organization-id"],
   })
 );
-
-app.options("*", cors());
 
 app.use(express.json({ limit: "30mb" }));
 app.use(express.urlencoded({ extended: true, limit: "30mb" }));
@@ -55,16 +46,10 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-/**
- * Старые рабочие routes — не трогаем
- */
 app.use("/api/pharmacy", pharmacyRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/admin", adminRoutes);
 
-/**
- * Новая админская часть
- */
 app.use("/api/admin-dashboard", adminDashboardRoutes);
 app.use("/api/organization-applications", organizationApplicationRoutes);
 app.use("/api/admin-channels", adminChannelsRoutes);
