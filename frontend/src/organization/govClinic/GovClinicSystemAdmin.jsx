@@ -1,49 +1,61 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-const initialDepartments = [
-  {
-    id: 1,
-    name: "Терапия",
-    floor: "2 этаж",
-    rooms: "101–107",
-  },
-  {
-    id: 2,
-    name: "Педиатрия",
-    floor: "3 этаж",
-    rooms: "201–206",
-  },
+const DEPARTMENT_OPTIONS = [
+  "Терапия",
+  "Педиатрия",
+  "Хирургия",
+  "Травматология",
+  "Неврология",
+  "Кардиология",
+  "Эндокринология",
+  "ЛОР",
+  "Офтальмология",
+  "Гинекология",
+  "Дерматология",
+  "Инфекционный кабинет",
+  "Рентген кабинет",
+  "УЗИ кабинет",
+  "Функциональная диагностика",
+  "Лаборатория",
+  "Регистратура",
+  "Доврачебный кабинет",
+  "Процедурный кабинет",
+  "Прививочный кабинет",
+  "Отдел кадров",
+  "Бухгалтерия",
+  "ИТ отдел",
 ];
 
-const initialEmployees = [
-  {
-    id: 1,
-    fullName: "Ахметова Айгуль Сериковна",
-    age: "42",
-    phone: "+7 777 111 22 33",
-    email: "akhmetova@clinic.kz",
-    departmentId: 1,
-    cabinet: "103",
-    position: "Врач-терапевт",
-    login: "akhmetova",
-    tempPassword: "TEMP-1234",
-    documents: ["Удостоверение личности.pdf", "Диплом.pdf"],
-  },
-  {
-    id: 2,
-    fullName: "Ибраев Нурлан Канатович",
-    age: "38",
-    phone: "+7 701 555 44 33",
-    email: "ibraev@clinic.kz",
-    departmentId: 2,
-    cabinet: "202",
-    position: "Педиатр",
-    login: "ibraev",
-    tempPassword: "TEMP-5678",
-    documents: ["Диплом.pdf"],
-  },
+const POSITION_OPTIONS = [
+  "Врач-терапевт",
+  "Врач-педиатр",
+  "Врач-хирург",
+  "Врач-травматолог",
+  "Врач-невропатолог",
+  "Врач-кардиолог",
+  "Врач-эндокринолог",
+  "Врач-ЛОР",
+  "Врач-офтальмолог",
+  "Врач-гинеколог",
+  "Врач-дерматолог",
+  "Врач-инфекционист",
+  "Врач-рентгенолог",
+  "Врач УЗИ",
+  "Медицинская сестра",
+  "Старшая медицинская сестра",
+  "Фельдшер",
+  "Регистратор",
+  "Лаборант",
+  "Бухгалтер",
+  "Специалист отдела кадров",
+  "Системный администратор",
+  "Заведующий отделением",
+  "Заместитель главного врача",
 ];
+
+const initialDepartments = [];
+const initialEmployees = [];
 
 function generatePassword() {
   const a = Math.random().toString(36).slice(2, 6).toUpperCase();
@@ -136,13 +148,24 @@ export default function GovClinicSystemAdmin() {
   function addDepartment(e) {
     e.preventDefault();
 
-    if (!departmentForm.name.trim()) return;
+    if (!departmentForm.name || !departmentForm.floor || !departmentForm.rooms) {
+      return;
+    }
+
+    const exists = departments.some(
+      (department) => department.name === departmentForm.name
+    );
+
+    if (exists) {
+      alert("Это отделение уже добавлено.");
+      return;
+    }
 
     setDepartments((prev) => [
       ...prev,
       {
         id: Date.now(),
-        name: departmentForm.name.trim(),
+        name: departmentForm.name,
         floor: departmentForm.floor.trim(),
         rooms: departmentForm.rooms.trim(),
       },
@@ -158,7 +181,13 @@ export default function GovClinicSystemAdmin() {
   function addEmployee(e) {
     e.preventDefault();
 
-    if (!employeeForm.fullName.trim() || !employeeForm.departmentId) return;
+    if (
+      !employeeForm.fullName.trim() ||
+      !employeeForm.departmentId ||
+      !employeeForm.position
+    ) {
+      return;
+    }
 
     setEmployees((prev) => [
       ...prev,
@@ -226,13 +255,19 @@ export default function GovClinicSystemAdmin() {
             <form className="org-admin-form" onSubmit={addDepartment}>
               <label>
                 Название отделения
-                <input
+                <select
                   name="name"
                   value={departmentForm.name}
                   onChange={updateDepartmentForm}
-                  placeholder="Например: Терапия"
                   required
-                />
+                >
+                  <option value="">Выберите отделение</option>
+                  {DEPARTMENT_OPTIONS.map((department) => (
+                    <option key={department} value={department}>
+                      {department}
+                    </option>
+                  ))}
+                </select>
               </label>
 
               <label>
@@ -242,6 +277,7 @@ export default function GovClinicSystemAdmin() {
                   value={departmentForm.floor}
                   onChange={updateDepartmentForm}
                   placeholder="Например: 2 этаж"
+                  required
                 />
               </label>
 
@@ -252,6 +288,7 @@ export default function GovClinicSystemAdmin() {
                   value={departmentForm.rooms}
                   onChange={updateDepartmentForm}
                   placeholder="Например: 101–107"
+                  required
                 />
               </label>
 
@@ -263,37 +300,40 @@ export default function GovClinicSystemAdmin() {
             <h3>Список отделений</h3>
 
             <div className="department-list">
-              {departments.map((department) => {
-                const people = employees.filter(
-                  (employee) => employee.departmentId === department.id
-                );
+              {departments.length ? (
+                departments.map((department) => {
+                  const people = employees.filter(
+                    (employee) => employee.departmentId === department.id
+                  );
 
-                return (
-                  <div className="department-card" key={department.id}>
-                    <div className="department-head">
-                      <div>
-                        <h4>{department.name}</h4>
-                        <p>
-                          {department.floor || "Этаж не указан"} · Кабинеты:{" "}
-                          {department.rooms || "не указаны"}
-                        </p>
+                  return (
+                    <div className="department-card" key={department.id}>
+                      <div className="department-head">
+                        <div>
+                          <h4>{department.name}</h4>
+                          <p>
+                            {department.floor} · Кабинеты: {department.rooms}
+                          </p>
+                        </div>
+
+                        <b>{people.length} сотрудников</b>
                       </div>
 
-                      <b>{people.length} сотрудников</b>
+                      <div className="department-people">
+                        {people.length ? (
+                          people.map((person) => (
+                            <span key={person.id}>{person.fullName}</span>
+                          ))
+                        ) : (
+                          <em>Сотрудники пока не добавлены</em>
+                        )}
+                      </div>
                     </div>
-
-                    <div className="department-people">
-                      {people.length ? (
-                        people.map((person) => (
-                          <span key={person.id}>{person.fullName}</span>
-                        ))
-                      ) : (
-                        <em>Сотрудники пока не добавлены</em>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              ) : (
+                <p className="empty-text">Отделения пока не добавлены.</p>
+              )}
             </div>
           </section>
         </div>
@@ -348,12 +388,19 @@ export default function GovClinicSystemAdmin() {
 
               <label>
                 Должность
-                <input
+                <select
                   name="position"
                   value={employeeForm.position}
                   onChange={updateEmployeeForm}
-                  placeholder="Например: Врач-терапевт"
-                />
+                  required
+                >
+                  <option value="">Выберите должность</option>
+                  {POSITION_OPTIONS.map((position) => (
+                    <option key={position} value={position}>
+                      {position}
+                    </option>
+                  ))}
+                </select>
               </label>
 
               <label>
@@ -402,6 +449,7 @@ export default function GovClinicSystemAdmin() {
                     onChange={updateEmployeeForm}
                     placeholder="Одноразовый пароль"
                   />
+
                   <button
                     type="button"
                     onClick={() =>
@@ -466,26 +514,30 @@ export default function GovClinicSystemAdmin() {
             </div>
 
             <div className="employee-card-list">
-              {filteredEmployees.map((employee) => (
-                <div
-                  className="employee-card"
-                  key={employee.id}
-                  onDoubleClick={() => setSelectedEmployee(employee)}
-                >
-                  <div>
-                    <h4>{employee.fullName}</h4>
-                    <p>{employee.position || "Должность не указана"}</p>
-                  </div>
+              {filteredEmployees.length ? (
+                filteredEmployees.map((employee) => (
+                  <div
+                    className="employee-card"
+                    key={employee.id}
+                    onDoubleClick={() => setSelectedEmployee(employee)}
+                  >
+                    <div>
+                      <h4>{employee.fullName}</h4>
+                      <p>{employee.position || "Должность не указана"}</p>
+                    </div>
 
-                  <div className="employee-card-info">
-                    <span>Возраст: {employee.age || "—"}</span>
-                    <span>
-                      Отделение: {getDepartmentName(employee.departmentId)}
-                    </span>
-                    <span>Кабинет: {employee.cabinet || "—"}</span>
+                    <div className="employee-card-info">
+                      <span>Возраст: {employee.age || "—"}</span>
+                      <span>
+                        Отделение: {getDepartmentName(employee.departmentId)}
+                      </span>
+                      <span>Кабинет: {employee.cabinet || "—"}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="empty-text">Сотрудники пока не добавлены.</p>
+              )}
             </div>
           </section>
         </div>
@@ -498,7 +550,10 @@ export default function GovClinicSystemAdmin() {
           <div className="documents-table">
             {employeeDocuments.length ? (
               employeeDocuments.map((doc, index) => (
-                <div className="documents-row" key={`${doc.documentName}-${index}`}>
+                <div
+                  className="documents-row"
+                  key={`${doc.documentName}-${index}`}
+                >
                   <span>{doc.documentName}</span>
                   <b>{doc.employeeName}</b>
                   <em>{doc.department}</em>
@@ -536,6 +591,11 @@ export default function GovClinicSystemAdmin() {
               </div>
 
               <div>
+                <span>Должность</span>
+                <b>{selectedEmployee.position || "—"}</b>
+              </div>
+
+              <div>
                 <span>Отделение</span>
                 <b>{getDepartmentName(selectedEmployee.departmentId)}</b>
               </div>
@@ -557,6 +617,7 @@ export default function GovClinicSystemAdmin() {
             </div>
 
             <h4>Документы</h4>
+
             <div className="employee-docs">
               {selectedEmployee.documents?.length ? (
                 selectedEmployee.documents.map((doc) => (
