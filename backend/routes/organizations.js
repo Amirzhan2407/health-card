@@ -1,9 +1,169 @@
 import express from "express";
+import crypto from "crypto";
 import { supabase } from "../lib/supabaseAdmin.js";
 import { requireAdminAuth } from "../middleware/requireAdminAuth.js";
 import { createAuditLog } from "../services/adminAuditService.js";
 
 const router = express.Router();
+
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(String(password), salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, savedHash) {
+  if (!password || !savedHash) return false;
+
+  const [salt, hash] = String(savedHash).split(":");
+  if (!salt || !hash) return false;
+
+  const checkHash = crypto.scryptSync(String(password), salt, 64).toString("hex");
+  return hash === checkHash;
+}
+
+function getRedirectPath(role) {
+  if (role === "chief_doctor") return "/organization/gov-clinic/chief-doctor";
+  if (role === "organization_admin") return "/organization/gov-clinic/system-admin";
+  return "/organization/gov-clinic/doctor";
+}
+
+router.post("/login", async (req, res) => {
+  try {
+    const city = String(req.body.city || "").trim();
+    const bin = String(req.body.bin || "").trim();
+    const login = String(req.body.login || "").trim();
+    const password = String(req.body.password || "");
+
+    if (!city || !bin || !login || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Город, БИН, логин и пароль обязательны.",
+      });
+    }
+
+    const { data: user, error } = await supabase
+      .from("organization_users")
+      .select("*, organizations(*)")
+      .ilike("city", city)
+      .eq("bin", bin)
+      .eq("login", login)
+      .maybeSingle();
+
+    if (error || !user) {
+      return res.status(401).json({
+        success: false,
+        message: "Пользователь не найден.",
+      });
+    }
+
+    if (user.status !== "active") {
+      return res.status(403).json({
+        success: false,
+        message: "Аккаунт отключён.",
+      });
+    }
+
+    if (!verifyPassword(password, user.password_hash)) {
+      return res.status(401).json({
+        success: false,
+        message: "Неверный пароль.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Вход выполнен.",
+      mustChangePassword: user.must_change_password,
+      redirectPath: getRedirectPath(user.role),
+      user: {
+        id: user.id,
+        organization_id: user.organization_id,
+        full_name: user.full_name,
+        email: user.email,
+        role: user.role,
+        login: user.login,
+        city: user.city,
+        bin: user.bin,
+      },
+      organization: user.organizations || null,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Ошибка входа.",
+    });
+  }
+});
+
+router.post("/change-password", async (req, res) => {
+  try {
+    const userId = req.body.userId;
+    const currentPassword = String(req.body.currentPassword || "");
+    const newPassword = String(req.body.newPassword || "");
+
+    if (!userId || !currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Заполните все поля.",
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Новый пароль должен быть минимум 6 символов.",
+      });
+    }
+
+    const { data: user, error } = await supabase
+      .from("organization_users")
+      .select("*")
+      .eq("id", userId)
+      .single();
+
+    if (error || !user) {
+      return res.status(404).json({
+        success: false,
+        message: "Пользователь не найден.",
+      });
+    }
+
+    if (!verifyPassword(currentPassword, user.password_hash)) {
+      return res.status(401).json({
+        success: false,
+        message: "Текущий пароль неверный.",
+      });
+    }
+
+    const { error: updateError } = await supabase
+      .from("organization_users")
+      .update({
+        password_hash: hashPassword(newPassword),
+        must_change_password: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
+
+    if (updateError) {
+      return res.status(500).json({
+        success: false,
+        message: updateError.message,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Пароль успешно изменён.",
+      redirectPath: getRedirectPath(user.role),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Ошибка смены пароля.",
+    });
+  }
+});
 
 router.get("/", requireAdminAuth, async (req, res) => {
   try {
@@ -52,16 +212,6 @@ router.get("/:id", requireAdminAuth, async (req, res) => {
       });
     }
 
-    if (
-      req.admin.role !== "super_admin" &&
-      data.assigned_admin_id !== req.admin.id
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "Нет доступа к организации.",
-      });
-    }
-
     return res.status(200).json({
       success: true,
       organization: data,
@@ -86,16 +236,6 @@ router.patch("/:id", requireAdminAuth, async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Организация не найдена.",
-      });
-    }
-
-    if (
-      req.admin.role !== "super_admin" &&
-      current.assigned_admin_id !== req.admin.id
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "Нет доступа к организации.",
       });
     }
 

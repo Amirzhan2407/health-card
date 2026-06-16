@@ -1,5 +1,6 @@
 import express from "express";
 import multer from "multer";
+import crypto from "crypto";
 import { supabase } from "../lib/supabaseAdmin.js";
 import { requireAdminAuth } from "../middleware/requireAdminAuth.js";
 import { createAuditLog } from "../services/adminAuditService.js";
@@ -30,6 +31,12 @@ const ALLOWED_STATUSES = [
   "rejected",
 ];
 
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(String(password), salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+
 function normalizeStatus(status) {
   if (!status || status === "all" || status === "undefined") return null;
   return String(status).trim();
@@ -40,6 +47,19 @@ function normalizeApplicationType(type) {
   if (type === "change_administrator") return "change_administrator";
   if (type === "change_organization_data") return "change_organization_data";
   return "new_organization";
+}
+
+function parseAdministrators(value) {
+  if (!value) return [];
+
+  if (Array.isArray(value)) return value;
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 async function getDocuments(applicationId) {
@@ -618,8 +638,80 @@ router.post("/:id/send-access", requireAdminAuth, async (req, res) => {
       });
     }
 
+    let organizationId = application.organization_id;
+
+    if (!organizationId) {
+      const organization = await createOrganizationFromApplication(
+        application,
+        req.admin.id
+      );
+
+      organizationId = organization?.id;
+    }
+
+    if (!organizationId) {
+      return res.status(500).json({
+        success: false,
+        message: "Не удалось создать организацию для доступа.",
+      });
+    }
+
     const roleLabel =
       role === "chief" ? "Главный врач" : `Администратор #${Number(index) + 1}`;
+
+    const userRole = role === "chief" ? "chief_doctor" : "organization_admin";
+
+    let phone = null;
+
+    if (role === "chief") {
+      phone =
+        application.new_chief_doctor_phone ||
+        application.chief_doctor_phone ||
+        null;
+    } else {
+      const admins = parseAdministrators(application.administrators);
+      const adminItem = admins[Number(index)] || null;
+      phone = adminItem?.phone || null;
+    }
+
+    const { error: userError } = await supabase
+      .from("organization_users")
+      .upsert(
+        {
+          organization_id: organizationId,
+          application_id: application.id,
+          city: application.city,
+          bin: application.bin,
+          full_name: fullName,
+          phone,
+          email,
+          role: userRole,
+          login,
+          password_hash: hashPassword(tempPassword),
+          must_change_password: true,
+          status: "active",
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "organization_id,login",
+        }
+      );
+
+    if (userError) {
+      await insertHistory({
+        applicationId: id,
+        adminId: req.admin.id,
+        action: "organization_user_create_failed",
+        oldStatus: application.status,
+        newStatus: application.status,
+        comment: `Ошибка создания пользователя: ${userError.message}`,
+      });
+
+      return res.status(500).json({
+        success: false,
+        message: userError.message,
+      });
+    }
 
     const emailResult = await sendOrganizationAccessEmail({
       to: email,
@@ -639,8 +731,8 @@ router.post("/:id/send-access", requireAdminAuth, async (req, res) => {
       oldStatus: application.status,
       newStatus: application.status,
       comment: emailResult.success
-        ? `Доступ отправлен: ${roleLabel}, ${email}`
-        : `Ошибка отправки доступа: ${emailResult.message}`,
+        ? `Доступ создан и отправлен: ${roleLabel}, ${email}`
+        : `Пользователь создан, но письмо не отправилось: ${emailResult.message}`,
     });
 
     if (!emailResult.success) {
@@ -652,7 +744,7 @@ router.post("/:id/send-access", requireAdminAuth, async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Доступ успешно отправлен.",
+      message: "Доступ успешно создан и отправлен.",
     });
   } catch (error) {
     console.error("SEND ACCESS ERROR:", error.message);
