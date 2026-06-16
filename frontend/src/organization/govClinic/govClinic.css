@@ -1,97 +1,127 @@
-/* src/organization/govClinic/govClinic.css */
-
 .gov-clinic-shell {
   min-height: 100vh;
   display: flex;
-  background: #f4f7fb;
-  color: #162033;
+  background: #f0fdf4;
+  color: #07111f;
 }
 
 .gov-clinic-sidebar {
   width: 280px;
-  background: #0f172a;
-  color: white;
+  background: linear-gradient(180deg, #022c22, #07111f);
+  color: #ffffff;
   padding: 24px 18px;
+  box-sizing: border-box;
 }
 
 .gov-clinic-logo h2 {
   margin: 0;
-  font-size: 24px;
+  font-size: 26px;
+  font-weight: 950;
 }
 
 .gov-clinic-logo p {
-  margin: 6px 0 24px;
-  color: #cbd5e1;
+  margin: 6px 0 28px;
+  color: #bbf7d0;
+  font-weight: 700;
 }
 
 .gov-clinic-nav {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .gov-clinic-nav a {
-  padding: 12px 14px;
-  border-radius: 12px;
-  color: #cbd5e1;
+  padding: 13px 15px;
+  border-radius: 14px;
+  color: #d1fae5;
   text-decoration: none;
-  font-weight: 600;
+  font-weight: 900;
 }
 
 .gov-clinic-nav a:hover,
 .gov-clinic-nav a.active {
-  background: #2563eb;
-  color: white;
+  background: #00b85a;
+  color: #ffffff;
+  box-shadow: 0 12px 28px rgba(0, 184, 90, 0.22);
 }
 
 .gov-clinic-main {
   flex: 1;
   padding: 24px;
+  min-width: 0;
 }
 
 .gov-clinic-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: white;
-  padding: 20px 24px;
-  border-radius: 18px;
+  background: #ffffff;
+  padding: 22px 26px;
+  border-radius: 24px;
   margin-bottom: 24px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
 }
 
 .gov-clinic-header h1 {
   margin: 0;
+  font-size: 30px;
+  font-weight: 950;
 }
 
 .gov-clinic-header p {
-  margin: 6px 0 0;
+  margin: 7px 0 0;
   color: #64748b;
-}
-
-.gov-clinic-login-link {
-  background: #ef4444;
-  color: white;
-  padding: 10px 16px;
-  border-radius: 12px;
-  text-decoration: none;
   font-weight: 700;
 }
 
+.gov-clinic-login-link,
+.gov-clinic-logout-mobile {
+  border: 0;
+  background: #ef4444;
+  color: #ffffff;
+  padding: 11px 17px;
+  border-radius: 14px;
+  text-decoration: none;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.gov-clinic-logout-mobile {
+  display: none;
+  width: 100%;
+  margin-top: 18px;
+}
+
 .gov-clinic-content {
-  background: white;
-  border-radius: 18px;
-  padding: 24px;
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 26px;
   min-height: 70vh;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
 }
 
 .gov-page-title {
   margin: 0 0 8px;
-  font-size: 28px;
+  font-size: 30px;
+  font-weight: 950;
 }
 
 .gov-page-subtitle {
-  margin: 0 0 24px;
+  margin: 0;
   color: #64748b;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.gov-page-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  margin-bottom: 22px;
 }
 
 .gov-grid {
@@ -101,14 +131,16 @@
 }
 
 .gov-card {
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 20px;
+  padding: 20px;
   background: #ffffff;
 }
 
 .gov-card h3 {
-  margin: 0 0 10px;
+  margin: 0 0 14px;
+  font-size: 21px;
+  font-weight: 950;
 }
 
 .gov-card p {
@@ -116,256 +148,59 @@
   color: #64748b;
 }
 
-.gov-list {
-  display: grid;
-  gap: 12px;
-}
-
-.gov-list-item {
-  padding: 14px 16px;
-  border-radius: 14px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-}
-
-@media (max-width: 900px) {
-  .gov-clinic-shell {
-    flex-direction: column;
-  }
-
-  .gov-clinic-sidebar {
-    width: auto;
-  }
-
-  .gov-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.gov-page-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 18px;
-  align-items: flex-start;
-  margin-bottom: 24px;
-}
-
-.gov-primary-btn,
-.gov-secondary-btn {
-  border: 0;
-  border-radius: 14px;
-  font-weight: 900;
-  cursor: pointer;
-  color: #ffffff;
-}
-
-.gov-primary-btn {
-  background: #16a34a;
-  padding: 13px 18px;
-}
-
-.gov-secondary-btn {
-  background: rgba(34, 211, 238, 0.16);
-  border: 1px solid rgba(34, 211, 238, 0.25);
-  padding: 11px 15px;
-}
-
-.chief-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.chief-stat-card {
-  background: rgba(15, 23, 42, 0.82);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  border-radius: 22px;
-  padding: 18px;
-}
-
-.chief-stat-card span {
-  color: #94a3b8;
-  font-weight: 800;
-  font-size: 13px;
-}
-
-.chief-stat-card strong {
-  display: block;
-  font-size: 32px;
-  margin-top: 8px;
-  color: #ffffff;
-}
-
-.chief-stat-card p {
-  margin: 8px 0 0;
-  color: #22c55e;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.chief-main-grid {
-  display: grid;
-  grid-template-columns: 1.5fr 1fr;
-  gap: 18px;
-  margin-bottom: 18px;
-}
-
-.chief-card-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: flex-start;
-  margin-bottom: 16px;
-}
-
-.chief-card-head h3 {
-  margin: 0 0 6px;
-}
-
-.chief-list {
-  display: grid;
-  gap: 12px;
-}
-
-.chief-list-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 14px;
-  align-items: center;
-  padding: 14px;
-  border-radius: 16px;
-  background: rgba(2, 6, 23, 0.28);
-  border: 1px solid rgba(148, 163, 184, 0.14);
-}
-
-.chief-list-row b {
-  display: block;
-  color: #ffffff;
-}
-
-.chief-list-row span {
-  display: block;
-  color: #94a3b8;
-  margin-top: 4px;
-  font-size: 13px;
-}
-
-.chief-list-row em {
-  color: #facc15;
-  font-style: normal;
-  font-weight: 900;
-  font-size: 13px;
-}
-
-.chief-money-box {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 14px;
-  padding: 14px;
-  border-radius: 16px;
-  background: rgba(2, 6, 23, 0.28);
-}
-
-.chief-money-box span {
-  color: #cbd5e1;
-  font-weight: 800;
-}
-
-.chief-money-box b {
-  color: #22c55e;
-  font-size: 22px;
-}
-
-.chief-table {
-  display: grid;
-  gap: 10px;
-}
-
-.chief-table-head,
-.chief-table-row {
-  display: grid;
-  grid-template-columns: 1.2fr 1.4fr 0.7fr 0.7fr;
-  gap: 12px;
-  align-items: center;
-}
-
-.chief-table-head {
-  color: #94a3b8;
-  font-size: 13px;
-  font-weight: 900;
-  padding: 0 14px;
-}
-
-.chief-table-row {
-  padding: 14px;
-  border-radius: 16px;
-  background: rgba(2, 6, 23, 0.28);
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  color: #e5e7eb;
-}
-
-.chief-table-row b {
-  color: #22c55e;
-}
-
-@media (max-width: 1000px) {
-  .chief-stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .chief-main-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 700px) {
-  .gov-page-head,
-  .chief-card-head,
-  .chief-list-row {
-    flex-direction: column;
-  }
-
-  .chief-stats-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .chief-table-head {
-    display: none;
-  }
-
-  .chief-table-row {
-    grid-template-columns: 1fr;
-  }
-}
-
-
 .org-admin-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin: 24px 0;
 }
 
 .org-admin-tabs button {
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  background: rgba(15, 23, 42, 0.72);
-  color: #cbd5e1;
+  border: 1px solid rgba(0, 184, 90, 0.22);
+  background: rgba(0, 184, 90, 0.08);
+  color: #047857;
   padding: 13px 18px;
   border-radius: 16px;
-  font-weight: 900;
+  font-weight: 950;
   cursor: pointer;
 }
 
 .org-admin-tabs button.active {
-  background: #00c853;
+  background: #00b85a;
   color: #ffffff;
-  border-color: #00c853;
+  border-color: #00b85a;
+  box-shadow: 0 14px 30px rgba(0, 184, 90, 0.22);
+}
+
+.admin-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.admin-stat-card {
+  border-radius: 22px;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  padding: 22px;
+}
+
+.admin-stat-card span {
+  color: #64748b;
+  font-weight: 900;
+}
+
+.admin-stat-card b {
+  display: block;
+  margin-top: 8px;
+  color: #00a344;
+  font-size: 38px;
+  font-weight: 950;
 }
 
 .org-admin-grid {
   display: grid;
-  grid-template-columns: 380px 1fr;
+  grid-template-columns: 390px 1fr;
   gap: 18px;
 }
 
@@ -381,39 +216,48 @@
 .org-admin-form label {
   display: grid;
   gap: 8px;
-  color: #dbeafe;
+  color: #0f172a;
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 950;
 }
 
 .org-admin-form input,
 .org-admin-form select,
-.org-admin-form textarea,
 .employee-filters input,
 .employee-filters select {
   width: 100%;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  background: rgba(2, 6, 23, 0.35);
-  color: #ffffff;
-  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: #f8fafc;
+  color: #07111f;
+  border-radius: 15px;
   padding: 13px 14px;
   outline: none;
   box-sizing: border-box;
 }
 
-.org-admin-form textarea {
-  min-height: 90px;
-  resize: vertical;
+.org-admin-form input:focus,
+.org-admin-form select:focus,
+.employee-filters input:focus,
+.employee-filters select:focus {
+  border-color: #00b85a;
+  box-shadow: 0 0 0 4px rgba(0, 184, 90, 0.12);
 }
 
-.org-admin-form button {
+.org-admin-form > button,
+.password-row button {
   border: 0;
   border-radius: 16px;
   padding: 14px;
-  background: #00c853;
+  background: #00b85a;
   color: #ffffff;
   font-weight: 950;
   cursor: pointer;
+}
+
+.password-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
 }
 
 .department-list,
@@ -424,8 +268,8 @@
 
 .department-card,
 .employee-card {
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  background: rgba(2, 6, 23, 0.28);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #f8fafc;
   border-radius: 20px;
   padding: 16px;
 }
@@ -441,19 +285,20 @@
 .department-head h4,
 .employee-card h4 {
   margin: 0;
-  color: #ffffff;
-  font-size: 17px;
+  color: #07111f;
+  font-size: 18px;
+  font-weight: 950;
 }
 
 .department-head p,
-.employee-card p,
-.department-desc {
-  margin: 6px 0 0;
-  color: #9fb2c8;
+.employee-card p {
+  margin: 7px 0 0;
+  color: #64748b;
+  font-weight: 700;
 }
 
 .department-head b {
-  color: #22c55e;
+  color: #00a344;
   white-space: nowrap;
 }
 
@@ -466,19 +311,21 @@
 
 .department-people span,
 .employee-docs span {
-  background: rgba(34, 211, 238, 0.12);
-  border: 1px solid rgba(34, 211, 238, 0.2);
-  color: #bae6fd;
+  background: rgba(0, 184, 90, 0.1);
+  border: 1px solid rgba(0, 184, 90, 0.22);
+  color: #047857;
   border-radius: 999px;
   padding: 8px 11px;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 900;
 }
 
 .department-people em,
-.employee-docs em {
-  color: #94a3b8;
+.employee-docs em,
+.empty-text {
+  color: #64748b;
   font-style: normal;
+  font-weight: 700;
 }
 
 .employee-top {
@@ -489,7 +336,7 @@
 
 .employee-filters {
   display: grid;
-  grid-template-columns: 1fr 220px;
+  grid-template-columns: 1fr 230px;
   gap: 12px;
 }
 
@@ -500,22 +347,22 @@
 
 .employee-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(0, 200, 83, 0.4);
+  border-color: rgba(0, 184, 90, 0.38);
 }
 
 .employee-card-info {
   display: grid;
   gap: 7px;
   text-align: right;
-  color: #cbd5e1;
+  color: #475569;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 850;
 }
 
 .employee-modal {
   position: fixed;
   inset: 0;
-  background: rgba(2, 6, 23, 0.72);
+  background: rgba(2, 6, 23, 0.66);
   display: grid;
   place-items: center;
   z-index: 100;
@@ -523,13 +370,13 @@
 }
 
 .employee-modal-card {
-  width: min(720px, 100%);
-  background: #0f172a;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  border-radius: 26px;
-  padding: 26px;
+  width: min(760px, 100%);
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 28px;
+  padding: 28px;
   position: relative;
-  color: #ffffff;
+  color: #07111f;
 }
 
 .employee-modal-card > button {
@@ -537,23 +384,24 @@
   top: 16px;
   right: 16px;
   border: 0;
-  background: rgba(239, 68, 68, 0.15);
-  color: #fecaca;
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
   font-size: 24px;
   cursor: pointer;
 }
 
 .employee-modal-card h3 {
   margin: 0 0 6px;
-  font-size: 26px;
+  font-size: 28px;
+  font-weight: 950;
 }
 
 .employee-modal-card p {
   margin: 0 0 20px;
-  color: #9fb2c8;
+  color: #64748b;
 }
 
 .employee-detail-grid {
@@ -563,22 +411,22 @@
 }
 
 .employee-detail-grid div {
-  background: rgba(2, 6, 23, 0.32);
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: 16px;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 17px;
   padding: 14px;
 }
 
 .employee-detail-grid span {
   display: block;
-  color: #94a3b8;
+  color: #64748b;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 950;
   margin-bottom: 6px;
 }
 
 .employee-detail-grid b {
-  color: #ffffff;
+  color: #07111f;
 }
 
 .employee-docs {
@@ -587,9 +435,68 @@
   gap: 8px;
 }
 
+.documents-table {
+  display: grid;
+  gap: 10px;
+}
+
+.documents-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 220px;
+  gap: 12px;
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.documents-row span {
+  font-weight: 950;
+}
+
+.documents-row b {
+  color: #047857;
+}
+
+.documents-row em {
+  color: #64748b;
+  font-style: normal;
+  font-weight: 800;
+}
+
 @media (max-width: 1000px) {
+  .gov-clinic-shell {
+    flex-direction: column;
+  }
+
+  .gov-clinic-sidebar {
+    width: auto;
+  }
+
+  .gov-clinic-nav {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .gov-clinic-main {
+    padding: 16px;
+  }
+
+  .gov-clinic-login-link {
+    display: none;
+  }
+
+  .gov-clinic-logout-mobile {
+    display: block;
+  }
+
   .org-admin-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .employee-filters {
@@ -604,4 +511,23 @@
   .employee-card-info {
     text-align: left;
   }
-} 
+
+  .documents-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  .gov-clinic-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-stat-grid,
+  .employee-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .password-row {
+    grid-template-columns: 1fr;
+  }
+}
