@@ -1,5 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+
+const API_URL = (
+  import.meta.env.VITE_API_URL || "https://health-card.onrender.com"
+).replace(/\/$/, "");
 
 const DEPARTMENT_OPTIONS = [
   "Терапия",
@@ -54,9 +58,6 @@ const POSITION_OPTIONS = [
   "Заместитель главного врача",
 ];
 
-const initialDepartments = [];
-const initialEmployees = [];
-
 function generatePassword() {
   const a = Math.random().toString(36).slice(2, 6).toUpperCase();
   const b = Math.random().toString(36).slice(2, 6).toUpperCase();
@@ -67,9 +68,22 @@ export default function GovClinicSystemAdmin() {
   const [searchParams] = useSearchParams();
   const tab = searchParams.get("tab") || "dashboard";
 
-  const [departments, setDepartments] = useState(initialDepartments);
-  const [employees, setEmployees] = useState(initialEmployees);
+  const organizationUser = JSON.parse(
+    localStorage.getItem("organizationUser") || "null"
+  );
+
+  const organizationData = JSON.parse(
+    localStorage.getItem("organizationData") || "null"
+  );
+
+  const organizationId =
+    organizationUser?.organization_id || organizationData?.id || "";
+
+  const [departments, setDepartments] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
 
   const [departmentForm, setDepartmentForm] = useState({
     name: "",
@@ -95,8 +109,52 @@ export default function GovClinicSystemAdmin() {
     departmentId: "all",
   });
 
+  useEffect(() => {
+    if (!organizationId) return;
+
+    loadData();
+  }, [organizationId]);
+
+  async function loadData() {
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const [departmentsResponse, employeesResponse] = await Promise.all([
+        fetch(`${API_URL}/api/organization-structure/departments`, {
+          headers: {
+            "x-organization-id": organizationId,
+          },
+        }),
+        fetch(`${API_URL}/api/organization-structure/employees`, {
+          headers: {
+            "x-organization-id": organizationId,
+          },
+        }),
+      ]);
+
+      const departmentsResult = await departmentsResponse.json();
+      const employeesResult = await employeesResponse.json();
+
+      if (!departmentsResponse.ok) {
+        throw new Error(departmentsResult.message || "Ошибка отделений.");
+      }
+
+      if (!employeesResponse.ok) {
+        throw new Error(employeesResult.message || "Ошибка сотрудников.");
+      }
+
+      setDepartments(departmentsResult.departments || []);
+      setEmployees(employeesResult.employees || []);
+    } catch (error) {
+      setMessage(error.message || "Ошибка загрузки данных.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function getDepartmentName(id) {
-    return departments.find((dep) => dep.id === Number(id))?.name || "—";
+    return departments.find((dep) => String(dep.id) === String(id))?.name || "—";
   }
 
   const filteredEmployees = useMemo(() => {
@@ -104,15 +162,15 @@ export default function GovClinicSystemAdmin() {
       const search = filters.search.toLowerCase();
 
       const matchesSearch =
-        employee.fullName.toLowerCase().includes(search) ||
-        employee.phone.toLowerCase().includes(search) ||
-        employee.email.toLowerCase().includes(search) ||
-        employee.cabinet.toLowerCase().includes(search) ||
-        employee.position.toLowerCase().includes(search);
+        String(employee.full_name || "").toLowerCase().includes(search) ||
+        String(employee.phone || "").toLowerCase().includes(search) ||
+        String(employee.email || "").toLowerCase().includes(search) ||
+        String(employee.cabinet || "").toLowerCase().includes(search) ||
+        String(employee.position || "").toLowerCase().includes(search);
 
       const matchesDepartment =
         filters.departmentId === "all" ||
-        String(employee.departmentId) === String(filters.departmentId);
+        String(employee.department_id) === String(filters.departmentId);
 
       return matchesSearch && matchesDepartment;
     });
@@ -141,71 +199,143 @@ export default function GovClinicSystemAdmin() {
     setEmployeeForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  function addDepartment(e) {
+  async function addDepartment(e) {
     e.preventDefault();
+
+    if (!organizationId) {
+      setMessage("organizationId не найден. Перезайдите в аккаунт.");
+      return;
+    }
 
     if (!departmentForm.name || !departmentForm.floor || !departmentForm.rooms) {
+      setMessage("Заполните отделение, этаж и кабинеты.");
       return;
     }
 
-    const exists = departments.some(
-      (department) => department.name === departmentForm.name
-    );
+    setLoading(true);
+    setMessage("");
 
-    if (exists) {
-      alert("Это отделение уже добавлено.");
-      return;
+    try {
+      const response = await fetch(
+        `${API_URL}/api/organization-structure/departments`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-organization-id": organizationId,
+          },
+          body: JSON.stringify({
+            organizationId,
+            name: departmentForm.name,
+            floor: departmentForm.floor,
+            rooms: departmentForm.rooms,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Ошибка добавления отделения.");
+      }
+
+      setDepartments((prev) => [...prev, result.department]);
+
+      setDepartmentForm({
+        name: "",
+        floor: "",
+        rooms: "",
+      });
+
+      setMessage("Отделение сохранено.");
+    } catch (error) {
+      setMessage(error.message || "Ошибка добавления отделения.");
+    } finally {
+      setLoading(false);
     }
-
-    setDepartments((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        name: departmentForm.name,
-        floor: departmentForm.floor.trim(),
-        rooms: departmentForm.rooms.trim(),
-      },
-    ]);
-
-    setDepartmentForm({
-      name: "",
-      floor: "",
-      rooms: "",
-    });
   }
 
-  function addEmployee(e) {
+  async function addEmployee(e) {
     e.preventDefault();
+
+    if (!organizationId) {
+      setMessage("organizationId не найден. Перезайдите в аккаунт.");
+      return;
+    }
 
     if (
       !employeeForm.fullName.trim() ||
       !employeeForm.departmentId ||
       !employeeForm.position
     ) {
+      setMessage("Заполните ФИО, должность и отделение.");
       return;
     }
 
-    setEmployees((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        ...employeeForm,
-        departmentId: Number(employeeForm.departmentId),
-      },
-    ]);
+    setLoading(true);
+    setMessage("");
 
-    setEmployeeForm({
-      fullName: "",
-      age: "",
-      phone: "",
-      email: "",
-      position: "",
-      departmentId: "",
-      cabinet: "",
-      login: "",
-      tempPassword: "",
-      documents: [],
-    });
+    try {
+      const response = await fetch(
+        `${API_URL}/api/organization-structure/employees`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-organization-id": organizationId,
+          },
+          body: JSON.stringify({
+            organizationId,
+            city: organizationUser?.city || "",
+            bin: organizationUser?.bin || "",
+            ...employeeForm,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Ошибка добавления сотрудника.");
+      }
+
+      setEmployees((prev) => [...prev, result.employee]);
+
+      setEmployeeForm({
+        fullName: "",
+        age: "",
+        phone: "",
+        email: "",
+        position: "",
+        departmentId: "",
+        cabinet: "",
+        login: "",
+        tempPassword: "",
+        documents: [],
+      });
+
+      setMessage("Сотрудник сохранён.");
+    } catch (error) {
+      setMessage(error.message || "Ошибка добавления сотрудника.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function normalizeEmployee(employee) {
+    return {
+      id: employee.id,
+      fullName: employee.full_name || employee.fullName || "",
+      age: employee.age || "",
+      phone: employee.phone || "",
+      email: employee.email || "",
+      position: employee.position || "",
+      departmentId: employee.department_id || employee.departmentId || "",
+      cabinet: employee.cabinet || "",
+      login: employee.login || "",
+      tempPassword: employee.tempPassword || "",
+      documents: employee.documents || [],
+    };
   }
 
   return (
@@ -218,6 +348,9 @@ export default function GovClinicSystemAdmin() {
           </p>
         </div>
       </div>
+
+      {message ? <div className="admin-message">{message}</div> : null}
+      {loading ? <div className="admin-message">Загрузка...</div> : null}
 
       {tab === "dashboard" && (
         <div className="admin-stat-grid">
@@ -288,7 +421,9 @@ export default function GovClinicSystemAdmin() {
                 />
               </label>
 
-              <button type="submit">Добавить отделение</button>
+              <button type="submit" disabled={loading}>
+                Добавить отделение
+              </button>
             </form>
           </section>
 
@@ -299,7 +434,8 @@ export default function GovClinicSystemAdmin() {
               {departments.length ? (
                 departments.map((department) => {
                   const people = employees.filter(
-                    (employee) => employee.departmentId === department.id
+                    (employee) =>
+                      String(employee.department_id) === String(department.id)
                   );
 
                   return (
@@ -318,7 +454,7 @@ export default function GovClinicSystemAdmin() {
                       <div className="department-people">
                         {people.length ? (
                           people.map((person) => (
-                            <span key={person.id}>{person.fullName}</span>
+                            <span key={person.id}>{person.full_name}</span>
                           ))
                         ) : (
                           <em>Сотрудники пока не добавлены</em>
@@ -470,7 +606,9 @@ export default function GovClinicSystemAdmin() {
                 />
               </label>
 
-              <button type="submit">Добавить сотрудника</button>
+              <button type="submit" disabled={loading}>
+                Добавить сотрудника
+              </button>
             </form>
           </section>
 
@@ -511,26 +649,30 @@ export default function GovClinicSystemAdmin() {
 
             <div className="employee-card-list">
               {filteredEmployees.length ? (
-                filteredEmployees.map((employee) => (
-                  <div
-                    className="employee-card"
-                    key={employee.id}
-                    onDoubleClick={() => setSelectedEmployee(employee)}
-                  >
-                    <div>
-                      <h4>{employee.fullName}</h4>
-                      <p>{employee.position || "Должность не указана"}</p>
-                    </div>
+                filteredEmployees.map((employee) => {
+                  const item = normalizeEmployee(employee);
 
-                    <div className="employee-card-info">
-                      <span>Возраст: {employee.age || "—"}</span>
-                      <span>
-                        Отделение: {getDepartmentName(employee.departmentId)}
-                      </span>
-                      <span>Кабинет: {employee.cabinet || "—"}</span>
+                  return (
+                    <div
+                      className="employee-card"
+                      key={item.id}
+                      onDoubleClick={() => setSelectedEmployee(item)}
+                    >
+                      <div>
+                        <h4>{item.fullName}</h4>
+                        <p>{item.position || "Должность не указана"}</p>
+                      </div>
+
+                      <div className="employee-card-info">
+                        <span>Возраст: {item.age || "—"}</span>
+                        <span>
+                          Отделение: {getDepartmentName(item.departmentId)}
+                        </span>
+                        <span>Кабинет: {item.cabinet || "—"}</span>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <p className="empty-text">Сотрудники пока не добавлены.</p>
               )}

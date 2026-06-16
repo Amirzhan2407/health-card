@@ -497,3 +497,14 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+.admin-message {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(0, 184, 90, 0.1);
+  border: 1px solid rgba(0, 184, 90, 0.22);
+  color: #047857;
+  font-weight: 900;
+}
