@@ -132,8 +132,8 @@ if (passwordForm.newPassword !== passwordForm.repeatPassword) {
   return;
 }
 
-if (passwordForm.newPassword.length < 8) {
-  setError("Новый пароль должен быть минимум 8 символов.");
+if (passwordForm.newPassword.length < 6) {
+  setError("Новый пароль должен быть минимум 6 символов.");
   return;
 }
 

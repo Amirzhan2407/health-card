@@ -1,9 +1,7 @@
 import { useMemo, useState } from "react";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 
-const API_URL = (
-  import.meta.env.VITE_API_URL || "https://health-card.onrender.com"
-).replace(/\/$/, "");
+const API_URL = "https://health-card.onrender.com";
 
 const APPLICATION_TYPES = {
   NEW_ORGANIZATION: "new_organization",
