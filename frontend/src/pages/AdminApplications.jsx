@@ -21,8 +21,8 @@ const TYPE_LABELS = {
 };
 
 const CATEGORY_LABELS = {
-  state_polyclinic: "Гос. поликлиника",
-  state_hospital: "Гос. больница",
+  state_polyclinic: "Государственная поликлиника",
+  state_hospital: "Государственная больница",
   private_clinic: "Частная клиника",
   dentistry: "Стоматология",
   laboratory: "Медицинская лаборатория",
@@ -38,19 +38,43 @@ const STATUS_FILTERS = [
 ];
 
 function text(value) {
-  if (value === null || value === undefined || value === "") return "—";
-  if (typeof value === "object") return JSON.stringify(value);
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return "—";
+  }
+
+  if (typeof value === "object") {
+    return JSON.stringify(value);
+  }
+
   return String(value);
 }
 
 function formatDate(value) {
-  if (!value) return "—";
-  return new Date(value).toLocaleString("ru-RU");
+  if (!value) {
+    return "—";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return date.toLocaleString("ru-RU");
 }
 
 function parseAdmins(value) {
-  if (!value) return [];
-  if (Array.isArray(value)) return value;
+  if (!value) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value;
+  }
 
   try {
     const parsed = JSON.parse(value);
@@ -60,46 +84,187 @@ function parseAdmins(value) {
   }
 }
 
+function parseObject(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (
+    typeof value === "object" &&
+    !Array.isArray(value)
+  ) {
+    return value;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      !Array.isArray(parsed)
+    ) {
+      return parsed;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function canShowAccessBlocks(status) {
-  return ["approved", "waiting_first_login", "waiting_eds"].includes(status);
+  return [
+    "approved",
+    "waiting_first_login",
+    "waiting_eds",
+  ].includes(status);
 }
 
 function generateTempCode() {
-  const part1 = Math.random().toString(36).slice(2, 6).toUpperCase();
-  const part2 = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `${part1}-${part2}`;
+  const firstPart = Math.random()
+    .toString(36)
+    .slice(2, 6)
+    .toUpperCase();
+
+  const secondPart = Math.random()
+    .toString(36)
+    .slice(2, 6)
+    .toUpperCase();
+
+  return `${firstPart}-${secondPart}`;
+}
+
+function createEmptyAccessForms() {
+  return {
+    chief: {
+      fullName: "",
+      email: "",
+      login: "",
+      tempPassword: "",
+    },
+    admins: [],
+    hr: {
+      fullName: "",
+      email: "",
+      login: "",
+      tempPassword: "",
+    },
+  };
 }
 
 export default function AdminApplications() {
   const [applications, setApplications] = useState([]);
   const [selected, setSelected] = useState(null);
   const [details, setDetails] = useState(null);
-  const [activeStatus, setActiveStatus] = useState("all");
-  const [comment, setComment] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [detailsLoading, setDetailsLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [accessForms, setAccessForms] = useState({ chief: null, admins: [] });
-  const [accessMessage, setAccessMessage] = useState("");
 
-  async function loadApplications(status = activeStatus) {
+  const [activeStatus, setActiveStatus] =
+    useState("all");
+
+  const [comment, setComment] = useState("");
+
+  const [loading, setLoading] = useState(false);
+  const [detailsLoading, setDetailsLoading] =
+    useState(false);
+
+  const [actionLoading, setActionLoading] =
+    useState(false);
+
+  const [sendingAccess, setSendingAccess] =
+    useState("");
+
+  const [error, setError] = useState("");
+  const [accessMessage, setAccessMessage] =
+    useState("");
+
+  const [accessForms, setAccessForms] = useState(
+    createEmptyAccessForms()
+  );
+
+  async function loadApplications(
+    status = activeStatus
+  ) {
     setLoading(true);
     setError("");
 
     try {
-      const query = status !== "all" ? `?status=${status}` : "";
-      const result = await adminRequest(`/api/organization-applications${query}`);
-      setApplications(result.applications || []);
+      const query =
+        status !== "all"
+          ? `?status=${encodeURIComponent(status)}`
+          : "";
+
+      const result = await adminRequest(
+        `/api/organization-applications${query}`
+      );
+
+      setApplications(
+        Array.isArray(result?.applications)
+          ? result.applications
+          : Array.isArray(result)
+            ? result
+            : []
+      );
     } catch (err) {
       setApplications([]);
-      setError(err.message || "Не удалось загрузить заявления.");
+      setError(
+        err?.message ||
+          "Не удалось загрузить заявления."
+      );
     } finally {
       setLoading(false);
     }
   }
 
+  function getHrSpecialist(application) {
+    const parsedHr = parseObject(
+      application?.hr_specialist ||
+        application?.hrSpecialist
+    );
+
+    if (parsedHr) {
+      return {
+        full_name:
+          parsedHr.full_name ||
+          parsedHr.fullName ||
+          "",
+        phone: parsedHr.phone || "",
+        email: parsedHr.email || "",
+      };
+    }
+
+    const fullName =
+      application?.hr_full_name ||
+      application?.hr_specialist_full_name ||
+      "";
+
+    const phone =
+      application?.hr_phone ||
+      application?.hr_specialist_phone ||
+      "";
+
+    const email =
+      application?.hr_email ||
+      application?.hr_specialist_email ||
+      "";
+
+    if (!fullName && !phone && !email) {
+      return null;
+    }
+
+    return {
+      full_name: fullName,
+      phone,
+      email,
+    };
+  }
+
   function buildAccessForms(application) {
-    const admins = parseAdmins(application?.administrators || application?.admins);
+    const admins = parseAdmins(
+      application?.administrators ||
+        application?.admins
+    );
+
+    const hr = getHrSpecialist(application);
 
     return {
       chief: {
@@ -114,149 +279,328 @@ export default function AdminApplications() {
         login: "",
         tempPassword: "",
       },
+
       admins: admins.map((admin) => ({
-        fullName: admin.full_name || "",
-        email: admin.email || "",
+        fullName:
+          admin?.full_name ||
+          admin?.fullName ||
+          "",
+        email: admin?.email || "",
         login: "",
         tempPassword: "",
       })),
+
+      hr: {
+        fullName:
+          hr?.full_name ||
+          hr?.fullName ||
+          "",
+        email: hr?.email || "",
+        login: "",
+        tempPassword: "",
+      },
     };
   }
 
   async function openApplication(application) {
+    if (!application?.id) {
+      return;
+    }
+
     setSelected(application);
     setDetails(null);
-    setComment(application.review_comment || "");
+    setComment(application?.review_comment || "");
     setAccessMessage("");
-    setDetailsLoading(true);
     setError("");
+    setDetailsLoading(true);
 
     try {
       const result = await adminRequest(
         `/api/organization-applications/${application.id}`
       );
 
-      setDetails(result);
-      setComment(result.application?.review_comment || "");
-      setAccessForms(buildAccessForms(result.application));
+      const loadedApplication =
+        result?.application || application;
+
+      setDetails({
+        application: loadedApplication,
+        documents: Array.isArray(result?.documents)
+          ? result.documents
+          : [],
+        history: Array.isArray(result?.history)
+          ? result.history
+          : [],
+      });
+
+      setSelected(loadedApplication);
+
+      setComment(
+        loadedApplication?.review_comment || ""
+      );
+
+      setAccessForms(
+        buildAccessForms(loadedApplication)
+      );
     } catch (err) {
       setDetails({
         application,
         documents: [],
         history: [],
       });
-      setAccessForms(buildAccessForms(application));
-      setError(err.message || "Не удалось открыть заявку.");
+
+      setAccessForms(
+        buildAccessForms(application)
+      );
+
+      setError(
+        err?.message ||
+          "Не удалось открыть заявку."
+      );
     } finally {
       setDetailsLoading(false);
     }
   }
 
   async function changeStatus(status) {
-    const id = details?.application?.id || selected?.id;
+    const currentApplication =
+      details?.application || selected;
 
-    if (!id) return;
+    const id = currentApplication?.id;
 
-    if (status === "rejected" && !comment.trim()) {
-      setError("При отклонении заявки нужно указать причину.");
+    if (!id || actionLoading) {
       return;
     }
 
+    if (
+      status === "rejected" &&
+      !comment.trim()
+    ) {
+      setError(
+        "При отклонении заявки нужно указать причину."
+      );
+      return;
+    }
+
+    setActionLoading(true);
     setError("");
     setAccessMessage("");
 
     try {
-      await adminRequest(`/api/organization-applications/${id}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          status,
-          comment,
-          reviewComment: comment,
-        }),
-      });
+      await adminRequest(
+        `/api/organization-applications/${id}/status`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            status,
+            comment: comment.trim(),
+            reviewComment: comment.trim(),
+          }),
+        }
+      );
+
+      const updatedApplication = {
+        ...currentApplication,
+        status,
+        review_comment: comment.trim(),
+      };
+
+      setSelected(updatedApplication);
+
+      setDetails((previous) => ({
+        application: updatedApplication,
+        documents: previous?.documents || [],
+        history: previous?.history || [],
+      }));
+
+      setApplications((previous) =>
+        previous.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                status,
+                review_comment: comment.trim(),
+              }
+            : item
+        )
+      );
+
+      if (status === "waiting_first_login") {
+        setAccessMessage(
+          "Заявка одобрена. Теперь создайте и отправьте доступы главному врачу, администраторам и сотруднику отдела кадров."
+        );
+      } else if (status === "in_progress") {
+        setAccessMessage(
+          "Заявка переведена в процесс."
+        );
+      } else if (status === "rejected") {
+        setAccessMessage("Заявка отклонена.");
+      }
 
       await loadApplications(activeStatus);
-
-      await openApplication({
-        ...(details?.application || selected),
-        status,
-        review_comment: comment,
-      });
     } catch (err) {
-      setError(err.message || "Не удалось изменить статус.");
+      setError(
+        err?.message ||
+          "Не удалось изменить статус заявки."
+      );
+    } finally {
+      setActionLoading(false);
     }
   }
 
   function changeFilter(status) {
     setActiveStatus(status);
+    setSelected(null);
+    setDetails(null);
+    setComment("");
+    setError("");
+    setAccessMessage("");
+    setAccessForms(createEmptyAccessForms());
     loadApplications(status);
   }
 
   function updateChiefAccess(field, value) {
-    setAccessForms((prev) => ({
-      ...prev,
+    setAccessForms((previous) => ({
+      ...previous,
       chief: {
-        ...prev.chief,
+        ...previous.chief,
         [field]: value,
       },
     }));
   }
 
-  function updateAdminAccess(index, field, value) {
-    setAccessForms((prev) => ({
-      ...prev,
-      admins: prev.admins.map((admin, adminIndex) =>
-        adminIndex === index ? { ...admin, [field]: value } : admin
+  function updateAdminAccess(
+    index,
+    field,
+    value
+  ) {
+    setAccessForms((previous) => ({
+      ...previous,
+      admins: previous.admins.map(
+        (admin, adminIndex) =>
+          adminIndex === index
+            ? {
+                ...admin,
+                [field]: value,
+              }
+            : admin
       ),
     }));
   }
 
+  function updateHrAccess(field, value) {
+    setAccessForms((previous) => ({
+      ...previous,
+      hr: {
+        ...previous.hr,
+        [field]: value,
+      },
+    }));
+  }
+
   async function sendAccess(role, index = null) {
-    const application = details?.application || selected;
+    const currentApplication =
+      details?.application || selected;
 
-    if (!application?.id) return;
-
-    const access =
-      role === "chief" ? accessForms.chief : accessForms.admins[index];
-
-    if (!access?.email) {
-      setError("Email для отправки доступа не указан.");
+    if (!currentApplication?.id) {
+      setError("Не удалось определить заявку.");
       return;
     }
 
-    if (!access?.login.trim()) {
+    let access = null;
+    let loadingKey = role;
+
+    if (role === "chief") {
+      access = accessForms.chief;
+      loadingKey = "chief";
+    }
+
+    if (role === "admin") {
+      access = accessForms.admins[index];
+      loadingKey = `admin-${index}`;
+    }
+
+    if (role === "hr") {
+      access = accessForms.hr;
+      loadingKey = "hr";
+    }
+
+    if (!access) {
+      setError(
+        "Данные пользователя для доступа не найдены."
+      );
+      return;
+    }
+
+    if (!access.fullName?.trim()) {
+      setError("ФИО пользователя не указано.");
+      return;
+    }
+
+    if (!access.email?.trim()) {
+      setError(
+        "Почта для отправки доступа не указана."
+      );
+      return;
+    }
+
+    if (!access.login?.trim()) {
       setError("Укажите логин.");
       return;
     }
 
-    if (!access?.tempPassword.trim()) {
+    if (!access.tempPassword?.trim()) {
       setError("Укажите одноразовый пароль.");
       return;
     }
 
+    setSendingAccess(loadingKey);
     setError("");
     setAccessMessage("");
 
     try {
-      await adminRequest(`/api/organization-applications/${application.id}/send-access`, {
-        method: "POST",
-        body: JSON.stringify({
-          role,
-          index,
-          fullName: access.fullName,
-          email: access.email,
-          login: access.login,
-          tempPassword: access.tempPassword,
-        }),
-      });
-
-      setAccessMessage(
-        role === "chief"
-          ? "Доступ главного врача отправлен."
-          : `Доступ администратора #${index + 1} отправлен.`
+      await adminRequest(
+        `/api/organization-applications/${currentApplication.id}/send-access`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            role,
+            index:
+              role === "admin" ? index : null,
+            fullName: access.fullName.trim(),
+            email: access.email
+              .trim()
+              .toLowerCase(),
+            login: access.login.trim(),
+            tempPassword:
+              access.tempPassword.trim(),
+          }),
+        }
       );
+
+      if (role === "chief") {
+        setAccessMessage(
+          "Логин и одноразовый пароль главного врача отправлены."
+        );
+      }
+
+      if (role === "admin") {
+        setAccessMessage(
+          `Логин и одноразовый пароль администратора #${index + 1} отправлены.`
+        );
+      }
+
+      if (role === "hr") {
+        setAccessMessage(
+          "Логин и одноразовый пароль сотрудника отдела кадров отправлены."
+        );
+      }
     } catch (err) {
-      setError(err.message || "Не удалось отправить доступ.");
+      setError(
+        err?.message ||
+          "Не удалось отправить доступ."
+      );
+    } finally {
+      setSendingAccess("");
     }
   }
 
@@ -264,25 +608,44 @@ export default function AdminApplications() {
     loadApplications("all");
   }, []);
 
-  const application = details?.application || selected;
+  const application =
+    details?.application || selected;
 
   const administrators = parseAdmins(
-    application?.administrators || application?.admins
+    application?.administrators ||
+      application?.admins
   );
 
-  const showAccessBlocks = canShowAccessBlocks(application?.status);
+  const hrSpecialist =
+    getHrSpecialist(application);
+
+  const showAccessBlocks =
+    canShowAccessBlocks(application?.status);
+
+  const isNewOrganization =
+    application?.application_type ===
+    "new_organization";
 
   return (
     <main className="adminContentPage">
       <section className="adminPageHead">
         <div>
           <h1>Заявления организаций</h1>
+
           <p>
-            Проверка заявок, создание доступов главного врача и администраторов.
+            Проверка заявок и создание доступов для
+            главного врача, администраторов организации
+            и отдела кадров.
           </p>
         </div>
 
-        <button type="button" onClick={() => loadApplications(activeStatus)}>
+        <button
+          type="button"
+          onClick={() =>
+            loadApplications(activeStatus)
+          }
+          disabled={loading}
+        >
           {loading ? "Загрузка..." : "Обновить"}
         </button>
       </section>
@@ -292,7 +655,11 @@ export default function AdminApplications() {
           <button
             key={value}
             type="button"
-            className={activeStatus === value ? "active" : ""}
+            className={
+              activeStatus === value
+                ? "active"
+                : ""
+            }
             onClick={() => changeFilter(value)}
           >
             {label}
@@ -300,8 +667,15 @@ export default function AdminApplications() {
         ))}
       </section>
 
-      {error ? <div className="adminError">{error}</div> : null}
-      {accessMessage ? <div className="adminSuccess">{accessMessage}</div> : null}
+      {error ? (
+        <div className="adminError">{error}</div>
+      ) : null}
+
+      {accessMessage ? (
+        <div className="adminSuccess">
+          {accessMessage}
+        </div>
+      ) : null}
 
       <section className="adminWorkGrid">
         <div className="adminCard">
@@ -322,42 +696,75 @@ export default function AdminApplications() {
             </div>
 
             {loading ? (
-              <div className="emptyRow">Загрузка...</div>
+              <div className="emptyRow">
+                Загрузка...
+              </div>
             ) : applications.length === 0 ? (
-              <div className="emptyRow">Заявок пока нет</div>
+              <div className="emptyRow">
+                Заявок пока нет
+              </div>
             ) : (
               applications.map((item) => (
-                <div className="adminRow" key={item.id}>
+                <div
+                  className="adminRow"
+                  key={item.id}
+                >
                   <span>
-                    <b>{text(item.application_number)}</b>
-                    <small>{formatDate(item.created_at)}</small>
+                    <b>
+                      {text(
+                        item.application_number
+                      )}
+                    </b>
+
+                    <small>
+                      {formatDate(item.created_at)}
+                    </small>
                   </span>
 
-                  <span>{text(item.organization_name)}</span>
+                  <span>
+                    {text(item.organization_name)}
+                  </span>
 
                   <span>
-                    {TYPE_LABELS[item.application_type] ||
-                      text(item.application_type)}
+                    {TYPE_LABELS[
+                      item.application_type
+                    ] ||
+                      text(
+                        item.application_type
+                      )}
                   </span>
 
                   <span>
                     {item.organization_type_label ||
-                      CATEGORY_LABELS[item.organization_type] ||
-                      text(item.organization_type)}
+                      CATEGORY_LABELS[
+                        item.organization_type
+                      ] ||
+                      text(
+                        item.organization_type
+                      )}
                   </span>
 
                   <span>{text(item.bin)}</span>
 
                   <span>
-                    <b className={`pill ${item.status || ""}`}>
-                      {STATUS_LABELS[item.status] || text(item.status)}
+                    <b
+                      className={`pill ${
+                        item.status || ""
+                      }`}
+                    >
+                      {STATUS_LABELS[
+                        item.status
+                      ] || text(item.status)}
                     </b>
                   </span>
 
                   <span>
                     <button
+                      type="button"
                       className="miniBtn"
-                      onClick={() => openApplication(item)}
+                      onClick={() =>
+                        openApplication(item)
+                      }
                     >
                       Открыть
                     </button>
@@ -372,23 +779,44 @@ export default function AdminApplications() {
           {!application ? (
             <div className="emptyDetails">
               <h2>Заявка не выбрана</h2>
-              <p>Сначала нажмите “Открыть” у заявки.</p>
+
+              <p>
+                Нажмите «Открыть» возле нужной
+                заявки.
+              </p>
             </div>
           ) : detailsLoading ? (
-            <div className="emptyDetails">Загрузка карточки...</div>
+            <div className="emptyDetails">
+              Загрузка карточки...
+            </div>
           ) : (
             <>
               <div className="detailsTop">
                 <div>
-                  <h2>{text(application.application_number)}</h2>
+                  <h2>
+                    {text(
+                      application.application_number
+                    )}
+                  </h2>
+
                   <p>
-                    {TYPE_LABELS[application.application_type] ||
-                      text(application.application_type)}
+                    {TYPE_LABELS[
+                      application.application_type
+                    ] ||
+                      text(
+                        application.application_type
+                      )}
                   </p>
                 </div>
 
-                <b className={`pill ${application.status || ""}`}>
-                  {STATUS_LABELS[application.status] || text(application.status)}
+                <b
+                  className={`pill ${
+                    application.status || ""
+                  }`}
+                >
+                  {STATUS_LABELS[
+                    application.status
+                  ] || text(application.status)}
                 </b>
               </div>
 
@@ -398,36 +826,58 @@ export default function AdminApplications() {
                 <div className="infoGrid">
                   <div>
                     <span>Название</span>
-                    <b>{text(application.organization_name)}</b>
+                    <b>
+                      {text(
+                        application.organization_name
+                      )}
+                    </b>
                   </div>
 
                   <div>
                     <span>Категория</span>
                     <b>
                       {application.organization_type_label ||
-                        CATEGORY_LABELS[application.organization_type] ||
-                        text(application.organization_type)}
+                        CATEGORY_LABELS[
+                          application
+                            .organization_type
+                        ] ||
+                        text(
+                          application.organization_type
+                        )}
                     </b>
                   </div>
 
                   <div>
                     <span>БИН</span>
-                    <b>{text(application.bin)}</b>
+                    <b>
+                      {text(application.bin)}
+                    </b>
                   </div>
 
                   <div>
                     <span>Город</span>
-                    <b>{text(application.city)}</b>
+                    <b>
+                      {text(application.city)}
+                    </b>
                   </div>
 
                   <div>
                     <span>Адрес</span>
-                    <b>{text(application.address)}</b>
+                    <b>
+                      {text(application.address)}
+                    </b>
                   </div>
 
                   <div>
-                    <span>Корпоративная почта</span>
-                    <b>{text(application.organization_email)}</b>
+                    <span>
+                      Корпоративная почта
+                    </span>
+
+                    <b>
+                      {text(
+                        application.organization_email
+                      )}
+                    </b>
                   </div>
                 </div>
               </div>
@@ -438,6 +888,7 @@ export default function AdminApplications() {
                 <div className="infoGrid">
                   <div>
                     <span>ФИО</span>
+
                     <b>
                       {text(
                         application.new_chief_doctor_full_name ||
@@ -448,6 +899,7 @@ export default function AdminApplications() {
 
                   <div>
                     <span>Телефон</span>
+
                     <b>
                       {text(
                         application.new_chief_doctor_phone ||
@@ -457,7 +909,10 @@ export default function AdminApplications() {
                   </div>
 
                   <div>
-                    <span>Почта главного врача</span>
+                    <span>
+                      Почта главного врача
+                    </span>
+
                     <b>
                       {text(
                         application.new_chief_doctor_email ||
@@ -473,88 +928,188 @@ export default function AdminApplications() {
 
                 {administrators.length > 0 ? (
                   <div className="adminUsersList">
-                    {administrators.map((admin, index) => (
-                      <div className="adminUserBox" key={index}>
-                        <h4>Администратор #{index + 1}</h4>
+                    {administrators.map(
+                      (admin, index) => (
+                        <div
+                          className="adminUserBox"
+                          key={`admin-${index}`}
+                        >
+                          <h4>
+                            Администратор #
+                            {index + 1}
+                          </h4>
 
-                        <div className="infoGrid">
-                          <div>
-                            <span>ФИО</span>
-                            <b>{text(admin.full_name)}</b>
-                          </div>
+                          <div className="infoGrid">
+                            <div>
+                              <span>ФИО</span>
+                              <b>
+                                {text(
+                                  admin.full_name ||
+                                    admin.fullName
+                                )}
+                              </b>
+                            </div>
 
-                          <div>
-                            <span>Телефон</span>
-                            <b>{text(admin.phone)}</b>
-                          </div>
+                            <div>
+                              <span>Телефон</span>
+                              <b>
+                                {text(admin.phone)}
+                              </b>
+                            </div>
 
-                          <div>
-                            <span>Почта администратора</span>
-                            <b>{text(admin.email)}</b>
+                            <div>
+                              <span>
+                                Почта администратора
+                              </span>
+
+                              <b>
+                                {text(admin.email)}
+                              </b>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    )}
                   </div>
                 ) : (
                   <p className="muted">
-                    Администраторы не указаны или старый формат заявки.
+                    Администраторы не указаны.
+                  </p>
+                )}
+              </div>
+
+              {isNewOrganization && (
+                <div className="section">
+                  <h3>Отдел кадров</h3>
+
+                  {hrSpecialist ? (
+                    <div className="adminUserBox">
+                      <h4>
+                        Ответственный сотрудник
+                        отдела кадров
+                      </h4>
+
+                      <div className="infoGrid">
+                        <div>
+                          <span>ФИО</span>
+                          <b>
+                            {text(
+                              hrSpecialist.full_name
+                            )}
+                          </b>
+                        </div>
+
+                        <div>
+                          <span>Телефон</span>
+                          <b>
+                            {text(
+                              hrSpecialist.phone
+                            )}
+                          </b>
+                        </div>
+
+                        <div>
+                          <span>Почта</span>
+                          <b>
+                            {text(
+                              hrSpecialist.email
+                            )}
+                          </b>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="muted">
+                      Сотрудник отдела кадров не
+                      указан.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="section">
+                <h3>Документы</h3>
+
+                {details?.documents?.length >
+                0 ? (
+                  <div className="docList">
+                    {details.documents.map(
+                      (document, index) => (
+                        <a
+                          key={
+                            document.id ||
+                            document.file_url ||
+                            index
+                          }
+                          href={
+                            document.file_url ||
+                            document.url
+                          }
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {text(
+                            document.document_name ||
+                              document.document_type ||
+                              document.file_name ||
+                              "Документ"
+                          )}
+                        </a>
+                      )
+                    )}
+                  </div>
+                ) : (
+                  <p className="muted">
+                    Документы не найдены.
                   </p>
                 )}
               </div>
 
               <div className="section">
-                <h3>Документы</h3>
-
-                {details?.documents?.length ? (
-                  <div className="docList">
-                    {details.documents.map((doc) => (
-                      <a
-                        key={doc.id || doc.file_url}
-                        href={doc.file_url}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {text(
-                          doc.document_name ||
-                            doc.document_type ||
-                            "Документ"
-                        )}
-                      </a>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="muted">Документы не найдены.</p>
-                )}
-              </div>
-
-              <div className="section">
-                <h3>Решение техподдержки</h3>
+                <h3>
+                  Решение технической поддержки
+                </h3>
 
                 <textarea
                   value={comment}
-                  onChange={(e) => setComment(e.target.value)}
+                  onChange={(event) =>
+                    setComment(event.target.value)
+                  }
                   placeholder="Комментарий для организации"
                 />
 
                 <div className="actions">
                   <button
+                    type="button"
                     className="process"
-                    onClick={() => changeStatus("in_progress")}
+                    disabled={actionLoading}
+                    onClick={() =>
+                      changeStatus("in_progress")
+                    }
                   >
                     В процесс
                   </button>
 
                   <button
+                    type="button"
                     className="approve"
-                    onClick={() => changeStatus("waiting_first_login")}
+                    disabled={actionLoading}
+                    onClick={() =>
+                      changeStatus(
+                        "waiting_first_login"
+                      )
+                    }
                   >
                     Одобрить заявку
                   </button>
 
                   <button
+                    type="button"
                     className="reject"
-                    onClick={() => changeStatus("rejected")}
+                    disabled={actionLoading}
+                    onClick={() =>
+                      changeStatus("rejected")
+                    }
                   >
                     Отклонить
                   </button>
@@ -563,87 +1118,69 @@ export default function AdminApplications() {
 
               {showAccessBlocks && (
                 <div className="section accessSection">
-                  <h3>Доступы организации</h3>
+                  <h3>
+                    Доступы сотрудников организации
+                  </h3>
 
-                  <div className="accessBox">
-                    <h4>Доступ главного врача</h4>
+                  <p className="muted">
+                    Для каждого пользователя укажите
+                    логин и одноразовый пароль. После
+                    первого входа пользователь должен
+                    установить новый пароль.
+                  </p>
 
-                    <div className="infoGrid">
-                      <div>
-                        <span>Имя главного врача</span>
-                        <b>{text(accessForms.chief?.fullName)}</b>
-                      </div>
-
-                      <div>
-                        <span>Почта</span>
-                        <b>{text(accessForms.chief?.email)}</b>
-                      </div>
-                    </div>
-
-                    <div className="accessFormGrid">
-                      <input
-                        value={accessForms.chief?.login || ""}
-                        onChange={(e) => updateChiefAccess("login", e.target.value)}
-                        placeholder="Логин"
-                      />
-
-                      <input
-                        value={accessForms.chief?.tempPassword || ""}
-                        onChange={(e) =>
-                          updateChiefAccess("tempPassword", e.target.value)
-                        }
-                        placeholder="Одноразовый пароль"
-                      />
-
-                      <button
-                        type="button"
-                        className="miniBtn"
-                        onClick={() =>
-                          updateChiefAccess("tempPassword", generateTempCode())
-                        }
-                      >
-                        Сгенерировать
-                      </button>
-
-                      <button
-                        type="button"
-                        className="approve"
-                        onClick={() => sendAccess("chief")}
-                      >
-                        Отправить
-                      </button>
-                    </div>
-                  </div>
-
-                  {accessForms.admins.map((admin, index) => (
-                    <div className="accessBox" key={index}>
-                      <h4>Доступ администратора #{index + 1}</h4>
+                  {accessForms.chief?.email ? (
+                    <div className="accessBox">
+                      <h4>
+                        Доступ главного врача
+                      </h4>
 
                       <div className="infoGrid">
                         <div>
-                          <span>Имя администратора</span>
-                          <b>{text(admin.fullName)}</b>
+                          <span>ФИО</span>
+                          <b>
+                            {text(
+                              accessForms.chief
+                                .fullName
+                            )}
+                          </b>
                         </div>
 
                         <div>
                           <span>Почта</span>
-                          <b>{text(admin.email)}</b>
+                          <b>
+                            {text(
+                              accessForms.chief.email
+                            )}
+                          </b>
                         </div>
                       </div>
 
                       <div className="accessFormGrid">
                         <input
-                          value={admin.login}
-                          onChange={(e) =>
-                            updateAdminAccess(index, "login", e.target.value)
+                          value={
+                            accessForms.chief
+                              .login
                           }
-                          placeholder="Логин"
+                          onChange={(event) =>
+                            updateChiefAccess(
+                              "login",
+                              event.target.value
+                            )
+                          }
+                          placeholder="Логин главного врача"
                         />
 
                         <input
-                          value={admin.tempPassword}
-                          onChange={(e) =>
-                            updateAdminAccess(index, "tempPassword", e.target.value)
+                          value={
+                            accessForms.chief
+                              .tempPassword
+                          }
+                          onChange={(event) =>
+                            updateChiefAccess(
+                              "tempPassword",
+                              event.target.value
+                            )
                           }
                           placeholder="Одноразовый пароль"
                         />
@@ -652,7 +1189,10 @@ export default function AdminApplications() {
                           type="button"
                           className="miniBtn"
                           onClick={() =>
-                            updateAdminAccess(index, "tempPassword", generateTempCode())
+                            updateChiefAccess(
+                              "tempPassword",
+                              generateTempCode()
+                            )
                           }
                         >
                           Сгенерировать
@@ -661,13 +1201,204 @@ export default function AdminApplications() {
                         <button
                           type="button"
                           className="approve"
-                          onClick={() => sendAccess("admin", index)}
+                          disabled={
+                            sendingAccess ===
+                            "chief"
+                          }
+                          onClick={() =>
+                            sendAccess("chief")
+                          }
                         >
-                          Отправить
+                          {sendingAccess ===
+                          "chief"
+                            ? "Отправка..."
+                            : "Отправить"}
                         </button>
                       </div>
                     </div>
-                  ))}
+                  ) : null}
+
+                  {accessForms.admins.map(
+                    (admin, index) => (
+                      <div
+                        className="accessBox"
+                        key={`access-admin-${index}`}
+                      >
+                        <h4>
+                          Доступ администратора #
+                          {index + 1}
+                        </h4>
+
+                        <div className="infoGrid">
+                          <div>
+                            <span>ФИО</span>
+                            <b>
+                              {text(
+                                admin.fullName
+                              )}
+                            </b>
+                          </div>
+
+                          <div>
+                            <span>Почта</span>
+                            <b>
+                              {text(admin.email)}
+                            </b>
+                          </div>
+                        </div>
+
+                        <div className="accessFormGrid">
+                          <input
+                            value={admin.login}
+                            onChange={(event) =>
+                              updateAdminAccess(
+                                index,
+                                "login",
+                                event.target.value
+                              )
+                            }
+                            placeholder={`Логин администратора #${index + 1}`}
+                          />
+
+                          <input
+                            value={
+                              admin.tempPassword
+                            }
+                            onChange={(event) =>
+                              updateAdminAccess(
+                                index,
+                                "tempPassword",
+                                event.target.value
+                              )
+                            }
+                            placeholder="Одноразовый пароль"
+                          />
+
+                          <button
+                            type="button"
+                            className="miniBtn"
+                            onClick={() =>
+                              updateAdminAccess(
+                                index,
+                                "tempPassword",
+                                generateTempCode()
+                              )
+                            }
+                          >
+                            Сгенерировать
+                          </button>
+
+                          <button
+                            type="button"
+                            className="approve"
+                            disabled={
+                              sendingAccess ===
+                              `admin-${index}`
+                            }
+                            onClick={() =>
+                              sendAccess(
+                                "admin",
+                                index
+                              )
+                            }
+                          >
+                            {sendingAccess ===
+                            `admin-${index}`
+                              ? "Отправка..."
+                              : "Отправить"}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  )}
+
+                  {isNewOrganization &&
+                  accessForms.hr?.email ? (
+                    <div className="accessBox">
+                      <h4>
+                        Доступ сотрудника отдела
+                        кадров
+                      </h4>
+
+                      <div className="infoGrid">
+                        <div>
+                          <span>ФИО</span>
+                          <b>
+                            {text(
+                              accessForms.hr
+                                .fullName
+                            )}
+                          </b>
+                        </div>
+
+                        <div>
+                          <span>Почта</span>
+                          <b>
+                            {text(
+                              accessForms.hr.email
+                            )}
+                          </b>
+                        </div>
+                      </div>
+
+                      <div className="accessFormGrid">
+                        <input
+                          value={
+                            accessForms.hr.login
+                          }
+                          onChange={(event) =>
+                            updateHrAccess(
+                              "login",
+                              event.target.value
+                            )
+                          }
+                          placeholder="Логин отдела кадров"
+                        />
+
+                        <input
+                          value={
+                            accessForms.hr
+                              .tempPassword
+                          }
+                          onChange={(event) =>
+                            updateHrAccess(
+                              "tempPassword",
+                              event.target.value
+                            )
+                          }
+                          placeholder="Одноразовый пароль"
+                        />
+
+                        <button
+                          type="button"
+                          className="miniBtn"
+                          onClick={() =>
+                            updateHrAccess(
+                              "tempPassword",
+                              generateTempCode()
+                            )
+                          }
+                        >
+                          Сгенерировать
+                        </button>
+
+                        <button
+                          type="button"
+                          className="approve"
+                          disabled={
+                            sendingAccess === "hr"
+                          }
+                          onClick={() =>
+                            sendAccess("hr")
+                          }
+                        >
+                          {sendingAccess === "hr"
+                            ? "Отправка..."
+                            : "Отправить"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </>

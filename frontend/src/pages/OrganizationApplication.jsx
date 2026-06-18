@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 
-const API_URL =
-  import.meta.env.VITE_API_URL || "https://health-card.onrender.com";
+const API_URL = (
+  import.meta.env.VITE_API_URL || "https://health-card.onrender.com"
+).replace(/\/$/, "");
 
 const APPLICATION_TYPES = {
   NEW_ORGANIZATION: "new_organization",
@@ -24,15 +25,27 @@ function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
-function FileField({ label, name, required, multiple, files, onChange }) {
+function FileField({
+  label,
+  name,
+  required = false,
+  multiple = false,
+  files,
+  onChange,
+}) {
   const selectedFiles = files?.[name];
 
   const fileNames = useMemo(() => {
     if (!selectedFiles) return [];
+
     if (selectedFiles instanceof FileList) {
       return Array.from(selectedFiles).map((file) => file.name);
     }
-    if (selectedFiles instanceof File) return [selectedFiles.name];
+
+    if (selectedFiles instanceof File) {
+      return [selectedFiles.name];
+    }
+
     return [];
   }, [selectedFiles]);
 
@@ -46,6 +59,7 @@ function FileField({ label, name, required, multiple, files, onChange }) {
       <div className="org-file-control">
         <label className="org-file-button">
           {multiple ? "Выбрать файлы" : "Выберите файл"}
+
           <input
             type="file"
             name={name}
@@ -59,8 +73,8 @@ function FileField({ label, name, required, multiple, files, onChange }) {
           {fileNames.length > 0
             ? fileNames.join(", ")
             : multiple
-            ? "Файлы не выбраны"
-            : "Файл не выбран"}
+              ? "Файлы не выбраны"
+              : "Файл не выбран"}
         </div>
       </div>
     </div>
@@ -100,6 +114,12 @@ export default function OrganizationApplication() {
     },
   ]);
 
+  const [hrSpecialist, setHrSpecialist] = useState({
+    full_name: "",
+    phone: "",
+    email: "",
+  });
+
   const [files, setFiles] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedApplication, setSubmittedApplication] = useState(null);
@@ -116,15 +136,31 @@ export default function OrganizationApplication() {
 
   function updateField(event) {
     const { name, value } = event.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   }
 
   function updateAdmin(index, field, value) {
     setAdmins((prev) =>
       prev.map((admin, adminIndex) =>
-        adminIndex === index ? { ...admin, [field]: value } : admin
+        adminIndex === index
+          ? {
+              ...admin,
+              [field]: value,
+            }
+          : admin
       )
     );
+  }
+
+  function updateHrSpecialist(field, value) {
+    setHrSpecialist((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
   }
 
   function addAdmin() {
@@ -133,18 +169,36 @@ export default function OrganizationApplication() {
       return;
     }
 
-    setAdmins((prev) => [...prev, { full_name: "", phone: "", email: "" }]);
+    setError("");
+
+    setAdmins((prev) => [
+      ...prev,
+      {
+        full_name: "",
+        phone: "",
+        email: "",
+      },
+    ]);
   }
 
   function removeAdmin(index) {
-    setAdmins((prev) => prev.filter((_, adminIndex) => adminIndex !== index));
+    setAdmins((prev) =>
+      prev.filter((_, adminIndex) => adminIndex !== index)
+    );
   }
 
   function updateFile(event) {
-    const { name, files: inputFiles, multiple } = event.target;
+    const {
+      name,
+      files: inputFiles,
+      multiple,
+    } = event.target;
+
     setFiles((prev) => ({
       ...prev,
-      [name]: multiple ? inputFiles : inputFiles?.[0] || null,
+      [name]: multiple
+        ? inputFiles
+        : inputFiles?.[0] || null,
     }));
   }
 
@@ -171,43 +225,85 @@ export default function OrganizationApplication() {
       comment: "",
     });
 
-    setAdmins([{ full_name: "", phone: "", email: "" }]);
+    setAdmins([
+      {
+        full_name: "",
+        phone: "",
+        email: "",
+      },
+    ]);
+
+    setHrSpecialist({
+      full_name: "",
+      phone: "",
+      email: "",
+    });
+
     setFiles({});
     setSubmittedApplication(null);
     setError("");
   }
 
   function validateEmails() {
-    const organizationEmail = normalizeEmail(form.organization_email);
-
-    const chiefEmail = normalizeEmail(
-      isNewOrganization ? form.chief_doctor_email : form.new_chief_doctor_email
+    const organizationEmail = normalizeEmail(
+      form.organization_email
     );
 
-    const adminEmails = admins.map((admin) => normalizeEmail(admin.email));
+    const chiefEmail = normalizeEmail(
+      isNewOrganization
+        ? form.chief_doctor_email
+        : form.new_chief_doctor_email
+    );
+
+    const adminEmails = admins.map((admin) =>
+      normalizeEmail(admin.email)
+    );
+
+    const hrEmail = normalizeEmail(hrSpecialist.email);
 
     if (!organizationEmail) {
       return "Укажите корпоративную почту организации.";
     }
 
-    if ((isNewOrganization || isChiefDoctorChange) && !chiefEmail) {
+    if (
+      (isNewOrganization || isChiefDoctorChange) &&
+      !chiefEmail
+    ) {
       return "Укажите почту главного врача.";
     }
 
-    if ((isNewOrganization || isAdministratorChange) && adminEmails.some((email) => !email)) {
+    if (
+      (isNewOrganization || isAdministratorChange) &&
+      adminEmails.some((email) => !email)
+    ) {
       return "У каждого администратора должна быть своя почта.";
+    }
+
+    if (isNewOrganization) {
+      if (!hrSpecialist.full_name.trim()) {
+        return "Укажите ФИО сотрудника отдела кадров.";
+      }
+
+      if (!hrSpecialist.phone.trim()) {
+        return "Укажите телефон сотрудника отдела кадров.";
+      }
+
+      if (!hrEmail) {
+        return "Укажите почту сотрудника отдела кадров.";
+      }
     }
 
     const allEmails = [
       organizationEmail,
       ...(chiefEmail ? [chiefEmail] : []),
       ...adminEmails.filter(Boolean),
+      ...(isNewOrganization && hrEmail ? [hrEmail] : []),
     ];
 
     const uniqueEmails = new Set(allEmails);
 
     if (uniqueEmails.size !== allEmails.length) {
-      return "Почты не должны повторяться: корпоративная почта, почта главного врача и почты администраторов должны быть разными.";
+      return "Почты не должны повторяться: корпоративная почта, почта главного врача, почты администраторов и почта отдела кадров должны быть разными.";
     }
 
     return "";
@@ -230,26 +326,57 @@ export default function OrganizationApplication() {
       const formData = new FormData();
 
       formData.append("application_type", applicationType);
-      formData.append("administrators", JSON.stringify(admins));
+
+      formData.append(
+        "administrators",
+        JSON.stringify(
+          admins.map((admin) => ({
+            full_name: admin.full_name.trim(),
+            phone: admin.phone.trim(),
+            email: normalizeEmail(admin.email),
+          }))
+        )
+      );
+
+      if (isNewOrganization) {
+        formData.append(
+          "hr_specialist",
+          JSON.stringify({
+            full_name: hrSpecialist.full_name.trim(),
+            phone: hrSpecialist.phone.trim(),
+            email: normalizeEmail(hrSpecialist.email),
+          })
+        );
+      }
 
       Object.entries(form).forEach(([key, value]) => {
-        formData.append(key, value || "");
+        formData.append(
+          key,
+          typeof value === "string"
+            ? value.trim()
+            : value || ""
+        );
       });
 
       Object.entries(files).forEach(([key, value]) => {
         if (!value) return;
 
         if (value instanceof FileList) {
-          Array.from(value).forEach((file) => formData.append(key, file));
+          Array.from(value).forEach((file) => {
+            formData.append(key, file);
+          });
         } else {
           formData.append(key, value);
         }
       });
 
-      const response = await fetch(`${API_URL}/api/organization-applications`, {
-        method: "POST",
-        body: formData,
-      });
+      const response = await fetch(
+        `${API_URL}/api/organization-applications`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
 
       const result = await response.json().catch(() => null);
 
@@ -261,9 +388,16 @@ export default function OrganizationApplication() {
         );
       }
 
-      setSubmittedApplication(result?.application || result?.data || result);
+      setSubmittedApplication(
+        result?.application ||
+          result?.data ||
+          result
+      );
     } catch (err) {
-      setError(err.message || "Произошла ошибка при отправке заявки.");
+      setError(
+        err.message ||
+          "Произошла ошибка при отправке заявки."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -278,6 +412,7 @@ export default function OrganizationApplication() {
 
         <section className="success-card">
           <div className="success-icon">✓</div>
+
           <h1>Заявка отправлена</h1>
 
           <div className="application-number">
@@ -290,11 +425,16 @@ export default function OrganizationApplication() {
           </div>
 
           <p>
-            Заявка отправлена в техническую поддержку Clinic OS. Ответ по заявке
-            придёт на корпоративную почту организации.
+            Заявка отправлена в техническую поддержку
+            Clinic OS. Ответ по заявке придёт на
+            корпоративную почту организации.
           </p>
 
-          <button type="button" className="primary-button" onClick={resetForm}>
+          <button
+            type="button"
+            className="primary-button"
+            onClick={resetForm}
+          >
             Отправить ещё одну заявку
           </button>
         </section>
@@ -311,35 +451,67 @@ export default function OrganizationApplication() {
       </div>
 
       <section className="application-hero">
-        <div className="page-badge">Заявка организации</div>
+        <div className="page-badge">
+          Заявка организации
+        </div>
+
         <h1>Подать заявку на подключение</h1>
+
         <p>
-          Заполните данные организации, главного врача и основных
-          администраторов. Администраторов можно указать максимум 3.
+          Заполните данные организации, главного врача,
+          администраторов и сотрудника отдела кадров.
+          Администраторов можно указать максимум 3.
         </p>
       </section>
 
-      <form className="application-form" onSubmit={submitApplication}>
+      <form
+        className="application-form"
+        onSubmit={submitApplication}
+      >
         <section className="form-section">
           <div className="section-number">1</div>
 
           <div className="section-content">
             <h2>Тип заявки</h2>
-            <p>Выберите, для чего организация отправляет заявление.</p>
 
-            <label className="org-label">Тип заявки</label>
+            <p>
+              Выберите, для чего организация отправляет
+              заявление.
+            </p>
+
+            <label className="org-label">
+              Тип заявки
+            </label>
+
             <select
               className="org-input"
               value={applicationType}
-              onChange={(event) => setApplicationType(event.target.value)}
+              onChange={(event) => {
+                setApplicationType(event.target.value);
+                setError("");
+              }}
             >
-              <option value={APPLICATION_TYPES.NEW_ORGANIZATION}>
+              <option
+                value={
+                  APPLICATION_TYPES.NEW_ORGANIZATION
+                }
+              >
                 Подключение новой организации
               </option>
-              <option value={APPLICATION_TYPES.CHANGE_CHIEF_DOCTOR}>
+
+              <option
+                value={
+                  APPLICATION_TYPES.CHANGE_CHIEF_DOCTOR
+                }
+              >
                 Изменение главного врача
               </option>
-              <option value={APPLICATION_TYPES.CHANGE_ADMINISTRATOR}>
+
+              <option
+                value={
+                  APPLICATION_TYPES.CHANGE_ADMINISTRATOR
+                }
+              >
                 Изменение администратора
               </option>
             </select>
@@ -351,13 +523,18 @@ export default function OrganizationApplication() {
 
           <div className="section-content">
             <h2>Данные организации</h2>
-            <p>Основная информация о медицинской организации.</p>
+
+            <p>
+              Основная информация о медицинской организации.
+            </p>
 
             <div className="form-grid one-column">
               <div>
                 <label className="org-label">
-                  Название организации<span className="required-star">*</span>
+                  Название организации
+                  <span className="required-star">*</span>
                 </label>
+
                 <input
                   className="org-input"
                   name="organization_name"
@@ -372,8 +549,10 @@ export default function OrganizationApplication() {
             <div className="form-grid two-columns">
               <div>
                 <label className="org-label">
-                  Тип организации<span className="required-star">*</span>
+                  Тип организации
+                  <span className="required-star">*</span>
                 </label>
+
                 <select
                   className="org-input"
                   name="organization_type"
@@ -382,7 +561,10 @@ export default function OrganizationApplication() {
                   required
                 >
                   {ORGANIZATION_TYPES.map((item) => (
-                    <option key={item.value} value={item.value}>
+                    <option
+                      key={item.value}
+                      value={item.value}
+                    >
                       {item.label}
                     </option>
                   ))}
@@ -391,8 +573,10 @@ export default function OrganizationApplication() {
 
               <div>
                 <label className="org-label">
-                  БИН организации<span className="required-star">*</span>
+                  БИН организации
+                  <span className="required-star">*</span>
                 </label>
+
                 <input
                   className="org-input"
                   name="bin"
@@ -400,6 +584,7 @@ export default function OrganizationApplication() {
                   onChange={updateField}
                   required
                   maxLength={12}
+                  inputMode="numeric"
                   placeholder="12 цифр"
                 />
               </div>
@@ -408,8 +593,10 @@ export default function OrganizationApplication() {
             <div className="form-grid two-columns">
               <div>
                 <label className="org-label">
-                  Город<span className="required-star">*</span>
+                  Город
+                  <span className="required-star">*</span>
                 </label>
+
                 <input
                   className="org-input"
                   name="city"
@@ -422,8 +609,10 @@ export default function OrganizationApplication() {
 
               <div>
                 <label className="org-label">
-                  Адрес организации<span className="required-star">*</span>
+                  Адрес организации
+                  <span className="required-star">*</span>
                 </label>
+
                 <input
                   className="org-input"
                   name="address"
@@ -441,6 +630,7 @@ export default function OrganizationApplication() {
                   Корпоративная почта организации
                   <span className="required-star">*</span>
                 </label>
+
                 <input
                   className="org-input"
                   type="email"
@@ -455,7 +645,8 @@ export default function OrganizationApplication() {
           </div>
         </section>
 
-        {(isNewOrganization || isChiefDoctorChange) && (
+        {(isNewOrganization ||
+          isChiefDoctorChange) && (
           <section className="form-section">
             <div className="section-number">3</div>
 
@@ -473,10 +664,13 @@ export default function OrganizationApplication() {
                       ФИО предыдущего главного врача
                       <span className="required-star">*</span>
                     </label>
+
                     <input
                       className="org-input"
                       name="previous_chief_doctor_full_name"
-                      value={form.previous_chief_doctor_full_name}
+                      value={
+                        form.previous_chief_doctor_full_name
+                      }
                       onChange={updateField}
                       required
                       placeholder="Например: Иванов Иван Иванович"
@@ -488,8 +682,10 @@ export default function OrganizationApplication() {
               <div className="form-grid three-columns">
                 <div>
                   <label className="org-label">
-                    ФИО главного врача<span className="required-star">*</span>
+                    ФИО главного врача
+                    <span className="required-star">*</span>
                   </label>
+
                   <input
                     className="org-input"
                     name={
@@ -510,8 +706,10 @@ export default function OrganizationApplication() {
 
                 <div>
                   <label className="org-label">
-                    Телефон<span className="required-star">*</span>
+                    Телефон
+                    <span className="required-star">*</span>
                   </label>
+
                   <input
                     className="org-input"
                     name={
@@ -532,8 +730,10 @@ export default function OrganizationApplication() {
 
                 <div>
                   <label className="org-label">
-                    Почта главного врача<span className="required-star">*</span>
+                    Почта главного врача
+                    <span className="required-star">*</span>
                   </label>
+
                   <input
                     className="org-input"
                     type="email"
@@ -557,27 +757,36 @@ export default function OrganizationApplication() {
           </section>
         )}
 
-        {(isNewOrganization || isAdministratorChange) && (
+        {(isNewOrganization ||
+          isAdministratorChange) && (
           <section className="form-section">
             <div className="section-number">4</div>
 
             <div className="section-content">
               <h2>Данные администраторов</h2>
+
               <p>
-                Укажите основных администраторов организации. Максимум можно
-                добавить 3 администратора.
+                Укажите основных администраторов организации.
+                Максимум можно добавить 3 администратора.
               </p>
 
               {admins.map((admin, index) => (
-                <div className="admin-box" key={index}>
+                <div
+                  className="admin-box"
+                  key={index}
+                >
                   <div className="admin-box-top">
-                    <h3>Администратор #{index + 1}</h3>
+                    <h3>
+                      Администратор #{index + 1}
+                    </h3>
 
                     {admins.length > 1 && (
                       <button
                         type="button"
                         className="small-danger-button"
-                        onClick={() => removeAdmin(index)}
+                        onClick={() =>
+                          removeAdmin(index)
+                        }
                       >
                         Удалить
                       </button>
@@ -590,11 +799,16 @@ export default function OrganizationApplication() {
                         ФИО администратора
                         <span className="required-star">*</span>
                       </label>
+
                       <input
                         className="org-input"
                         value={admin.full_name}
                         onChange={(event) =>
-                          updateAdmin(index, "full_name", event.target.value)
+                          updateAdmin(
+                            index,
+                            "full_name",
+                            event.target.value
+                          )
                         }
                         required
                         placeholder="Например: Сидоров Сергей Сергеевич"
@@ -603,13 +817,19 @@ export default function OrganizationApplication() {
 
                     <div>
                       <label className="org-label">
-                        Телефон<span className="required-star">*</span>
+                        Телефон
+                        <span className="required-star">*</span>
                       </label>
+
                       <input
                         className="org-input"
                         value={admin.phone}
                         onChange={(event) =>
-                          updateAdmin(index, "phone", event.target.value)
+                          updateAdmin(
+                            index,
+                            "phone",
+                            event.target.value
+                          )
                         }
                         required
                         placeholder="+7 777 000 00 00"
@@ -621,12 +841,17 @@ export default function OrganizationApplication() {
                         Почта администратора
                         <span className="required-star">*</span>
                       </label>
+
                       <input
                         className="org-input"
                         type="email"
                         value={admin.email}
                         onChange={(event) =>
-                          updateAdmin(index, "email", event.target.value)
+                          updateAdmin(
+                            index,
+                            "email",
+                            event.target.value
+                          )
                         }
                         required
                         placeholder="admin@clinic.kz"
@@ -654,8 +879,97 @@ export default function OrganizationApplication() {
           </section>
         )}
 
+        {isNewOrganization && (
+          <section className="form-section">
+            <div className="section-number">5</div>
+
+            <div className="section-content">
+              <h2>Сотрудник отдела кадров</h2>
+
+              <p>
+                Укажите сотрудника отдела кадров, который
+                будет добавлять сотрудников организации и
+                загружать кадровые документы.
+              </p>
+
+              <div className="admin-box hr-box">
+                <div className="admin-box-top">
+                  <h3>
+                    Ответственный сотрудник отдела кадров
+                  </h3>
+                </div>
+
+                <div className="form-grid three-columns">
+                  <div>
+                    <label className="org-label">
+                      ФИО сотрудника
+                      <span className="required-star">*</span>
+                    </label>
+
+                    <input
+                      className="org-input"
+                      value={hrSpecialist.full_name}
+                      onChange={(event) =>
+                        updateHrSpecialist(
+                          "full_name",
+                          event.target.value
+                        )
+                      }
+                      required
+                      placeholder="Например: Абдуллина Айгуль Сериковна"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="org-label">
+                      Телефон
+                      <span className="required-star">*</span>
+                    </label>
+
+                    <input
+                      className="org-input"
+                      value={hrSpecialist.phone}
+                      onChange={(event) =>
+                        updateHrSpecialist(
+                          "phone",
+                          event.target.value
+                        )
+                      }
+                      required
+                      placeholder="+7 777 000 00 00"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="org-label">
+                      Почта сотрудника
+                      <span className="required-star">*</span>
+                    </label>
+
+                    <input
+                      className="org-input"
+                      type="email"
+                      value={hrSpecialist.email}
+                      onChange={(event) =>
+                        updateHrSpecialist(
+                          "email",
+                          event.target.value
+                        )
+                      }
+                      required
+                      placeholder="hr@clinic.kz"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
         <section className="form-section">
-          <div className="section-number">5</div>
+          <div className="section-number">
+            {isNewOrganization ? "6" : "5"}
+          </div>
 
           <div className="section-content">
             <h2>Документы</h2>
@@ -679,7 +993,10 @@ export default function OrganizationApplication() {
             <FileField
               label="Документ о назначении главного врача"
               name="chief_doctor_order"
-              required={isNewOrganization || isChiefDoctorChange}
+              required={
+                isNewOrganization ||
+                isChiefDoctorChange
+              }
               files={files}
               onChange={updateFile}
             />
@@ -687,7 +1004,10 @@ export default function OrganizationApplication() {
             <FileField
               label="Документ о назначении администратора"
               name="administrator_order"
-              required={isNewOrganization || isAdministratorChange}
+              required={
+                isNewOrganization ||
+                isAdministratorChange
+              }
               files={files}
               onChange={updateFile}
             />
@@ -703,7 +1023,9 @@ export default function OrganizationApplication() {
         </section>
 
         <section className="form-section">
-          <div className="section-number">6</div>
+          <div className="section-number">
+            {isNewOrganization ? "7" : "6"}
+          </div>
 
           <div className="section-content">
             <h2>Комментарий</h2>
@@ -716,7 +1038,11 @@ export default function OrganizationApplication() {
               placeholder="Например: просим подключить организацию к системе Clinic OS"
             />
 
-            {error ? <div className="error-message">{error}</div> : null}
+            {error ? (
+              <div className="error-message">
+                {error}
+              </div>
+            ) : null}
 
             <div className="form-actions">
               <button
@@ -724,7 +1050,9 @@ export default function OrganizationApplication() {
                 className="primary-button"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? "Отправка..." : "Отправить заявку"}
+                {isSubmitting
+                  ? "Отправка..."
+                  : "Отправить заявку"}
               </button>
             </div>
           </div>
@@ -742,8 +1070,16 @@ function ApplicationPageStyles() {
       .organization-application-page {
         min-height: 100vh;
         background:
-          radial-gradient(circle at top left, rgba(0, 255, 170, 0.14), transparent 28%),
-          radial-gradient(circle at bottom right, rgba(0, 210, 255, 0.13), transparent 25%),
+          radial-gradient(
+            circle at top left,
+            rgba(0, 255, 170, 0.14),
+            transparent 28%
+          ),
+          radial-gradient(
+            circle at bottom right,
+            rgba(0, 210, 255, 0.13),
+            transparent 25%
+          ),
           #07111f;
         color: #ffffff;
         padding: 42px 24px 90px;
@@ -818,6 +1154,10 @@ function ApplicationPageStyles() {
         font-weight: 900;
       }
 
+      .section-content {
+        min-width: 0;
+      }
+
       .section-content h2 {
         margin: 0 0 8px;
         font-size: 25px;
@@ -835,11 +1175,13 @@ function ApplicationPageStyles() {
       }
 
       .two-columns {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns:
+          repeat(2, minmax(0, 1fr));
       }
 
       .three-columns {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns:
+          repeat(3, minmax(0, 1fr));
       }
 
       .org-label {
@@ -858,8 +1200,10 @@ function ApplicationPageStyles() {
       .org-input,
       .org-textarea {
         width: 100%;
-        border: 1px solid rgba(148, 163, 184, 0.28);
-        background: rgba(15, 23, 42, 0.84);
+        border:
+          1px solid rgba(148, 163, 184, 0.28);
+        background:
+          rgba(15, 23, 42, 0.84);
         color: #ffffff;
         border-radius: 16px;
         padding: 15px 16px;
@@ -868,23 +1212,46 @@ function ApplicationPageStyles() {
         box-sizing: border-box;
       }
 
+      .org-input:focus,
+      .org-textarea:focus {
+        border-color:
+          rgba(34, 197, 94, 0.72);
+        box-shadow:
+          0 0 0 3px rgba(34, 197, 94, 0.12);
+      }
+
+      .org-input::placeholder,
+      .org-textarea::placeholder {
+        color: #64748b;
+      }
+
       .org-textarea {
         min-height: 116px;
         resize: vertical;
       }
 
       .admin-box {
-        border: 1px solid rgba(148, 163, 184, 0.18);
+        border:
+          1px solid rgba(148, 163, 184, 0.18);
         border-radius: 20px;
         padding: 18px;
         margin-bottom: 16px;
-        background: rgba(2, 6, 23, 0.22);
+        background:
+          rgba(2, 6, 23, 0.22);
+      }
+
+      .hr-box {
+        border-color:
+          rgba(34, 197, 94, 0.32);
+        background:
+          rgba(34, 197, 94, 0.06);
       }
 
       .admin-box-top {
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 16px;
         margin-bottom: 14px;
       }
 
@@ -903,12 +1270,15 @@ function ApplicationPageStyles() {
       }
 
       .secondary-button {
-        background: rgba(34, 211, 238, 0.18);
-        border: 1px solid rgba(34, 211, 238, 0.3);
+        background:
+          rgba(34, 211, 238, 0.18);
+        border:
+          1px solid rgba(34, 211, 238, 0.3);
         padding: 13px 18px;
       }
 
-      .secondary-button:disabled {
+      .secondary-button:disabled,
+      .primary-button:disabled {
         opacity: 0.5;
         cursor: not-allowed;
       }
@@ -932,10 +1302,12 @@ function ApplicationPageStyles() {
         display: flex;
         align-items: center;
         gap: 14px;
-        border: 1px solid rgba(148, 163, 184, 0.22);
+        border:
+          1px solid rgba(148, 163, 184, 0.22);
         border-radius: 16px;
         padding: 12px;
-        background: rgba(15, 23, 42, 0.66);
+        background:
+          rgba(15, 23, 42, 0.66);
       }
 
       .org-file-button {
@@ -956,8 +1328,10 @@ function ApplicationPageStyles() {
       }
 
       .org-file-name {
+        min-width: 0;
         color: #cbd5e1;
         font-size: 14px;
+        overflow-wrap: anywhere;
       }
 
       .form-actions {
@@ -976,19 +1350,34 @@ function ApplicationPageStyles() {
         margin-top: 16px;
         padding: 14px 16px;
         border-radius: 16px;
-        background: rgba(239, 68, 68, 0.12);
-        border: 1px solid rgba(239, 68, 68, 0.28);
+        background:
+          rgba(239, 68, 68, 0.12);
+        border:
+          1px solid rgba(239, 68, 68, 0.28);
         color: #fecaca;
         font-weight: 700;
       }
 
       .success-card {
+        box-sizing: border-box;
         width: min(680px, 100%);
         margin: 80px auto 0;
-        background: rgba(15, 23, 42, 0.9);
+        background:
+          rgba(15, 23, 42, 0.9);
+        border:
+          1px solid rgba(148, 163, 184, 0.16);
         border-radius: 32px;
         padding: 42px;
         text-align: center;
+      }
+
+      .success-card h1 {
+        margin-bottom: 14px;
+      }
+
+      .success-card p {
+        color: #9fb2c8;
+        line-height: 1.7;
       }
 
       .success-icon {
@@ -1001,6 +1390,11 @@ function ApplicationPageStyles() {
         place-items: center;
         font-size: 42px;
         font-weight: 900;
+      }
+
+      .application-number {
+        margin-bottom: 18px;
+        color: #cbd5e1;
       }
 
       @media (max-width: 1000px) {
@@ -1030,7 +1424,17 @@ function ApplicationPageStyles() {
 
         .org-file-button,
         .primary-button {
+          box-sizing: border-box;
           width: 100%;
+        }
+
+        .form-actions {
+          justify-content: stretch;
+        }
+
+        .success-card {
+          margin-top: 40px;
+          padding: 28px 20px;
         }
       }
     `}</style>

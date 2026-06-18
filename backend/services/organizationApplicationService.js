@@ -101,10 +101,32 @@ function normalizeAdministrators(value) {
   }
 }
 
-function validateUniqueEmails({ organizationEmail, chiefEmail, administrators }) {
+function normalizeHrSpecialist(value) {
+  if (!value) return null;
+
+  try {
+    const parsed = typeof value === "string" ? JSON.parse(value) : value;
+
+    return {
+      full_name: normalizeText(parsed.full_name),
+      phone: normalizeText(parsed.phone),
+      email: normalizeEmail(parsed.email),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function validateUniqueEmails({
+  organizationEmail,
+  chiefEmail,
+  administrators,
+  hrSpecialist,
+}) {
   const emails = [
     organizationEmail,
     chiefEmail,
+    hrSpecialist?.email,
     ...administrators.map((admin) => admin.email),
   ].filter(Boolean);
 
@@ -112,7 +134,7 @@ function validateUniqueEmails({ organizationEmail, chiefEmail, administrators })
 
   if (uniqueEmails.size !== emails.length) {
     throw new Error(
-      "Почты не должны повторяться: корпоративная почта, почта главного врача и почты администраторов должны быть разными."
+      "Почты не должны повторяться: корпоративная почта, почта главного врача, почта отдела кадров и почты администраторов должны быть разными."
     );
   }
 }
@@ -191,6 +213,7 @@ export async function createOrganizationApplication({ body, files }) {
   const applicationType = normalizeApplicationType(body.application_type);
   const applicationNumber = generateApplicationNumber();
   const administrators = normalizeAdministrators(body.administrators);
+  const hrSpecialist = normalizeHrSpecialist(body.hr_specialist);
 
   const organizationEmail = normalizeEmail(body.organization_email);
 
@@ -208,6 +231,7 @@ export async function createOrganizationApplication({ body, files }) {
     organizationEmail,
     chiefEmail: chiefDoctorEmail,
     administrators,
+    hrSpecialist,
   });
 
   const payload = {
@@ -234,6 +258,7 @@ export async function createOrganizationApplication({ body, files }) {
     new_chief_doctor_email: normalizeEmail(body.new_chief_doctor_email),
 
     administrators,
+    hr_specialist: hrSpecialist,
 
     sender_full_name: normalizeText(body.organization_name),
     sender_phone: chiefDoctorPhone,
@@ -254,6 +279,7 @@ export async function createOrganizationApplication({ body, files }) {
     if (!payload.chief_doctor_full_name) throw new Error("ФИО главного врача обязательно.");
     if (!payload.chief_doctor_phone) throw new Error("Телефон главного врача обязателен.");
     if (!payload.chief_doctor_email) throw new Error("Почта главного врача обязательна.");
+
     if (administrators.length === 0) throw new Error("Нужно указать хотя бы одного администратора.");
     if (administrators.length > 3) throw new Error("Можно указать максимум 3 администратора.");
 
@@ -262,6 +288,10 @@ export async function createOrganizationApplication({ body, files }) {
       if (!admin.phone) throw new Error(`Телефон администратора #${index + 1} обязателен.`);
       if (!admin.email) throw new Error(`Почта администратора #${index + 1} обязательна.`);
     });
+
+    if (!hrSpecialist?.full_name) throw new Error("ФИО сотрудника отдела кадров обязательно.");
+    if (!hrSpecialist?.phone) throw new Error("Телефон сотрудника отдела кадров обязателен.");
+    if (!hrSpecialist?.email) throw new Error("Почта сотрудника отдела кадров обязательна.");
   }
 
   if (applicationType === "change_chief_doctor") {

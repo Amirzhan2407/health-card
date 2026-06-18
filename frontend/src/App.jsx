@@ -1,3 +1,5 @@
+
+
 import { Routes, Route, Navigate } from "react-router-dom";
 
 import { LanguageProvider } from "./i18n/LanguageContext";
@@ -29,66 +31,93 @@ import OrganizationLogin from "./pages/OrganizationLogin";
 import GovClinicLayout from "./organization/govClinic/GovClinicLayout";
 import GovClinicChiefDoctor from "./organization/govClinic/GovClinicChiefDoctor";
 import GovClinicSystemAdmin from "./organization/govClinic/GovClinicSystemAdmin";
+import GovClinicHR from "./organization/govClinic/GovClinicHR";
 
 function App() {
-  return (
-    <LanguageProvider>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route
-          path="/organization-application"
-          element={<OrganizationApplication />}
-        />
-        <Route path="/organization-login" element={<OrganizationLogin />} />
+return ( <LanguageProvider> <Routes>
+<Route path="/login" element={<Login />} />
 
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<HomePage />} />
-          <Route path="search" element={<Search />} />
-          <Route path="health" element={<HealthPage />} />
-          <Route path="documents" element={<DocumentsPage />} />
-          <Route path="documents-cloud" element={<DocumentsCloudPage />} />
-          <Route path="my-documents" element={<DocumentsPage />} />
-          <Route path="ai-assistant" element={<AiAssistantPage />} />
-          <Route path="passport" element={<Passport />} />
-        </Route>
+```
+    <Route
+      path="/organization-application"
+      element={<OrganizationApplication />}
+    />
 
-        <Route path="/admin" element={<AdminLogin />} />
+    <Route
+      path="/organization-login"
+      element={<OrganizationLogin />}
+    />
 
-        <Route path="/admin-panel" element={<AdminLayout />}>
-          <Route index element={<AdminDashboard />} />
-          <Route path="staff" element={<AdminStaff />} />
-          <Route path="applications" element={<AdminApplications />} />
-          <Route path="orgs" element={<AdminOrganizations />} />
-          <Route path="channels" element={<AdminChannels />} />
-          <Route path="logs" element={<AdminAuditLogs />} />
-          <Route path="roles" element={<AdminRoles />} />
-        </Route>
+    <Route path="/" element={<MainLayout />}>
+      <Route index element={<HomePage />} />
+      <Route path="search" element={<Search />} />
+      <Route path="health" element={<HealthPage />} />
+      <Route path="documents" element={<DocumentsPage />} />
+      <Route path="documents-cloud" element={<DocumentsCloudPage />} />
+      <Route path="my-documents" element={<DocumentsPage />} />
+      <Route path="ai-assistant" element={<AiAssistantPage />} />
+      <Route path="passport" element={<Passport />} />
+    </Route>
 
-        <Route
-          path="/admin-panel/organizations"
-          element={<Navigate to="/admin-panel/orgs" replace />}
-        />
+    <Route path="/admin" element={<AdminLogin />} />
 
-        <Route
-          path="/admin-panel/orgs-old"
-          element={<Navigate to="/admin-panel/orgs" replace />}
-        />
+    <Route path="/admin-panel" element={<AdminLayout />}>
+      <Route index element={<AdminDashboard />} />
+      <Route path="staff" element={<AdminStaff />} />
+      <Route path="applications" element={<AdminApplications />} />
+      <Route path="orgs" element={<AdminOrganizations />} />
+      <Route path="channels" element={<AdminChannels />} />
+      <Route path="logs" element={<AdminAuditLogs />} />
+      <Route path="roles" element={<AdminRoles />} />
+    </Route>
 
-        <Route
-          path="/admin-panel/applications-old"
-          element={<Navigate to="/admin-panel/applications" replace />}
-        />
+    <Route
+      path="/admin-panel/organizations"
+      element={<Navigate to="/admin-panel/orgs" replace />}
+    />
 
-        <Route path="/organization/gov-clinic" element={<GovClinicLayout />}>
-          <Route index element={<Navigate to="system-admin" replace />} />
-          <Route path="chief-doctor" element={<GovClinicChiefDoctor />} />
-          <Route path="system-admin" element={<GovClinicSystemAdmin />} />
-        </Route>
+    <Route
+      path="/admin-panel/orgs-old"
+      element={<Navigate to="/admin-panel/orgs" replace />}
+    />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </LanguageProvider>
-  );
+    <Route
+      path="/admin-panel/applications-old"
+      element={<Navigate to="/admin-panel/applications" replace />}
+    />
+
+    <Route
+      path="/organization/gov-clinic"
+      element={<GovClinicLayout />}
+    >
+      <Route
+        index
+        element={<Navigate to="system-admin" replace />}
+      />
+
+      <Route
+        path="chief-doctor"
+        element={<GovClinicChiefDoctor />}
+      />
+
+      <Route
+        path="system-admin"
+        element={<GovClinicSystemAdmin />}
+      />
+
+      <Route
+        path="hr"
+        element={<GovClinicHR />}
+      />
+    </Route>
+
+    <Route path="*" element={<Navigate to="/" replace />} />
+  </Routes>
+</LanguageProvider>
+
+
+);
 }
 
 export default App;
+

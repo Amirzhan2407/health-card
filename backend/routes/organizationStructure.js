@@ -1,276 +1,967 @@
+
+
 import express from "express";
+import multer from "multer";
 import crypto from "crypto";
 import { supabase } from "../lib/supabaseAdmin.js";
 
 const router = express.Router();
 
+const upload = multer({
+storage: multer.memoryStorage(),
+limits: {
+fileSize: 30 * 1024 * 1024,
+},
+});
+
+const BUCKET_NAME = "organization-documents";
+
 function hashPassword(password) {
-  if (!password) return null;
+if (!password) return null;
 
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto.scryptSync(String(password), salt, 64).toString("hex");
+const salt = crypto.randomBytes(16).toString("hex");
+const hash = crypto.scryptSync(String(password), salt, 64).toString("hex");
 
-  return `${salt}:${hash}`;
+return salt + ":" + hash;
+}
+
+function generatePassword() {
+const a = Math.random().toString(36).slice(2, 6).toUpperCase();
+const b = Math.random().toString(36).slice(2, 6).toUpperCase();
+
+return a + "-" + b;
 }
 
 function getOrganizationId(req) {
-  return (
-    req.headers["x-organization-id"] ||
-    req.query.organizationId ||
-    req.body.organizationId ||
-    null
-  );
+return (
+req.headers["x-organization-id"] ||
+req.query.organization_id ||
+req.query.organizationId ||
+req.body.organization_id ||
+req.body.organizationId ||
+null
+);
+}
+
+function safeText(value) {
+if (value === undefined || value === null) return "";
+return String(value).trim();
+}
+
+function safeFileName(name) {
+return String(name || "document")
+.replaceAll(" ", "")
+.replaceAll("/", "")
+.replaceAll("\"", "")  
+.replaceAll(":", "")
+.slice(0, 160);
+}
+
+function getRoleByPosition(position) {
+const value = String(position || "").toLowerCase();
+
+if (value.includes("отдел кадров")) return "hr";
+if (value.includes("заместитель")) return "deputy_chief_doctor";
+if (value.includes("завед")) return "department_head";
+if (value.includes("регистратор")) return "registrar";
+if (value.includes("медсестр")) return "nurse";
+if (value.includes("врач")) return "doctor";
+if (value.includes("администратор")) return "organization_admin";
+
+return "employee";
 }
 
 router.get("/departments", async (req, res) => {
-  try {
-    const organizationId = getOrganizationId(req);
+try {
+const organizationId = getOrganizationId(req);
 
-    if (!organizationId) {
-      return res.status(400).json({
-        success: false,
-        message: "organizationId не указан.",
-      });
-    }
+```
+if (!organizationId) {
+  return res.status(400).json({
+    success: false,
+    message: "organization_id не указан.",
+  });
+}
 
-    const { data, error } = await supabase
-      .from("organization_departments")
-      .select("*")
-      .eq("organization_id", organizationId)
-      .order("created_at", { ascending: true });
+const { data, error } = await supabase
+  .from("organization_departments")
+  .select("*")
+  .eq("organization_id", organizationId)
+  .order("created_at", { ascending: true });
 
-    if (error) {
-      return res.status(500).json({
-        success: false,
-        message: error.message,
-      });
-    }
+if (error) {
+  return res.status(500).json({
+    success: false,
+    message: error.message,
+  });
+}
 
-    return res.status(200).json({
-      success: true,
-      departments: data || [],
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message || "Ошибка получения отделений.",
-    });
-  }
+return res.status(200).json({
+  success: true,
+  departments: data || [],
+});
+```
+
+} catch (error) {
+return res.status(500).json({
+success: false,
+message: error.message || "Ошибка получения отделений.",
+});
+}
 });
 
 router.post("/departments", async (req, res) => {
-  try {
-    const organizationId = getOrganizationId(req);
-    const name = String(req.body.name || "").trim();
-    const floor = String(req.body.floor || "").trim();
-    const rooms = String(req.body.rooms || "").trim();
+try {
+const organizationId = getOrganizationId(req);
+const name = safeText(req.body.name);
+const floor = safeText(req.body.floor);
+const rooms = safeText(req.body.rooms);
 
-    if (!organizationId || !name || !floor || !rooms) {
-      return res.status(400).json({
-        success: false,
-        message: "Заполните название отделения, этаж и кабинеты.",
-      });
-    }
+```
+if (!organizationId || !name) {
+  return res.status(400).json({
+    success: false,
+    message: "Название отделения обязательно.",
+  });
+}
 
-    const { data, error } = await supabase
-      .from("organization_departments")
-      .insert({
-        organization_id: organizationId,
-        name,
-        floor,
-        rooms,
-      })
-      .select("*")
-      .single();
+const { data, error } = await supabase
+  .from("organization_departments")
+  .insert({
+    organization_id: organizationId,
+    name,
+    floor,
+    rooms,
+  })
+  .select("*")
+  .single();
 
-    if (error) {
-      return res.status(500).json({
-        success: false,
-        message: error.message,
-      });
-    }
+if (error) {
+  return res.status(500).json({
+    success: false,
+    message: error.message,
+  });
+}
 
-    return res.status(201).json({
-      success: true,
-      department: data,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message || "Ошибка добавления отделения.",
-    });
-  }
+return res.status(201).json({
+  success: true,
+  department: data,
+});
+```
+
+} catch (error) {
+return res.status(500).json({
+success: false,
+message: error.message || "Ошибка добавления отделения.",
+});
+}
 });
 
 router.get("/employees", async (req, res) => {
-  try {
-    const organizationId = getOrganizationId(req);
+try {
+const organizationId = getOrganizationId(req);
+const status = req.query.status ? String(req.query.status) : null;
 
-    if (!organizationId) {
-      return res.status(400).json({
-        success: false,
-        message: "organizationId не указан.",
-      });
-    }
+```
+if (!organizationId) {
+  return res.status(400).json({
+    success: false,
+    message: "organization_id не указан.",
+  });
+}
 
-    const { data: employees, error } = await supabase
-      .from("organization_employees")
-      .select("*")
-      .eq("organization_id", organizationId)
-      .order("created_at", { ascending: true });
+let query = supabase
+  .from("organization_employees")
+  .select("*")
+  .eq("organization_id", organizationId)
+  .order("created_at", { ascending: true });
 
-    if (error) {
-      return res.status(500).json({
-        success: false,
-        message: error.message,
-      });
-    }
+if (status && status !== "all") {
+  query = query.eq("status", status);
+}
 
-    const employeeIds = (employees || []).map((item) => item.id);
+const { data: employees, error } = await query;
 
-    let documents = [];
+if (error) {
+  return res.status(500).json({
+    success: false,
+    message: error.message,
+  });
+}
 
-    if (employeeIds.length) {
-      const { data: docs, error: docsError } = await supabase
-        .from("organization_employee_documents")
-        .select("*")
-        .in("employee_id", employeeIds)
-        .order("created_at", { ascending: true });
+const employeeIds = (employees || []).map((item) => item.id);
 
-      if (docsError) {
-        return res.status(500).json({
-          success: false,
-          message: docsError.message,
-        });
-      }
+let documents = [];
 
-      documents = docs || [];
-    }
+if (employeeIds.length > 0) {
+  const { data: docs, error: docsError } = await supabase
+    .from("organization_employee_documents")
+    .select("*")
+    .in("employee_id", employeeIds)
+    .order("created_at", { ascending: true });
 
-    const employeesWithDocs = (employees || []).map((employee) => ({
-      ...employee,
-      documents: documents
-        .filter((doc) => doc.employee_id === employee.id)
-        .map((doc) => doc.file_name),
-    }));
-
-    return res.status(200).json({
-      success: true,
-      employees: employeesWithDocs,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message || "Ошибка получения сотрудников.",
-    });
+  if (!docsError) {
+    documents = docs || [];
   }
+}
+
+const employeesWithDocuments = (employees || []).map((employee) => {
+  const employeeDocuments = documents.filter((doc) => {
+    return doc.employee_id === employee.id;
+  });
+
+  return {
+    ...employee,
+    documents: employeeDocuments,
+  };
+});
+
+return res.status(200).json({
+  success: true,
+  employees: employeesWithDocuments,
+});
+```
+
+} catch (error) {
+return res.status(500).json({
+success: false,
+message: error.message || "Ошибка получения сотрудников.",
+});
+}
 });
 
 router.post("/employees", async (req, res) => {
-  try {
-    const organizationId = getOrganizationId(req);
+try {
+const organizationId = getOrganizationId(req);
 
-    const fullName = String(req.body.fullName || "").trim();
-    const age = String(req.body.age || "").trim();
-    const phone = String(req.body.phone || "").trim();
-    const email = String(req.body.email || "").trim();
-    const position = String(req.body.position || "").trim();
-    const departmentId = req.body.departmentId || null;
-    const cabinet = String(req.body.cabinet || "").trim();
-    const login = String(req.body.login || "").trim();
-    const tempPassword = String(req.body.tempPassword || "").trim();
-    const documents = Array.isArray(req.body.documents) ? req.body.documents : [];
+```
+const fullName = safeText(req.body.full_name || req.body.fullName);
+const iin = safeText(req.body.iin);
+const age = safeText(req.body.age);
+const phone = safeText(req.body.phone);
+const email = safeText(req.body.email).toLowerCase();
+const position = safeText(req.body.position);
+const department = safeText(req.body.department);
+const departmentId = req.body.department_id || req.body.departmentId || null;
+const cabinet = safeText(req.body.cabinet);
+const role = safeText(req.body.role) || getRoleByPosition(position);
+const status = safeText(req.body.status) || "active";
+const createdByUserId =
+  req.body.created_by_user_id || req.body.createdByUserId || null;
 
-    if (!organizationId || !fullName || !position || !departmentId) {
-      return res.status(400).json({
-        success: false,
-        message: "ФИО, должность и отделение обязательны.",
-      });
-    }
+if (!organizationId) {
+  return res.status(400).json({
+    success: false,
+    message: "organization_id не указан.",
+  });
+}
 
-    const passwordHash = hashPassword(tempPassword);
+if (!fullName || !position || !department) {
+  return res.status(400).json({
+    success: false,
+    message: "ФИО, должность и отделение обязательны.",
+  });
+}
 
-    const { data: employee, error } = await supabase
-      .from("organization_employees")
-      .insert({
-        organization_id: organizationId,
-        department_id: departmentId,
-        full_name: fullName,
-        age,
-        phone,
-        email,
-        position,
-        cabinet,
-        login: login || null,
-        password_hash: passwordHash,
-        must_change_password: true,
-        status: "active",
-      })
-      .select("*")
-      .single();
+const { data: employee, error } = await supabase
+  .from("organization_employees")
+  .insert({
+    organization_id: organizationId,
+    department_id: departmentId,
+    full_name: fullName,
+    iin,
+    age,
+    phone,
+    email,
+    position,
+    department,
+    cabinet,
+    role,
+    login: null,
+    password_hash: null,
+    must_change_password: true,
+    status,
+    created_by_user_id: createdByUserId,
+    updated_at: new Date().toISOString(),
+  })
+  .select("*")
+  .single();
 
-    if (error) {
-      return res.status(500).json({
-        success: false,
-        message: error.message,
-      });
-    }
+if (error) {
+  return res.status(500).json({
+    success: false,
+    message: error.message,
+  });
+}
 
-    if (documents.length) {
-      const docsPayload = documents.map((fileName) => ({
-        organization_id: organizationId,
-        employee_id: employee.id,
-        file_name: fileName,
-        file_url: null,
-      }));
+return res.status(201).json({
+  success: true,
+  message: "Сотрудник добавлен.",
+  employee,
+});
+```
 
-      const { error: docsError } = await supabase
-        .from("organization_employee_documents")
-        .insert(docsPayload);
+} catch (error) {
+return res.status(500).json({
+success: false,
+message: error.message || "Ошибка добавления сотрудника.",
+});
+}
+});
 
-      if (docsError) {
-        return res.status(500).json({
-          success: false,
-          message: docsError.message,
-        });
-      }
-    }
+router.patch("/employees/:id", async (req, res) => {
+try {
+const employeeId = req.params.id;
 
-    if (login && tempPassword) {
-      await supabase.from("organization_users").upsert(
-        {
-          organization_id: organizationId,
-          city: req.body.city || "",
-          bin: req.body.bin || "",
-          full_name: fullName,
-          phone,
-          email,
-          role: "employee",
-          login,
-          password_hash: passwordHash,
-          must_change_password: true,
-          status: "active",
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: "organization_id,login",
-        }
-      );
-    }
+```
+const payload = {};
 
-    return res.status(201).json({
-      success: true,
-      employee: {
-        ...employee,
-        documents,
-      },
+if (req.body.full_name !== undefined || req.body.fullName !== undefined) {
+  payload.full_name = safeText(req.body.full_name || req.body.fullName);
+}
+
+if (req.body.iin !== undefined) payload.iin = safeText(req.body.iin);
+if (req.body.age !== undefined) payload.age = safeText(req.body.age);
+if (req.body.phone !== undefined) payload.phone = safeText(req.body.phone);
+
+if (req.body.email !== undefined) {
+  payload.email = safeText(req.body.email).toLowerCase();
+}
+
+if (req.body.position !== undefined) {
+  payload.position = safeText(req.body.position);
+}
+
+if (req.body.department !== undefined) {
+  payload.department = safeText(req.body.department);
+}
+
+if (req.body.department_id !== undefined || req.body.departmentId !== undefined) {
+  payload.department_id = req.body.department_id || req.body.departmentId || null;
+}
+
+if (req.body.cabinet !== undefined) {
+  payload.cabinet = safeText(req.body.cabinet);
+}
+
+if (req.body.role !== undefined) {
+  payload.role = safeText(req.body.role);
+}
+
+if (req.body.status !== undefined) {
+  payload.status = safeText(req.body.status);
+}
+
+if (req.body.dismissed_at !== undefined) {
+  payload.dismissed_at = req.body.dismissed_at || null;
+}
+
+payload.updated_at = new Date().toISOString();
+
+const { data: currentEmployee } = await supabase
+  .from("organization_employees")
+  .select("*")
+  .eq("id", employeeId)
+  .maybeSingle();
+
+const { data: updatedEmployee, error } = await supabase
+  .from("organization_employees")
+  .update(payload)
+  .eq("id", employeeId)
+  .select("*")
+  .single();
+
+if (error) {
+  return res.status(500).json({
+    success: false,
+    message: error.message,
+  });
+}
+
+if (currentEmployee && currentEmployee.login && payload.status) {
+  await supabase
+    .from("organization_users")
+    .update({
+      status:
+        payload.status === "dismissed" || payload.status === "blocked"
+          ? "blocked"
+          : "active",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("organization_id", currentEmployee.organization_id)
+    .eq("login", currentEmployee.login);
+}
+
+return res.status(200).json({
+  success: true,
+  message: "Данные сотрудника обновлены.",
+  employee: updatedEmployee,
+});
+```
+
+} catch (error) {
+return res.status(500).json({
+success: false,
+message: error.message || "Ошибка изменения сотрудника.",
+});
+}
+});
+
+router.delete("/employees/:id", async (req, res) => {
+try {
+const employeeId = req.params.id;
+
+```
+const { data: employee, error: employeeError } = await supabase
+  .from("organization_employees")
+  .select("*")
+  .eq("id", employeeId)
+  .maybeSingle();
+
+if (employeeError || !employee) {
+  return res.status(404).json({
+    success: false,
+    message: "Сотрудник не найден.",
+  });
+}
+
+await supabase
+  .from("organization_employee_documents")
+  .delete()
+  .eq("employee_id", employeeId);
+
+if (employee.login) {
+  await supabase
+    .from("organization_users")
+    .delete()
+    .eq("organization_id", employee.organization_id)
+    .eq("login", employee.login);
+}
+
+const { error } = await supabase
+  .from("organization_employees")
+  .delete()
+  .eq("id", employeeId);
+
+if (error) {
+  return res.status(500).json({
+    success: false,
+    message: error.message,
+  });
+}
+
+return res.status(200).json({
+  success: true,
+  message: "Сотрудник удалён.",
+});
+```
+
+} catch (error) {
+return res.status(500).json({
+success: false,
+message: error.message || "Ошибка удаления сотрудника.",
+});
+}
+});
+
+router.post("/employee-documents", upload.any(), async (req, res) => {
+try {
+const organizationId = getOrganizationId(req);
+const employeeId = req.body.employee_id || req.body.employeeId;
+
+```
+if (!organizationId || !employeeId) {
+  return res.status(400).json({
+    success: false,
+    message: "organization_id и employee_id обязательны.",
+  });
+}
+
+const uploadedDocuments = [];
+
+for (let index = 0; index < (req.files || []).length; index += 1) {
+  const file = req.files[index];
+  const documentType = file.fieldname || "document";
+  const fileName = safeFileName(file.originalname);
+  const filePath =
+    organizationId +
+    "/employees/" +
+    employeeId +
+    "/" +
+    documentType +
+    "/" +
+    Date.now() +
+    "-" +
+    index +
+    "-" +
+    fileName;
+
+  const { error: uploadError } = await supabase.storage
+    .from(BUCKET_NAME)
+    .upload(filePath, file.buffer, {
+      contentType: file.mimetype,
+      upsert: true,
     });
-  } catch (error) {
+
+  if (uploadError) {
     return res.status(500).json({
       success: false,
-      message: error.message || "Ошибка добавления сотрудника.",
+      message: uploadError.message,
     });
   }
+
+  const { data: publicUrlData } = supabase.storage
+    .from(BUCKET_NAME)
+    .getPublicUrl(filePath);
+
+  const { data: document, error: documentError } = await supabase
+    .from("organization_employee_documents")
+    .insert({
+      organization_id: organizationId,
+      employee_id: employeeId,
+      document_type: documentType,
+      file_name: file.originalname,
+      file_path: filePath,
+      file_url: publicUrlData ? publicUrlData.publicUrl : null,
+      mime_type: file.mimetype,
+      size_bytes: file.size || 0,
+      uploaded_at: new Date().toISOString(),
+    })
+    .select("*")
+    .single();
+
+  if (documentError) {
+    return res.status(500).json({
+      success: false,
+      message: documentError.message,
+    });
+  }
+
+  uploadedDocuments.push(document);
+}
+
+return res.status(201).json({
+  success: true,
+  message: "Документы загружены.",
+  documents: uploadedDocuments,
+});
+```
+
+} catch (error) {
+return res.status(500).json({
+success: false,
+message: error.message || "Ошибка загрузки документов.",
+});
+}
+});
+
+router.patch("/employees/:id/chief-approve", async (req, res) => {
+try {
+const organizationId = getOrganizationId(req);
+const employeeId = req.params.id;
+
+```
+if (!organizationId || !employeeId) {
+  return res.status(400).json({
+    success: false,
+    message: "organization_id и сотрудник обязательны.",
+  });
+}
+
+const { data: updatedEmployee, error } = await supabase
+  .from("organization_employees")
+  .update({
+    status: "approved_for_access",
+    updated_at: new Date().toISOString(),
+  })
+  .eq("id", employeeId)
+  .eq("organization_id", organizationId)
+  .select("*")
+  .single();
+
+if (error) {
+  return res.status(500).json({
+    success: false,
+    message: error.message,
+  });
+}
+
+return res.status(200).json({
+  success: true,
+  message: "Сотрудник одобрен.",
+  employee: updatedEmployee,
+});
+```
+
+} catch (error) {
+return res.status(500).json({
+success: false,
+message: error.message || "Ошибка одобрения сотрудника.",
+});
+}
+});
+
+router.patch("/employees/:id/chief-reject", async (req, res) => {
+try {
+const organizationId = getOrganizationId(req);
+const employeeId = req.params.id;
+const rejectReason = safeText(req.body.rejectReason || req.body.reason);
+
+```
+if (!organizationId || !employeeId) {
+  return res.status(400).json({
+    success: false,
+    message: "organization_id и сотрудник обязательны.",
+  });
+}
+
+const { data: updatedEmployee, error } = await supabase
+  .from("organization_employees")
+  .update({
+    status: "rejected_by_chief",
+    rejection_reason: rejectReason || null,
+    updated_at: new Date().toISOString(),
+  })
+  .eq("id", employeeId)
+  .eq("organization_id", organizationId)
+  .select("*")
+  .single();
+
+if (error) {
+  return res.status(500).json({
+    success: false,
+    message: error.message,
+  });
+}
+
+return res.status(200).json({
+  success: true,
+  message: "Сотрудник отклонён.",
+  employee: updatedEmployee,
+});
+```
+
+} catch (error) {
+return res.status(500).json({
+success: false,
+message: error.message || "Ошибка отклонения сотрудника.",
+});
+}
+});
+
+router.post("/employees/:id/access", async (req, res) => {
+try {
+const organizationId = getOrganizationId(req);
+const employeeId = req.params.id;
+
+```
+const login = safeText(req.body.login);
+const tempPassword = safeText(req.body.tempPassword) || generatePassword();
+
+if (!organizationId || !employeeId || !login || !tempPassword) {
+  return res.status(400).json({
+    success: false,
+    message: "organization_id, сотрудник, логин и пароль обязательны.",
+  });
+}
+
+const { data: employee, error: employeeError } = await supabase
+  .from("organization_employees")
+  .select("*")
+  .eq("id", employeeId)
+  .eq("organization_id", organizationId)
+  .single();
+
+if (employeeError || !employee) {
+  return res.status(404).json({
+    success: false,
+    message: "Сотрудник не найден.",
+  });
+}
+
+const passwordHash = hashPassword(tempPassword);
+const role = employee.role || getRoleByPosition(employee.position);
+
+const { data: updatedEmployee, error: updateError } = await supabase
+  .from("organization_employees")
+  .update({
+    login,
+    password_hash: passwordHash,
+    must_change_password: true,
+    status: "active",
+    updated_at: new Date().toISOString(),
+  })
+  .eq("id", employeeId)
+  .eq("organization_id", organizationId)
+  .select("*")
+  .single();
+
+if (updateError) {
+  return res.status(500).json({
+    success: false,
+    message: updateError.message,
+  });
+}
+
+const { error: userError } = await supabase.from("organization_users").upsert(
+  {
+    organization_id: organizationId,
+    application_id: employee.application_id || null,
+    city: req.body.city || employee.city || "",
+    bin: req.body.bin || employee.bin || "",
+    full_name: employee.full_name,
+    phone: employee.phone || "",
+    email: employee.email || "",
+    role,
+    login,
+    password_hash: passwordHash,
+    must_change_password: true,
+    status: "active",
+    updated_at: new Date().toISOString(),
+  },
+  {
+    onConflict: "organization_id,login",
+  }
+);
+
+if (userError) {
+  return res.status(500).json({
+    success: false,
+    message: userError.message,
+  });
+}
+
+return res.status(200).json({
+  success: true,
+  message: "Доступ сотруднику создан.",
+  tempPassword,
+  employee: updatedEmployee,
+});
+```
+
+} catch (error) {
+return res.status(500).json({
+success: false,
+message: error.message || "Ошибка создания доступа.",
+});
+}
+});
+
+router.patch("/employees/:id/reset-password", async (req, res) => {
+try {
+const organizationId = getOrganizationId(req);
+const employeeId = req.params.id;
+const tempPassword = safeText(req.body.tempPassword) || generatePassword();
+
+```
+if (!organizationId || !employeeId) {
+  return res.status(400).json({
+    success: false,
+    message: "organization_id и сотрудник обязательны.",
+  });
+}
+
+const { data: employee, error: employeeError } = await supabase
+  .from("organization_employees")
+  .select("*")
+  .eq("id", employeeId)
+  .eq("organization_id", organizationId)
+  .single();
+
+if (employeeError || !employee) {
+  return res.status(404).json({
+    success: false,
+    message: "Сотрудник не найден.",
+  });
+}
+
+if (!employee.login) {
+  return res.status(400).json({
+    success: false,
+    message: "У сотрудника ещё нет логина.",
+  });
+}
+
+const passwordHash = hashPassword(tempPassword);
+
+const { data: updatedEmployee, error: updateError } = await supabase
+  .from("organization_employees")
+  .update({
+    password_hash: passwordHash,
+    must_change_password: true,
+    updated_at: new Date().toISOString(),
+  })
+  .eq("id", employeeId)
+  .eq("organization_id", organizationId)
+  .select("*")
+  .single();
+
+if (updateError) {
+  return res.status(500).json({
+    success: false,
+    message: updateError.message,
+  });
+}
+
+const { error: userError } = await supabase
+  .from("organization_users")
+  .update({
+    password_hash: passwordHash,
+    must_change_password: true,
+    updated_at: new Date().toISOString(),
+  })
+  .eq("organization_id", organizationId)
+  .eq("login", employee.login);
+
+if (userError) {
+  return res.status(500).json({
+    success: false,
+    message: userError.message,
+  });
+}
+
+return res.status(200).json({
+  success: true,
+  message: "Пароль сброшен.",
+  tempPassword,
+  employee: updatedEmployee,
+});
+```
+
+} catch (error) {
+return res.status(500).json({
+success: false,
+message: error.message || "Ошибка сброса пароля.",
+});
+}
+});
+
+router.patch("/employees/:id/block", async (req, res) => {
+try {
+const organizationId = getOrganizationId(req);
+const employeeId = req.params.id;
+
+```
+const { data: employee, error: employeeError } = await supabase
+  .from("organization_employees")
+  .select("*")
+  .eq("id", employeeId)
+  .eq("organization_id", organizationId)
+  .single();
+
+if (employeeError || !employee) {
+  return res.status(404).json({
+    success: false,
+    message: "Сотрудник не найден.",
+  });
+}
+
+const { data: updatedEmployee, error: updateError } = await supabase
+  .from("organization_employees")
+  .update({
+    status: "blocked",
+    updated_at: new Date().toISOString(),
+  })
+  .eq("id", employeeId)
+  .eq("organization_id", organizationId)
+  .select("*")
+  .single();
+
+if (updateError) {
+  return res.status(500).json({
+    success: false,
+    message: updateError.message,
+  });
+}
+
+if (employee.login) {
+  await supabase
+    .from("organization_users")
+    .update({
+      status: "blocked",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("organization_id", organizationId)
+    .eq("login", employee.login);
+}
+
+return res.status(200).json({
+  success: true,
+  message: "Доступ заблокирован.",
+  employee: updatedEmployee,
+});
+```
+
+} catch (error) {
+return res.status(500).json({
+success: false,
+message: error.message || "Ошибка блокировки доступа.",
+});
+}
+});
+
+router.patch("/employees/:id/unblock", async (req, res) => {
+try {
+const organizationId = getOrganizationId(req);
+const employeeId = req.params.id;
+
+```
+const { data: employee, error: employeeError } = await supabase
+  .from("organization_employees")
+  .select("*")
+  .eq("id", employeeId)
+  .eq("organization_id", organizationId)
+  .single();
+
+if (employeeError || !employee) {
+  return res.status(404).json({
+    success: false,
+    message: "Сотрудник не найден.",
+  });
+}
+
+const { data: updatedEmployee, error: updateError } = await supabase
+  .from("organization_employees")
+  .update({
+    status: "active",
+    updated_at: new Date().toISOString(),
+  })
+  .eq("id", employeeId)
+  .eq("organization_id", organizationId)
+  .select("*")
+  .single();
+
+if (updateError) {
+  return res.status(500).json({
+    success: false,
+    message: updateError.message,
+  });
+}
+
+if (employee.login) {
+  await supabase
+    .from("organization_users")
+    .update({
+      status: "active",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("organization_id", organizationId)
+    .eq("login", employee.login);
+}
+
+return res.status(200).json({
+  success: true,
+  message: "Доступ разблокирован.",
+  employee: updatedEmployee,
+});
+```
+
+} catch (error) {
+return res.status(500).json({
+success: false,
+message: error.message || "Ошибка разблокировки доступа.",
+});
+}
 });
 
 export default router;

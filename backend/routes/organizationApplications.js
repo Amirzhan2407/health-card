@@ -51,7 +51,6 @@ function normalizeApplicationType(type) {
 
 function parseAdministrators(value) {
   if (!value) return [];
-
   if (Array.isArray(value)) return value;
 
   try {
@@ -59,6 +58,17 @@ function parseAdministrators(value) {
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
+  }
+}
+
+function parseHrSpecialist(value) {
+  if (!value) return null;
+  if (typeof value === "object") return value;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
   }
 }
 
@@ -176,6 +186,7 @@ async function createOrganizationFromApplication(application, adminId) {
     .update({
       organization_id: data.id,
       status: "waiting_first_login",
+      updated_at: new Date().toISOString(),
     })
     .eq("id", application.id);
 
@@ -447,6 +458,7 @@ router.patch("/:id/status", requireAdminAuth, async (req, res) => {
       .update({
         status,
         review_comment: comment || null,
+        updated_at: new Date().toISOString(),
       })
       .eq("id", id)
       .select("*")
@@ -548,6 +560,7 @@ router.patch("/:id/assign", requireAdminAuth, async (req, res) => {
       .update({
         assigned_admin_id: assignedAdminId,
         status: current.status === "new" ? "assigned" : current.status,
+        updated_at: new Date().toISOString(),
       })
       .eq("id", id)
       .select("*")
@@ -600,7 +613,7 @@ router.post("/:id/send-access", requireAdminAuth, async (req, res) => {
     const { id } = req.params;
     const { role, index, fullName, email, login, tempPassword } = req.body;
 
-    if (!["chief", "admin"].includes(role)) {
+    if (!["chief", "admin", "hr"].includes(role)) {
       return res.status(400).json({
         success: false,
         message: "Неверная роль доступа.",
@@ -657,9 +670,18 @@ router.post("/:id/send-access", requireAdminAuth, async (req, res) => {
     }
 
     const roleLabel =
-      role === "chief" ? "Главный врач" : `Администратор #${Number(index) + 1}`;
+      role === "chief"
+        ? "Главный врач"
+        : role === "hr"
+        ? "Отдел кадров"
+        : `Администратор #${Number(index) + 1}`;
 
-    const userRole = role === "chief" ? "chief_doctor" : "organization_admin";
+    const userRole =
+      role === "chief"
+        ? "chief_doctor"
+        : role === "hr"
+        ? "hr"
+        : "organization_admin";
 
     let phone = null;
 
@@ -668,6 +690,9 @@ router.post("/:id/send-access", requireAdminAuth, async (req, res) => {
         application.new_chief_doctor_phone ||
         application.chief_doctor_phone ||
         null;
+    } else if (role === "hr") {
+      const hr = parseHrSpecialist(application.hr_specialist);
+      phone = hr?.phone || null;
     } else {
       const admins = parseAdministrators(application.administrators);
       const adminItem = admins[Number(index)] || null;

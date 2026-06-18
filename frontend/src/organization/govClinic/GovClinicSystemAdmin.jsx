@@ -31,37 +31,17 @@ const DEPARTMENT_OPTIONS = [
   "ИТ отдел",
 ];
 
-const POSITION_OPTIONS = [
-  "Врач-терапевт",
-  "Врач-педиатр",
-  "Врач-хирург",
-  "Врач-травматолог",
-  "Врач-невропатолог",
-  "Врач-кардиолог",
-  "Врач-эндокринолог",
-  "Врач-ЛОР",
-  "Врач-офтальмолог",
-  "Врач-гинеколог",
-  "Врач-дерматолог",
-  "Врач-инфекционист",
-  "Врач-рентгенолог",
-  "Врач УЗИ",
-  "Медицинская сестра",
-  "Старшая медицинская сестра",
-  "Фельдшер",
-  "Регистратор",
-  "Лаборант",
-  "Бухгалтер",
-  "Специалист отдела кадров",
-  "Системный администратор",
-  "Заведующий отделением",
-  "Заместитель главного врача",
-];
-
 function generatePassword() {
   const a = Math.random().toString(36).slice(2, 6).toUpperCase();
   const b = Math.random().toString(36).slice(2, 6).toUpperCase();
   return `${a}-${b}`;
+}
+
+function getStatusText(status) {
+  if (status === "active") return "Активен";
+  if (status === "blocked") return "Заблокирован";
+  if (status === "no_access") return "Нет доступа";
+  return status || "Нет доступа";
 }
 
 export default function GovClinicSystemAdmin() {
@@ -82,6 +62,8 @@ export default function GovClinicSystemAdmin() {
   const [departments, setDepartments] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [accessEmployee, setAccessEmployee] = useState(null);
+
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -91,27 +73,19 @@ export default function GovClinicSystemAdmin() {
     rooms: "",
   });
 
-  const [employeeForm, setEmployeeForm] = useState({
-    fullName: "",
-    age: "",
-    phone: "",
-    email: "",
-    position: "",
-    departmentId: "",
-    cabinet: "",
+  const [accessForm, setAccessForm] = useState({
     login: "",
     tempPassword: "",
-    documents: [],
   });
 
   const [filters, setFilters] = useState({
     search: "",
     departmentId: "all",
+    status: "all",
   });
 
   useEffect(() => {
     if (!organizationId) return;
-
     loadData();
   }, [organizationId]);
 
@@ -166,37 +140,29 @@ export default function GovClinicSystemAdmin() {
         String(employee.phone || "").toLowerCase().includes(search) ||
         String(employee.email || "").toLowerCase().includes(search) ||
         String(employee.cabinet || "").toLowerCase().includes(search) ||
-        String(employee.position || "").toLowerCase().includes(search);
+        String(employee.position || "").toLowerCase().includes(search) ||
+        String(employee.login || "").toLowerCase().includes(search);
 
       const matchesDepartment =
         filters.departmentId === "all" ||
         String(employee.department_id) === String(filters.departmentId);
 
-      return matchesSearch && matchesDepartment;
+      const status = employee.login ? employee.status || "active" : "no_access";
+
+      const matchesStatus =
+        filters.status === "all" || String(status) === String(filters.status);
+
+      return matchesSearch && matchesDepartment && matchesStatus;
     });
   }, [employees, filters]);
 
-  const documentsCount = employees.reduce((total, employee) => {
-    return total + (employee.documents?.length || 0);
-  }, 0);
+  const noAccessCount = employees.filter((e) => !e.login).length;
+  const activeCount = employees.filter((e) => e.login && e.status === "active").length;
+  const blockedCount = employees.filter((e) => e.status === "blocked").length;
 
   function updateDepartmentForm(e) {
     const { name, value } = e.target;
     setDepartmentForm((prev) => ({ ...prev, [name]: value }));
-  }
-
-  function updateEmployeeForm(e) {
-    const { name, value, files } = e.target;
-
-    if (name === "documents") {
-      setEmployeeForm((prev) => ({
-        ...prev,
-        documents: Array.from(files || []).map((file) => file.name),
-      }));
-      return;
-    }
-
-    setEmployeeForm((prev) => ({ ...prev, [name]: value }));
   }
 
   async function addDepartment(e) {
@@ -255,29 +221,30 @@ export default function GovClinicSystemAdmin() {
     }
   }
 
-  async function addEmployee(e) {
+  function openAccessModal(employee) {
+    const loginBase = String(employee.full_name || "")
+      .toLowerCase()
+      .replace(/[^a-zа-яё0-9]+/gi, ".")
+      .replace(/^\.+|\.+$/g, "");
+
+    setAccessEmployee(employee);
+    setAccessForm({
+      login: employee.login || loginBase || "",
+      tempPassword: generatePassword(),
+    });
+  }
+
+  async function createAccess(e) {
     e.preventDefault();
 
-    if (!organizationId) {
-      setMessage("organizationId не найден. Перезайдите в аккаунт.");
-      return;
-    }
-
-    if (
-      !employeeForm.fullName.trim() ||
-      !employeeForm.departmentId ||
-      !employeeForm.position
-    ) {
-      setMessage("Заполните ФИО, должность и отделение.");
-      return;
-    }
+    if (!accessEmployee) return;
 
     setLoading(true);
     setMessage("");
 
     try {
       const response = await fetch(
-        `${API_URL}/api/organization-structure/employees`,
+        `${API_URL}/api/organization-structure/employees/${accessEmployee.id}/access`,
         {
           method: "POST",
           headers: {
@@ -288,7 +255,8 @@ export default function GovClinicSystemAdmin() {
             organizationId,
             city: organizationUser?.city || "",
             bin: organizationUser?.bin || "",
-            ...employeeForm,
+            login: accessForm.login,
+            tempPassword: accessForm.tempPassword,
           }),
         }
       );
@@ -296,27 +264,96 @@ export default function GovClinicSystemAdmin() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.message || "Ошибка добавления сотрудника.");
+        throw new Error(result.message || "Ошибка создания доступа.");
       }
 
-      setEmployees((prev) => [...prev, result.employee]);
+      setEmployees((prev) =>
+        prev.map((item) =>
+          item.id === accessEmployee.id ? result.employee : item
+        )
+      );
 
-      setEmployeeForm({
-        fullName: "",
-        age: "",
-        phone: "",
-        email: "",
-        position: "",
-        departmentId: "",
-        cabinet: "",
-        login: "",
-        tempPassword: "",
-        documents: [],
-      });
-
-      setMessage("Сотрудник сохранён.");
+      setMessage(`Доступ создан. Временный пароль: ${result.tempPassword}`);
+      setAccessEmployee(null);
     } catch (error) {
-      setMessage(error.message || "Ошибка добавления сотрудника.");
+      setMessage(error.message || "Ошибка создания доступа.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function resetPassword(employee) {
+    const tempPassword = generatePassword();
+
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/organization-structure/employees/${employee.id}/reset-password`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "x-organization-id": organizationId,
+          },
+          body: JSON.stringify({
+            organizationId,
+            tempPassword,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Ошибка сброса пароля.");
+      }
+
+      setEmployees((prev) =>
+        prev.map((item) => (item.id === employee.id ? result.employee : item))
+      );
+
+      setMessage(`Пароль сброшен. Новый временный пароль: ${result.tempPassword}`);
+    } catch (error) {
+      setMessage(error.message || "Ошибка сброса пароля.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function changeBlockStatus(employee, action) {
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/organization-structure/employees/${employee.id}/${action}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "x-organization-id": organizationId,
+          },
+          body: JSON.stringify({
+            organizationId,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Ошибка изменения статуса.");
+      }
+
+      setEmployees((prev) =>
+        prev.map((item) => (item.id === employee.id ? result.employee : item))
+      );
+
+      setMessage(result.message || "Статус обновлен.");
+    } catch (error) {
+      setMessage(error.message || "Ошибка изменения статуса.");
     } finally {
       setLoading(false);
     }
@@ -333,7 +370,7 @@ export default function GovClinicSystemAdmin() {
       departmentId: employee.department_id || employee.departmentId || "",
       cabinet: employee.cabinet || "",
       login: employee.login || "",
-      tempPassword: employee.tempPassword || "",
+      status: employee.login ? employee.status || "active" : "no_access",
       documents: employee.documents || [],
     };
   }
@@ -344,7 +381,7 @@ export default function GovClinicSystemAdmin() {
         <div>
           <h2 className="gov-page-title">Администратор организации</h2>
           <p className="gov-page-subtitle">
-            Создание отделений, сотрудников, кабинетов и документов поликлиники.
+            Управление отделениями и доступами сотрудников.
           </p>
         </div>
       </div>
@@ -365,8 +402,18 @@ export default function GovClinicSystemAdmin() {
           </div>
 
           <div className="admin-stat-card">
-            <span>Документов в карточках</span>
-            <b>{documentsCount}</b>
+            <span>Без доступа</span>
+            <b>{noAccessCount}</b>
+          </div>
+
+          <div className="admin-stat-card">
+            <span>Активных доступов</span>
+            <b>{activeCount}</b>
+          </div>
+
+          <div className="admin-stat-card">
+            <span>Заблокировано</span>
+            <b>{blockedCount}</b>
           </div>
 
           <div className="admin-stat-card">
@@ -454,7 +501,9 @@ export default function GovClinicSystemAdmin() {
                       <div className="department-people">
                         {people.length ? (
                           people.map((person) => (
-                            <span key={person.id}>{person.full_name}</span>
+                            <span key={person.id}>
+                              {person.full_name} — {person.position || "должность не указана"}
+                            </span>
                           ))
                         ) : (
                           <em>Сотрудники пока не добавлены</em>
@@ -472,213 +521,121 @@ export default function GovClinicSystemAdmin() {
       )}
 
       {tab === "employees" && (
-        <div className="org-admin-grid">
-          <section className="gov-card">
-            <h3>Добавить сотрудника</h3>
+        <section className="gov-card">
+          <div className="employee-top">
+            <div>
+              <h3>Доступы сотрудников</h3>
+              <p className="gov-page-subtitle">
+                Сотрудников добавляет отдел кадров. Администратор только выдает логин и пароль.
+              </p>
+            </div>
 
-            <form className="org-admin-form" onSubmit={addEmployee}>
-              <label>
-                ФИО
-                <input
-                  name="fullName"
-                  value={employeeForm.fullName}
-                  onChange={updateEmployeeForm}
-                  placeholder="ФИО сотрудника"
-                  required
-                />
-              </label>
+            <div className="employee-filters">
+              <input
+                value={filters.search}
+                onChange={(e) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    search: e.target.value,
+                  }))
+                }
+                placeholder="Поиск по ФИО, должности, логину"
+              />
 
-              <label>
-                Возраст
-                <input
-                  name="age"
-                  value={employeeForm.age}
-                  onChange={updateEmployeeForm}
-                  placeholder="Например: 35"
-                />
-              </label>
+              <select
+                value={filters.departmentId}
+                onChange={(e) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    departmentId: e.target.value,
+                  }))
+                }
+              >
+                <option value="all">Все отделения</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
 
-              <label>
-                Номер телефона
-                <input
-                  name="phone"
-                  value={employeeForm.phone}
-                  onChange={updateEmployeeForm}
-                  placeholder="+7 777 000 00 00"
-                />
-              </label>
+              <select
+                value={filters.status}
+                onChange={(e) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    status: e.target.value,
+                  }))
+                }
+              >
+                <option value="all">Все статусы</option>
+                <option value="no_access">Нет доступа</option>
+                <option value="active">Активен</option>
+                <option value="blocked">Заблокирован</option>
+              </select>
+            </div>
+          </div>
 
-              <label>
-                Почта
-                <input
-                  name="email"
-                  value={employeeForm.email}
-                  onChange={updateEmployeeForm}
-                  placeholder="employee@clinic.kz"
-                />
-              </label>
+          <div className="employee-card-list">
+            {filteredEmployees.length ? (
+              filteredEmployees.map((employee) => {
+                const item = normalizeEmployee(employee);
 
-              <label>
-                Должность
-                <select
-                  name="position"
-                  value={employeeForm.position}
-                  onChange={updateEmployeeForm}
-                  required
-                >
-                  <option value="">Выберите должность</option>
-                  {POSITION_OPTIONS.map((position) => (
-                    <option key={position} value={position}>
-                      {position}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                Отделение
-                <select
-                  name="departmentId"
-                  value={employeeForm.departmentId}
-                  onChange={updateEmployeeForm}
-                  required
-                >
-                  <option value="">Выберите отделение</option>
-                  {departments.map((department) => (
-                    <option key={department.id} value={department.id}>
-                      {department.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                Кабинет
-                <input
-                  name="cabinet"
-                  value={employeeForm.cabinet}
-                  onChange={updateEmployeeForm}
-                  placeholder="Например: 103"
-                />
-              </label>
-
-              <label>
-                Логин
-                <input
-                  name="login"
-                  value={employeeForm.login}
-                  onChange={updateEmployeeForm}
-                  placeholder="Например: doctor103"
-                />
-              </label>
-
-              <label>
-                Одноразовый пароль
-                <div className="password-row">
-                  <input
-                    name="tempPassword"
-                    value={employeeForm.tempPassword}
-                    onChange={updateEmployeeForm}
-                    placeholder="Одноразовый пароль"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setEmployeeForm((prev) => ({
-                        ...prev,
-                        tempPassword: generatePassword(),
-                      }))
-                    }
+                return (
+                  <div
+                    className="employee-card"
+                    key={item.id}
+                    onDoubleClick={() => setSelectedEmployee(item)}
                   >
-                    Сгенерировать
-                  </button>
-                </div>
-              </label>
-
-              <label>
-                Документы
-                <input
-                  name="documents"
-                  type="file"
-                  multiple
-                  onChange={updateEmployeeForm}
-                />
-              </label>
-
-              <button type="submit" disabled={loading}>
-                Добавить сотрудника
-              </button>
-            </form>
-          </section>
-
-          <section className="gov-card org-admin-wide">
-            <div className="employee-top">
-              <h3>Сотрудники</h3>
-
-              <div className="employee-filters">
-                <input
-                  value={filters.search}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      search: e.target.value,
-                    }))
-                  }
-                  placeholder="Поиск по ФИО, телефону, почте, кабинету"
-                />
-
-                <select
-                  value={filters.departmentId}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      departmentId: e.target.value,
-                    }))
-                  }
-                >
-                  <option value="all">Все отделения</option>
-                  {departments.map((department) => (
-                    <option key={department.id} value={department.id}>
-                      {department.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="employee-card-list">
-              {filteredEmployees.length ? (
-                filteredEmployees.map((employee) => {
-                  const item = normalizeEmployee(employee);
-
-                  return (
-                    <div
-                      className="employee-card"
-                      key={item.id}
-                      onDoubleClick={() => setSelectedEmployee(item)}
-                    >
-                      <div>
-                        <h4>{item.fullName}</h4>
-                        <p>{item.position || "Должность не указана"}</p>
-                      </div>
-
-                      <div className="employee-card-info">
-                        <span>Возраст: {item.age || "—"}</span>
-                        <span>
-                          Отделение: {getDepartmentName(item.departmentId)}
-                        </span>
-                        <span>Кабинет: {item.cabinet || "—"}</span>
-                      </div>
+                    <div>
+                      <h4>{item.fullName}</h4>
+                      <p>{item.position || "Должность не указана"}</p>
                     </div>
-                  );
-                })
-              ) : (
-                <p className="empty-text">Сотрудники пока не добавлены.</p>
-              )}
-            </div>
-          </section>
-        </div>
+
+                    <div className="employee-card-info">
+                      <span>Отделение: {getDepartmentName(item.departmentId)}</span>
+                      <span>Кабинет: {item.cabinet || "—"}</span>
+                      <span>Логин: {item.login || "не создан"}</span>
+                      <span>Статус: {getStatusText(item.status)}</span>
+                    </div>
+
+                    <div className="employee-actions">
+                      {!item.login ? (
+                        <button type="button" onClick={() => openAccessModal(employee)}>
+                          Создать доступ
+                        </button>
+                      ) : (
+                        <>
+                          <button type="button" onClick={() => resetPassword(employee)}>
+                            Сбросить пароль
+                          </button>
+
+                          {item.status === "blocked" ? (
+                            <button
+                              type="button"
+                              onClick={() => changeBlockStatus(employee, "unblock")}
+                            >
+                              Разблокировать
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => changeBlockStatus(employee, "block")}
+                            >
+                              Заблокировать
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="empty-text">Сотрудники пока не добавлены отделом кадров.</p>
+            )}
+          </div>
+        </section>
       )}
 
       {selectedEmployee && (
@@ -726,8 +683,8 @@ export default function GovClinicSystemAdmin() {
               </div>
 
               <div>
-                <span>Одноразовый пароль</span>
-                <b>{selectedEmployee.tempPassword || "—"}</b>
+                <span>Статус</span>
+                <b>{getStatusText(selectedEmployee.status)}</b>
               </div>
             </div>
 
@@ -742,6 +699,67 @@ export default function GovClinicSystemAdmin() {
                 <em>Документы не прикреплены</em>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {accessEmployee && (
+        <div className="employee-modal" onClick={() => setAccessEmployee(null)}>
+          <div className="employee-modal-card" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setAccessEmployee(null)}>×</button>
+
+            <h3>Создать доступ</h3>
+            <p>
+              {accessEmployee.full_name} — {accessEmployee.position}
+            </p>
+
+            <form className="org-admin-form" onSubmit={createAccess}>
+              <label>
+                Логин
+                <input
+                  value={accessForm.login}
+                  onChange={(e) =>
+                    setAccessForm((prev) => ({
+                      ...prev,
+                      login: e.target.value,
+                    }))
+                  }
+                  required
+                />
+              </label>
+
+              <label>
+                Временный пароль
+                <div className="password-row">
+                  <input
+                    value={accessForm.tempPassword}
+                    onChange={(e) =>
+                      setAccessForm((prev) => ({
+                        ...prev,
+                        tempPassword: e.target.value,
+                      }))
+                    }
+                    required
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setAccessForm((prev) => ({
+                        ...prev,
+                        tempPassword: generatePassword(),
+                      }))
+                    }
+                  >
+                    Сгенерировать
+                  </button>
+                </div>
+              </label>
+
+              <button type="submit" disabled={loading}>
+                Выдать доступ
+              </button>
+            </form>
           </div>
         </div>
       )}
