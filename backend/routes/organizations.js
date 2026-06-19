@@ -88,6 +88,21 @@ router.post("/login", async (req, res) => {
 
     if (dbUser && !userError) {
       user = dbUser;
+      if (user.role === "employee") {
+        const { data: emp } = await supabase
+          .from("organization_employees")
+          .select("*")
+          .eq("login", user.login)
+          .eq("organization_id", user.organization_id)
+          .maybeSingle();
+
+        if (emp) {
+          const resolvedRole = getRoleByPosition(emp.position);
+          if (resolvedRole && resolvedRole !== "employee") {
+            user.role = resolvedRole;
+          }
+        }
+      }
     } else {
       // Fallback: search in organization_employees
       const { data: emp, error: empError } = await supabase
@@ -99,7 +114,7 @@ router.post("/login", async (req, res) => {
         .maybeSingle();
 
       if (emp && !empError) {
-        const resolvedRole = emp.role || getRoleByPosition(emp.position) || "employee";
+        const resolvedRole = getRoleByPosition(emp.position) || "employee";
         user = {
           id: emp.id,
           organization_id: emp.organization_id,
@@ -223,23 +238,40 @@ if (updateError) {
   });
 }
 
-return res.status(200).json({
-  success: true,
-  message: "Пароль успешно изменён.",
-  mustChangePassword: false,
-  redirectPath: getRedirectPath(user.role),
-  user: {
-    id: user.id,
-    organization_id: user.organization_id,
-    full_name: user.full_name,
-    email: user.email,
-    role: user.role,
-    login: user.login,
-    city: user.city,
-    bin: user.bin,
-    must_change_password: false,
-  },
-});
+  let resolvedRole = user.role;
+  if (resolvedRole === "employee") {
+    const { data: emp } = await supabase
+      .from("organization_employees")
+      .select("*")
+      .eq("login", user.login)
+      .eq("organization_id", user.organization_id)
+      .maybeSingle();
+
+    if (emp) {
+      const parsedRole = getRoleByPosition(emp.position);
+      if (parsedRole && parsedRole !== "employee") {
+        resolvedRole = parsedRole;
+      }
+    }
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: "Пароль успешно изменён.",
+    mustChangePassword: false,
+    redirectPath: getRedirectPath(resolvedRole),
+    user: {
+      id: user.id,
+      organization_id: user.organization_id,
+      full_name: user.full_name,
+      email: user.email,
+      role: resolvedRole,
+      login: user.login,
+      city: user.city,
+      bin: user.bin,
+      must_change_password: false,
+    },
+  });
 
 
 } catch (error) {

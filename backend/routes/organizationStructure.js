@@ -695,6 +695,18 @@ if (role === "chief" || role === "chief_doctor") {
   role = "employee";
 }
 
+// Map the role to a DB-compatible value to satisfy organization_users_role_check constraint
+let dbRole = "employee";
+if (role === "chief_doctor" || role === "chief") {
+  dbRole = "chief_doctor";
+} else if (role === "organization_admin" || role === "admin") {
+  dbRole = "organization_admin";
+} else if (role === "hr") {
+  dbRole = "hr";
+} else {
+  dbRole = "employee";
+}
+
 const { data: updatedEmployee, error: updateError } = await supabase
   .from("organization_employees")
   .update({
@@ -725,7 +737,7 @@ const { error: userError } = await supabase.from("organization_users").upsert(
     full_name: employee.full_name,
     phone: employee.phone || "",
     email: employee.email || "",
-    role,
+    role: dbRole,
     login,
     password_hash: passwordHash,
     must_change_password: true,
