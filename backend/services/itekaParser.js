@@ -663,4 +663,3 @@ function getMockMedicineData(medicine, city, options) {
     pharmacies: pharmacies.slice(0, 8)
   };
 }
-}
