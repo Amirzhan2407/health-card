@@ -115,6 +115,17 @@ app.get("/api/test-db-insert", async (req, res) => {
 });
 
 
+app.get("/api/debug-constraint-rpc", async (req, res) => {
+  try {
+    const { data: constraints, error: constError } = await supabase
+      .rpc('get_constraint_definition', { t_name: 'organization_users', c_name: 'organization_users_role_check' });
+    
+    res.status(200).json({ success: true, constraints, error: constError });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.use("/api/pharmacy", pharmacyRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/admin", adminRoutes);
