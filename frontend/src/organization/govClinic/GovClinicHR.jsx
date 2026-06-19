@@ -30,7 +30,6 @@ const POSITIONS = [
 
 const EMPTY_FORM = {
   full_name: "",
-  iin: "",
   phone: "",
   email: "",
   position: "",
@@ -193,7 +192,6 @@ try {
   const payload = {
     organization_id: user.organization_id,
     full_name: form.full_name.trim(),
-    iin: form.iin.trim(),
     phone: form.phone.trim(),
     email: form.email.trim(),
     position: form.position.trim(),
@@ -240,7 +238,6 @@ setEditingId(employee.id);
 
 setForm({
   full_name: employee.full_name || "",
-  iin: employee.iin || "",
   phone: employee.phone || "",
   email: employee.email || "",
   position: employee.position || "",
@@ -573,16 +570,7 @@ return ( <div> <h2 className="gov-page-title">Отдел кадров</h2>
             />
           </label>
 
-          <label>
-            ИИН (12 цифр)
-            <input
-              name="iin"
-              value={form.iin}
-              onChange={updateField}
-              placeholder="12 цифр"
-              maxLength={12}
-            />
-          </label>
+
 
           <label>
             Номер телефона

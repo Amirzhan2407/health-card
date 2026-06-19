@@ -237,7 +237,6 @@ const organizationId = getOrganizationId(req);
 
 
 const fullName = safeText(req.body.full_name || req.body.fullName);
-const iin = safeText(req.body.iin);
 const age = safeText(req.body.age);
 const phone = safeText(req.body.phone);
 const email = safeText(req.body.email).toLowerCase();
@@ -268,7 +267,6 @@ const { data: employee, error } = await supabase
     organization_id: organizationId,
     department_id: departmentId,
     full_name: fullName,
-    iin,
     age,
     phone,
     email,
@@ -317,7 +315,6 @@ if (req.body.full_name !== undefined || req.body.fullName !== undefined) {
   payload.full_name = safeText(req.body.full_name || req.body.fullName);
 }
 
-if (req.body.iin !== undefined) payload.iin = safeText(req.body.iin);
 if (req.body.age !== undefined) payload.age = safeText(req.body.age);
 if (req.body.phone !== undefined) payload.phone = safeText(req.body.phone);
 
