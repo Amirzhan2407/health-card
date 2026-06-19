@@ -508,104 +508,118 @@ return ( <div> <h2 className="gov-page-title">Отдел кадров</h2>
   ) : null}
 
   {activeTab === "add" ? (
-    <form className="gov-card" onSubmit={saveEmployee}>
-      <h3>{editingId ? "Изменить сотрудника" : "Добавить сотрудника"}</h3>
+    <form className="gov-card" onSubmit={saveEmployee} style={{ maxWidth: '800px', margin: '0 auto' }}>
+      <h3 style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '16px', marginBottom: '24px' }}>
+        {editingId ? "✏️ Редактировать профиль сотрудника" : "👤 Добавление нового сотрудника"}
+      </h3>
 
-      <div className="gov-form-grid">
-        <label>
-          ФИО сотрудника
-          <input
-            name="full_name"
-            value={form.full_name}
-            onChange={updateField}
-            placeholder="Иванов Иван Иванович"
-            required
-          />
-        </label>
+      <div style={{ marginBottom: '32px' }}>
+        <h4 style={{ color: '#0f172a', margin: '0 0 16px', fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          📋 Личные данные
+        </h4>
+        <div className="gov-form-grid">
+          <label>
+            ФИО сотрудника
+            <input
+              name="full_name"
+              value={form.full_name}
+              onChange={updateField}
+              placeholder="Иванов Иван Иванович"
+              required
+            />
+          </label>
 
-        <label>
-          ИИН
-          <input
-            name="iin"
-            value={form.iin}
-            onChange={updateField}
-            placeholder="12 цифр"
-            maxLength={12}
-          />
-        </label>
+          <label>
+            ИИН (12 цифр)
+            <input
+              name="iin"
+              value={form.iin}
+              onChange={updateField}
+              placeholder="12 цифр"
+              maxLength={12}
+            />
+          </label>
 
-        <label>
-          Телефон
-          <input
-            name="phone"
-            value={form.phone}
-            onChange={updateField}
-            placeholder="+7 777 000 00 00"
-          />
-        </label>
+          <label>
+            Номер телефона
+            <input
+              name="phone"
+              value={form.phone}
+              onChange={updateField}
+              placeholder="+7 777 000 00 00"
+            />
+          </label>
 
-        <label>
-          Почта
-          <input
-            type="email"
-            name="email"
-            value={form.email}
-            onChange={updateField}
-            placeholder="doctor@clinic.kz"
-          />
-        </label>
-
-        <label>
-          Должность
-          <input
-            name="position"
-            value={form.position}
-            onChange={updateField}
-            placeholder="Терапевт"
-            required
-          />
-        </label>
-
-        <label>
-          Отделение
-          <input
-            name="department"
-            value={form.department}
-            onChange={updateField}
-            placeholder="Терапевтическое отделение"
-            required
-          />
-        </label>
-
-        <label>
-          Кабинет
-          <input
-            name="cabinet"
-            value={form.cabinet}
-            onChange={updateField}
-            placeholder="204"
-          />
-        </label>
-
-        <label>
-          Роль
-          <select name="role" value={form.role} onChange={updateField}>
-            <option value="doctor">Врач</option>
-            <option value="nurse">Медсестра / медбрат</option>
-            <option value="registrar">Регистратор</option>
-            <option value="department_head">Заведующий отделением</option>
-            <option value="deputy_chief_doctor">Заместитель главного врача</option>
-          </select>
-        </label>
+          <label>
+            Электронная почта
+            <input
+              type="email"
+              name="email"
+              value={form.email}
+              onChange={updateField}
+              placeholder="doctor@clinic.kz"
+            />
+          </label>
+        </div>
       </div>
 
-      <div className="gov-actions">
+      <div style={{ marginBottom: '32px' }}>
+        <h4 style={{ color: '#0f172a', margin: '0 0 16px', fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          💼 Профессиональные данные
+        </h4>
+        <div className="gov-form-grid">
+          <label>
+            Должность
+            <input
+              name="position"
+              value={form.position}
+              onChange={updateField}
+              placeholder="Терапевт"
+              required
+            />
+          </label>
+
+          <label>
+            Отделение
+            <input
+              name="department"
+              value={form.department}
+              onChange={updateField}
+              placeholder="Терапевтическое отделение"
+              required
+            />
+          </label>
+
+          <label>
+            Кабинет
+            <input
+              name="cabinet"
+              value={form.cabinet}
+              onChange={updateField}
+              placeholder="204"
+            />
+          </label>
+
+          <label>
+            Роль в системе
+            <select name="role" value={form.role} onChange={updateField}>
+              <option value="doctor">🩺 Врач</option>
+              <option value="nurse">💉 Медсестра / медбрат</option>
+              <option value="registrar">💻 Регистратор</option>
+              <option value="department_head">🏥 Заведующий отделением</option>
+              <option value="deputy_chief_doctor">👨‍⚕️ Заместитель главного врача</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div className="gov-actions" style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px', marginTop: '24px' }}>
         <button type="submit" disabled={saving}>
           {saving ? "Сохранение..." : editingId ? "Сохранить изменения" : "Добавить сотрудника"}
         </button>
 
         <button type="button" onClick={resetForm}>
-          Очистить
+          Очистить форму
         </button>
       </div>
     </form>
