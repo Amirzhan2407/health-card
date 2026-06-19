@@ -47,11 +47,17 @@ app.get("/api/health", (req, res) => {
 });
 
 app.get("/api/check-version", (req, res) => {
+  const url = process.env.SUPABASE_URL || "NOT SET";
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "NOT SET";
+  const maskedKey = key !== "NOT SET" ? key.substring(0, 8) + "..." : "NOT SET";
   res.status(200).json({
     success: true,
-    version: "v2-roles-fix"
+    version: "v2-roles-fix",
+    supabaseUrl: url,
+    supabaseKeyMasked: maskedKey
   });
 });
+
 
 
 app.use("/api/pharmacy", pharmacyRoutes);
