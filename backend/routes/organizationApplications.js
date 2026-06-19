@@ -678,10 +678,10 @@ router.post("/:id/send-access", requireAdminAuth, async (req, res) => {
 
     const userRole =
       role === "chief"
-        ? "chief_doctor"
+        ? "chief"
         : role === "hr"
         ? "hr"
-        : "organization_admin";
+        : "admin";
 
     let phone = null;
 

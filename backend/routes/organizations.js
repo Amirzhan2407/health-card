@@ -28,11 +28,11 @@ return hash === checkHash;
 }
 
 function getRedirectPath(role) {
-if (role === "chief_doctor") {
+if (role === "chief_doctor" || role === "chief") {
 return "/organization/gov-clinic/chief-doctor";
 }
 
-if (role === "organization_admin") {
+if (role === "organization_admin" || role === "admin") {
 return "/organization/gov-clinic/system-admin";
 }
 

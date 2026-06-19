@@ -680,7 +680,9 @@ if (employeeError || !employee) {
 }
 
 const passwordHash = hashPassword(tempPassword);
-const role = employee.role || getRoleByPosition(employee.position);
+let role = employee.role || getRoleByPosition(employee.position);
+if (role === "chief_doctor") role = "chief";
+if (role === "organization_admin") role = "admin";
 
 const { data: updatedEmployee, error: updateError } = await supabase
   .from("organization_employees")
