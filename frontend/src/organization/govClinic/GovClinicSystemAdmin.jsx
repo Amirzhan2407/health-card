@@ -388,35 +388,81 @@ export default function GovClinicSystemAdmin() {
       {loading ? <div className="admin-message">Загрузка...</div> : null}
 
       {tab === "dashboard" && (
-        <div className="admin-stat-grid">
-          <div className="admin-stat-card">
-            <span>Отделений</span>
-            <b>{departments.length}</b>
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          <div className="admin-stat-grid">
+            <div className="admin-stat-card">
+              <span>Отделений</span>
+              <b>{departments.length}</b>
+            </div>
+
+            <div className="admin-stat-card">
+              <span>Сотрудников</span>
+              <b>{employees.length}</b>
+            </div>
+
+            <div className="admin-stat-card">
+              <span>Без доступа</span>
+              <b>{noAccessCount}</b>
+            </div>
+
+            <div className="admin-stat-card">
+              <span>Активных доступов</span>
+              <b>{activeCount}</b>
+            </div>
+
+            <div className="admin-stat-card">
+              <span>Заблокировано</span>
+              <b>{blockedCount}</b>
+            </div>
+
+            <div className="admin-stat-card">
+              <span>Кабинеты</span>
+              <b>{departments.filter((d) => d.rooms).length}</b>
+            </div>
           </div>
 
-          <div className="admin-stat-card">
-            <span>Сотрудников</span>
-            <b>{employees.length}</b>
-          </div>
-
-          <div className="admin-stat-card">
-            <span>Без доступа</span>
-            <b>{noAccessCount}</b>
-          </div>
-
-          <div className="admin-stat-card">
-            <span>Активных доступов</span>
-            <b>{activeCount}</b>
-          </div>
-
-          <div className="admin-stat-card">
-            <span>Заблокировано</span>
-            <b>{blockedCount}</b>
-          </div>
-
-          <div className="admin-stat-card">
-            <span>Кабинеты</span>
-            <b>{departments.filter((d) => d.rooms).length}</b>
+          <div className="gov-card" style={{ marginTop: "8px" }}>
+            <h3>Сотрудники, ожидающие создания доступа ({noAccessCount})</h3>
+            {employees.filter((emp) => !emp.login).length === 0 ? (
+              <p className="empty-text" style={{ margin: "10px 0 0" }}>Все сотрудники имеют доступы.</p>
+            ) : (
+              <div className="employee-card-list" style={{ marginTop: "16px" }}>
+                {employees
+                  .filter((emp) => !emp.login)
+                  .map((employee) => {
+                    const item = normalizeEmployee(employee);
+                    return (
+                      <div className="employee-card" key={item.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <h4 style={{ margin: 0 }}>{item.fullName}</h4>
+                          <p style={{ margin: "4px 0 0", color: "#64748b" }}>{item.position || "Должность не указана"}</p>
+                        </div>
+                        <div className="employee-card-info" style={{ textAlign: "right" }}>
+                          <span>Отделение: {getDepartmentName(item.departmentId)}</span>
+                          <span>Кабинет: {item.cabinet || "—"}</span>
+                        </div>
+                        <div className="employee-actions">
+                          <button
+                            type="button"
+                            onClick={() => openAccessModal(employee)}
+                            style={{
+                              background: "#00b85a",
+                              color: "#ffffff",
+                              border: 0,
+                              borderRadius: "10px",
+                              padding: "8px 16px",
+                              fontWeight: "bold",
+                              cursor: "pointer"
+                            }}
+                          >
+                            Создать доступ
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
           </div>
         </div>
       )}

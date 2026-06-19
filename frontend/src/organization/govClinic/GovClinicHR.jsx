@@ -453,7 +453,11 @@ return ( <div> <h2 className="gov-page-title">Отдел кадров</h2>
 
                 <span>{employee.position || "—"}</span>
                 <span>{employee.department || "—"}</span>
-                <span>{employee.status === "dismissed" ? "Уволен" : "Активен"}</span>
+                <span>
+                  <span className={`gov-status ${employee.status === "dismissed" ? "dismissed" : "active"}`}>
+                    {employee.status === "dismissed" ? "Уволен" : "Активен"}
+                  </span>
+                </span>
 
                 <span className="gov-actions">
                   <button
