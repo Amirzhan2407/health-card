@@ -1035,7 +1035,7 @@ router.get("/public/organizations", async (req, res) => {
     const { data, error } = await supabase
       .from("organizations")
       .select("id, organization_name, bin, city, status")
-      .eq("status", "approved");
+      .in("status", ["approved", "waiting_first_login"]);
 
     if (error) {
       // In case status filter doesn't match or table issues, query raw
