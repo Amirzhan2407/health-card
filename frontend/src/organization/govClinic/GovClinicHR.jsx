@@ -151,7 +151,6 @@ try {
     cabinet: form.cabinet.trim(),
     role: form.role,
     status: "active",
-    created_by_user_id: user.id,
   };
 
   const url = editingId

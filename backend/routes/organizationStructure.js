@@ -246,8 +246,6 @@ const departmentId = req.body.department_id || req.body.departmentId || null;
 const cabinet = safeText(req.body.cabinet);
 const role = safeText(req.body.role) || getRoleByPosition(position);
 const status = safeText(req.body.status) || "active";
-const createdByUserId =
-  req.body.created_by_user_id || req.body.createdByUserId || null;
 
 if (!organizationId) {
   return res.status(400).json({
@@ -281,7 +279,6 @@ const { data: employee, error } = await supabase
     password_hash: null,
     must_change_password: true,
     status,
-    created_by_user_id: createdByUserId,
     updated_at: new Date().toISOString(),
   })
   .select("*")
