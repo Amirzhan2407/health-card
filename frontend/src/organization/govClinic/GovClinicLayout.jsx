@@ -150,6 +150,14 @@ return ( <div className="gov-clinic-shell"> <aside className="gov-clinic-sidebar
           >
             Доступы
           </button>
+
+          <button
+            type="button"
+            className={currentTab === "support" ? "active" : ""}
+            onClick={() => goAdminTab("support")}
+          >
+            Поддержка
+          </button>
         </>
       ) : null}
 

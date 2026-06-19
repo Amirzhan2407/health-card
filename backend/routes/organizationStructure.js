@@ -4,7 +4,7 @@ import express from "express";
 import multer from "multer";
 import crypto from "crypto";
 import { supabase } from "../lib/supabaseAdmin.js";
-import { sendOrganizationAccessEmail } from "../services/emailService.js";
+import { sendOrganizationAccessEmail, sendAppointmentBookingEmail } from "../services/emailService.js";
 
 const router = express.Router();
 
@@ -1024,6 +1024,380 @@ success: false,
 message: error.message || "Ошибка разблокировки доступа.",
 });
 }
+});
+
+// In-memory fallback for appointments if DB table does not exist
+let inMemoryAppointments = [];
+
+// GET /api/organization-structure/public/organizations
+router.get("/public/organizations", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("organizations")
+      .select("id, organization_name, bin, city, status")
+      .eq("status", "approved");
+
+    if (error) {
+      // In case status filter doesn't match or table issues, query raw
+      const { data: rawData, error: rawError } = await supabase
+        .from("organizations")
+        .select("id, organization_name, bin, city");
+      if (rawError) throw rawError;
+      return res.status(200).json({ success: true, organizations: rawData || [] });
+    }
+
+    return res.status(200).json({ success: true, organizations: data || [] });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Ошибка получения списка организаций.",
+    });
+  }
+});
+
+// GET /api/organization-structure/appointments
+router.get("/appointments", async (req, res) => {
+  try {
+    const employeeId = req.query.employee_id || req.query.employeeId;
+    const date = req.query.date;
+
+    if (!employeeId || !date) {
+      return res.status(400).json({
+        success: false,
+        message: "employee_id и date обязательны.",
+      });
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("organization_appointments")
+        .select("*")
+        .eq("employee_id", employeeId)
+        .eq("date", date)
+        .order("time", { ascending: true });
+
+      if (error) throw error;
+
+      return res.status(200).json({
+        success: true,
+        appointments: data || [],
+      });
+    } catch (dbErr) {
+      console.warn("DB appointments query failed, fallback to memory:", dbErr.message);
+      const filtered = inMemoryAppointments.filter(
+        (app) => app.employee_id === employeeId && app.date === date
+      );
+      return res.status(200).json({
+        success: true,
+        appointments: filtered,
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Ошибка получения записей.",
+    });
+  }
+});
+
+// POST /api/organization-structure/appointments
+router.post("/appointments", async (req, res) => {
+  try {
+    const {
+      organization_id,
+      employee_id,
+      patient_name,
+      patient_iin,
+      patient_phone,
+      patient_email,
+      date,
+      time,
+      reason,
+      cabinet,
+      comment
+    } = req.body;
+
+    if (!organization_id || !employee_id || !patient_name || !patient_iin || !date || !time) {
+      return res.status(400).json({
+        success: false,
+        message: "Организация, сотрудник, ФИО, ИИН, дата и время обязательны.",
+      });
+    }
+
+    const newApp = {
+      id: crypto.randomUUID ? crypto.randomUUID() : "app-" + Date.now(),
+      organization_id,
+      employee_id,
+      patient_name,
+      patient_iin,
+      patient_phone: patient_phone || "",
+      patient_email: patient_email || "",
+      date,
+      time,
+      reason: reason || "Прием к врачу",
+      status: "pending",
+      cabinet: cabinet || "",
+      comment: comment || "",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    let savedApp = null;
+    let isInMemory = false;
+
+    try {
+      const { data, error } = await supabase
+        .from("organization_appointments")
+        .insert(newApp)
+        .select("*")
+        .single();
+
+      if (error) throw error;
+      savedApp = data;
+    } catch (dbErr) {
+      console.warn("DB appointments insert failed, fallback to memory:", dbErr.message);
+      inMemoryAppointments.push(newApp);
+      savedApp = newApp;
+      isInMemory = true;
+    }
+
+    // Load organization name and doctor name for email details
+    let orgName = "Медицинская организация";
+    let docName = "Врач";
+
+    try {
+      const { data: org } = await supabase.from("organizations").select("organization_name").eq("id", organization_id).maybeSingle();
+      if (org) orgName = org.organization_name;
+
+      const { data: emp } = await supabase.from("organization_employees").select("full_name, cabinet").eq("id", employee_id).maybeSingle();
+      if (emp) {
+        docName = emp.full_name;
+        if (!cabinet && emp.cabinet) {
+          savedApp.cabinet = emp.cabinet;
+          if (isInMemory) {
+            newApp.cabinet = emp.cabinet;
+          } else {
+            await supabase.from("organization_appointments").update({ cabinet: emp.cabinet }).eq("id", savedApp.id);
+          }
+        }
+      }
+    } catch (metaErr) {
+      console.warn("Meta lookup failed:", metaErr.message);
+    }
+
+    // Send email notification to client
+    if (patient_email) {
+      try {
+        await sendAppointmentBookingEmail({
+          to: patient_email,
+          patientName: patient_name,
+          organizationName: orgName,
+          doctorName: docName,
+          date,
+          time,
+          cabinet: savedApp.cabinet || cabinet || "—",
+          appointmentId: savedApp.id
+        });
+      } catch (emailErr) {
+        console.error("Booking email dispatch failed:", emailErr.message);
+      }
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: "Запись на прием успешно создана.",
+      appointment: savedApp,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Ошибка записи на прием.",
+    });
+  }
+});
+
+// PATCH /api/organization-structure/appointments/:id/status
+router.patch("/appointments/:id/status", async (req, res) => {
+  try {
+    const appId = req.params.id;
+    const { status } = req.body;
+
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        message: "Статус обязателен.",
+      });
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("organization_appointments")
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq("id", appId)
+        .select("*")
+        .single();
+
+      if (error) throw error;
+
+      return res.status(200).json({
+        success: true,
+        message: "Статус записи обновлен.",
+        appointment: data,
+      });
+    } catch (dbErr) {
+      console.warn("DB appointments status patch failed, fallback to memory:", dbErr.message);
+      const appIndex = inMemoryAppointments.findIndex((app) => app.id === appId);
+      if (appIndex !== -1) {
+        inMemoryAppointments[appIndex].status = status;
+        inMemoryAppointments[appIndex].updated_at = new Date().toISOString();
+        return res.status(200).json({
+          success: true,
+          message: "Статус записи обновлен (memory).",
+          appointment: inMemoryAppointments[appIndex],
+        });
+      }
+      return res.status(404).json({
+        success: false,
+        message: "Запись не найдена в памяти.",
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Ошибка обновления статуса.",
+    });
+  }
+});
+
+// GET /api/organization-structure/support-messages
+router.get("/support-messages", async (req, res) => {
+  try {
+    const organizationId = getOrganizationId(req);
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        message: "organization_id не указан.",
+      });
+    }
+
+    const { data, error } = await supabase
+      .from("admin_channel_messages")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: true });
+
+    if (error) throw error;
+
+    return res.status(200).json({
+      success: true,
+      messages: data || [],
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Ошибка получения сообщений поддержки.",
+    });
+  }
+});
+
+// POST /api/organization-structure/support-messages
+router.post("/support-messages", async (req, res) => {
+  try {
+    const organizationId = getOrganizationId(req);
+    const { message, senderUsername, senderFullName } = req.body;
+
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        message: "organization_id не указан.",
+      });
+    }
+
+    if (!message || !String(message).trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Сообщение не может быть пустым.",
+      });
+    }
+
+    const { data, error } = await supabase
+      .from("admin_channel_messages")
+      .insert({
+        organization_id: organizationId,
+        sender_username: senderUsername || "admin",
+        sender_full_name: senderFullName || "Администратор организации",
+        sender_role: "organization_admin",
+        message: String(message).trim(),
+        created_at: new Date().toISOString()
+      })
+      .select("*")
+      .single();
+
+    if (error) throw error;
+
+    return res.status(201).json({
+      success: true,
+      message: data,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Ошибка отправки сообщения поддержки.",
+    });
+  }
+});
+
+// POST /api/organization-structure/support-upload
+router.post("/support-upload", upload.any(), async (req, res) => {
+  try {
+    const organizationId = getOrganizationId(req);
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        message: "organization_id не указан.",
+      });
+    }
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Файл не прикреплен.",
+      });
+    }
+
+    const file = req.files[0];
+    const fileName = safeFileName(file.originalname);
+    const filePath =
+      organizationId +
+      "/support/" +
+      Date.now() +
+      "_" +
+      fileName;
+
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET_NAME)
+      .upload(filePath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: true,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data: publicUrlData } = supabase.storage
+      .from(BUCKET_NAME)
+      .getPublicUrl(filePath);
+
+    return res.status(201).json({
+      success: true,
+      file_url: publicUrlData ? publicUrlData.publicUrl : null,
+      file_name: fileName
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Ошибка загрузки документа.",
+    });
+  }
 });
 
 export default router;

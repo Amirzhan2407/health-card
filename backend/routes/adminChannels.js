@@ -340,4 +340,105 @@ router.post("/:category/messages", requireAdminAuth, async (req, res) => {
   }
 });
 
+// GET /api/admin-channels/organization/:orgId/messages
+router.get("/organization/:orgId/messages", requireAdminAuth, async (req, res) => {
+  try {
+    const { orgId } = req.params;
+
+    const { data: messages, error } = await supabase
+      .from("admin_channel_messages")
+      .select("*")
+      .eq("organization_id", orgId)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    const enrichedMessages = [];
+    for (const message of messages || []) {
+      if (message.sender_admin_id) {
+        enrichedMessages.push(await enrichMessage(message));
+      } else {
+        // Message from organization admin
+        enrichedMessages.push({
+          ...message,
+          sender_label: `${message.sender_full_name} (${message.sender_username || "Админ"})`
+        });
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      messages: enrichedMessages,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Ошибка получения сообщений организации.",
+    });
+  }
+});
+
+// POST /api/admin-channels/organization/:orgId/messages
+router.post("/organization/:orgId/messages", requireAdminAuth, async (req, res) => {
+  try {
+    const { orgId } = req.params;
+    const message = String(req.body.message || "").trim();
+
+    if (!message) {
+      return res.status(400).json({
+        success: false,
+        message: "Сообщение не может быть пустым.",
+      });
+    }
+
+    const username = getLogin(req.admin);
+    const fullName = getFullName(req.admin);
+    const role = getRole(req.admin);
+
+    const { data, error } = await supabase
+      .from("admin_channel_messages")
+      .insert({
+        sender_admin_id: req.admin.id,
+        sender_username: username,
+        sender_full_name: fullName,
+        sender_role: role,
+        message,
+        organization_id: orgId,
+      })
+      .select("*")
+      .single();
+
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    const senderLabel = makeSenderLabel({
+      username,
+      fullName,
+      role,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: {
+        ...data,
+        sender_label: senderLabel,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Ошибка отправки ответа.",
+    });
+  }
+});
+
 export default router;

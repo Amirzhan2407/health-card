@@ -541,3 +541,124 @@ export async function sendOrganizationAccessEmail({
     };
   }
 }
+
+export async function sendAppointmentBookingEmail({
+  to,
+  patientName,
+  organizationName,
+  doctorName,
+  date,
+  time,
+  cabinet,
+  appointmentId,
+}) {
+  if (!to) {
+    return {
+      success: false,
+      message: "Email получателя не указан.",
+    };
+  }
+
+  if (!GMAIL_FROM) {
+    return {
+      success: false,
+      message: "GMAIL_FROM не настроен на сервере.",
+    };
+  }
+
+  const subject = "Запись к врачу — Clinic OS";
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ClinicOS_Appointment_${appointmentId}`;
+
+  const html = `
+    <!doctype html>
+    <html lang="ru">
+      <head>
+        <meta charset="UTF-8" />
+        <title>${subject}</title>
+      </head>
+      <body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
+        <div style="max-width:600px;margin:28px auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:24px;overflow:hidden;box-shadow:0 10px 25px rgba(0,0,0,0.05);">
+          <div style="padding:26px 30px;background:#064e3b;color:#ffffff;">
+            <div style="font-size:24px;font-weight:900;outline:none;">Clinic OS</div>
+            <div style="font-size:13px;opacity:0.8;margin-top:4px;">Талон на прием к врачу</div>
+          </div>
+
+          <div style="padding:30px;">
+            <h2 style="color:#0f172a;font-size:20px;margin:0 0 14px;">Здравствуйте, ${escapeHtml(patientName)}!</h2>
+            <p style="color:#475569;font-size:15px;line-height:1.6;margin:0 0 20px;">
+              У вас назначена запись. Подробности приема указаны ниже:
+            </p>
+
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;padding:20px;margin-bottom:24px;">
+              <table style="width:100%;border-collapse:collapse;">
+                <tr>
+                  <td style="padding:6px 0;color:#64748b;font-weight:700;width:140px;">Организация:</td>
+                  <td style="padding:6px 0;color:#0f172a;font-weight:800;">${escapeHtml(organizationName)}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;color:#64748b;font-weight:700;">Врач:</td>
+                  <td style="padding:6px 0;color:#0f172a;font-weight:800;">${escapeHtml(doctorName)}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;color:#64748b;font-weight:700;">Дата и время:</td>
+                  <td style="padding:6px 0;color:#059669;font-weight:800;">${date} в ${time}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;color:#64748b;font-weight:700;">Кабинет:</td>
+                  <td style="padding:6px 0;color:#0f172a;font-weight:800;">№${escapeHtml(cabinet)}</td>
+                </tr>
+              </table>
+            </div>
+
+            <div style="text-align:center;margin:24px 0;padding:20px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:18px;">
+              <p style="margin:0 0 12px;color:#166534;font-weight:800;font-size:14px;">Ваш электронный талон (QR-код):</p>
+              <img src="${qrCodeUrl}" alt="QR Талон" style="border:4px solid #ffffff;border-radius:10px;box-shadow:0 4px 10px rgba(0,0,0,0.1);" />
+              <p style="margin:8px 0 0;color:#64748b;font-size:11px;">Покажите этот код при входе в клинику или в кабинете врача</p>
+            </div>
+
+            <p style="color:#64748b;font-size:13px;line-height:1.6;margin:20px 0 0;">
+              С уважением, медицинская система <b>Clinic OS</b>.
+            </p>
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `
+Clinic OS - У вас назначена запись
+
+Здравствуйте, ${patientName}!
+У вас назначена запись.
+
+Организация: ${organizationName}
+Врач: ${doctorName}
+Дата и время: ${date} в ${time}
+Кабинет: №${cabinet}
+
+Вы можете предъявить ваш QR-код на входе:
+${qrCodeUrl}
+
+С уважением, Clinic OS.
+  `.trim();
+
+  try {
+    await sendGmailMessage({
+      to,
+      subject,
+      text,
+      html,
+    });
+
+    return {
+      success: true,
+      message: "Письмо с талоном отправлено.",
+    };
+  } catch (error) {
+    console.error("SEND BOOKING EMAIL ERROR:", error);
+    return {
+      success: false,
+      message: error.message || "Ошибка отправки письма.",
+    };
+  }
+}

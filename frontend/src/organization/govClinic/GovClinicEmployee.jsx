@@ -155,6 +155,26 @@ const MOCK_NOTIFICATIONS = [
   }
 ];
 
+const getBirthDateFromIin = (iin) => {
+  if (!iin || iin.length !== 12) return "—";
+  const yy = iin.slice(0, 2);
+  const mm = iin.slice(2, 4);
+  const dd = iin.slice(4, 6);
+  const centuryDigit = iin[6];
+  let yearPrefix = "19";
+  if (centuryDigit === "5" || centuryDigit === "6") yearPrefix = "20";
+  else if (centuryDigit === "1" || centuryDigit === "2") yearPrefix = "18";
+  return `${yearPrefix}${yy}-${mm}-${dd}`;
+};
+
+const getGenderFromIin = (iin) => {
+  if (!iin || iin.length !== 12) return "Не определён";
+  const genderDigit = iin[6];
+  if (["1", "3", "5"].includes(genderDigit)) return "Мужской";
+  if (["2", "4", "6"].includes(genderDigit)) return "Женский";
+  return "Не определён";
+};
+
 export default function GovClinicEmployee() {
   const [searchParams, setSearchParams] = useSearchParams();
   const currentTab = searchParams.get("tab") || "dashboard";
@@ -211,6 +231,8 @@ export default function GovClinicEmployee() {
     // Fetch profile info
     async function loadAllData() {
       setLoadingProfile(true);
+      let empId = user.id;
+
       try {
         // Load employees to find current matching employee profile
         const empRes = await fetch(
@@ -221,8 +243,10 @@ export default function GovClinicEmployee() {
           const match = (empData.employees || []).find(e => e.login === user.login);
           if (match) {
             setEmployeeProfile(match);
+            empId = match.id;
           } else {
             setEmployeeProfile({
+              id: user.id,
               full_name: user.full_name,
               position: ROLE_LABELS[user.role] || "Сотрудник",
               department: "Отделение не назначено",
@@ -237,24 +261,50 @@ export default function GovClinicEmployee() {
         setLoadingProfile(false);
       }
 
-      // Initialize mock arrays, then attempt future real API load
+      // Initialize mock / local arrays
       setPatients(MOCK_PATIENTS);
-      setAppointments(MOCK_APPOINTMENTS);
       setNotifications(MOCK_NOTIFICATIONS);
 
-      // Attempt to load appointments from real API in future
+      // Load appointments from real API
       try {
         const appRes = await fetch(
-          `${API_URL}/api/organization-structure/appointments?employee_id=${user.id}&date=${selectedDate}`
+          `${API_URL}/api/organization-structure/appointments?employee_id=${empId}&date=${selectedDate}`
         );
         if (appRes.ok) {
           const appData = await appRes.json();
-          if (appData.appointments && appData.appointments.length > 0) {
-            setAppointments(appData.appointments);
+          const loadedApps = appData.appointments || [];
+          setAppointments(loadedApps);
+
+          // Populate patient profiles from loaded appointments dynamically
+          if (loadedApps.length > 0) {
+            setPatients(prev => {
+              const unique = [...prev];
+              loadedApps.forEach(app => {
+                if (app.patient_name && app.patient_iin && !unique.some(p => p.iin === app.patient_iin)) {
+                  unique.push({
+                    id: app.patient_id || app.patient_iin,
+                    iin: app.patient_iin,
+                    full_name: app.patient_name,
+                    phone: app.patient_phone || "—",
+                    email: app.patient_email || "—",
+                    birth_date: getBirthDateFromIin(app.patient_iin),
+                    gender: getGenderFromIin(app.patient_iin),
+                    blood_type: "Не указана",
+                    allergies: "Нет",
+                    chronic_conditions: "Нет",
+                    records: []
+                  });
+                }
+              });
+              return unique;
+            });
           }
+        } else {
+          setAppointments([]);
         }
       } catch (err) {
-        console.warn("Real appointments API not ready yet, using mock data:", err);
+        console.warn("Appointments API fetch error:", err);
+        setAppointments([]);
       }
     }
 
@@ -354,7 +404,7 @@ export default function GovClinicEmployee() {
 
   // Action helpers
   function openPatientCard(patientId) {
-    const pat = patients.find(p => p.id === patientId);
+    const pat = patients.find(p => p.id === patientId || p.iin === patientId);
     if (pat) {
       setSelectedPatient(pat);
       setSelectedAppointment(null);
@@ -363,11 +413,32 @@ export default function GovClinicEmployee() {
   }
 
   function startAppointment(appointment) {
-    const pat = patients.find(p => p.id === appointment.patient_id);
+    const pat = patients.find(p => p.id === appointment.patient_id || p.iin === appointment.patient_iin);
     if (pat) {
       setSelectedPatient(pat);
       setSelectedAppointment(null);
       // Switch status to arrived if it was pending
+      if (appointment.status === "pending") {
+        updateAppointmentStatus(appointment.id, "arrived");
+      }
+      changeTab("medical_records");
+    } else {
+      const newPat = {
+        id: appointment.patient_id || appointment.patient_iin,
+        iin: appointment.patient_iin,
+        full_name: appointment.patient_name,
+        phone: appointment.patient_phone || "—",
+        email: appointment.patient_email || "—",
+        birth_date: getBirthDateFromIin(appointment.patient_iin),
+        gender: getGenderFromIin(appointment.patient_iin),
+        blood_type: "Не указана",
+        allergies: "Нет",
+        chronic_conditions: "Нет",
+        records: []
+      };
+      setPatients(prev => [...prev, newPat]);
+      setSelectedPatient(newPat);
+      setSelectedAppointment(null);
       if (appointment.status === "pending") {
         updateAppointmentStatus(appointment.id, "arrived");
       }

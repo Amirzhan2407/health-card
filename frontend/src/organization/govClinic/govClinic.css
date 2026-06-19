@@ -1894,4 +1894,229 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ======================================================
+   SUPPORT CHAT STYLES IN CLINIC OS
+   ====================================================== */
+
+.support-chat-card-container {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 190px);
+  min-height: 500px;
+}
+
+.support-messages-box {
+  flex-grow: 1;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #f8fafc;
+  padding: 20px;
+  margin-bottom: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.layoutRoot.dark .support-messages-box {
+  background: rgba(15, 23, 42, 0.4);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+.empty-chat-text {
+  text-align: center;
+  color: #64748b;
+  margin: auto;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.support-message-item {
+  max-width: 75%;
+  padding: 14px 18px;
+  border-radius: 20px;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.02);
+  line-height: 1.5;
+}
+
+.support-message-item.own {
+  align-self: flex-end;
+  background: linear-gradient(135deg, #00b85a, #059669);
+  color: #ffffff;
+  border-bottom-right-radius: 4px;
+}
+
+.support-message-item.support {
+  align-self: flex-start;
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+  border-bottom-left-radius: 4px;
+}
+
+.layoutRoot.dark .support-message-item.support {
+  background: #1e293b;
+  border-color: rgba(255, 255, 255, 0.05);
+  color: #f1f5f9;
+}
+
+.msg-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.support-message-item.own .msg-header b {
+  color: #d1fae5;
+}
+
+.support-message-item.support .msg-header b {
+  color: #4f46e5;
+}
+
+.support-message-item.own .msg-header small {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.support-message-item.support .msg-header small {
+  color: #64748b;
+}
+
+.msg-body {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat-doc-link {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: inherit;
+  text-decoration: none;
+  font-weight: 850;
+  transition: background 0.2s;
+}
+
+.support-message-item.support .chat-doc-link {
+  background: rgba(148, 163, 184, 0.1);
+  color: #059669;
+}
+
+.chat-doc-link:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.support-message-item.support .chat-doc-link:hover {
+  background: rgba(5, 150, 105, 0.15);
+}
+
+.support-send-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.support-textarea {
+  width: 100%;
+  height: 80px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-size: 14px;
+  outline: none;
+  background: #ffffff;
+  resize: none;
+  font-weight: 700;
+  transition: border-color 0.2s;
+}
+
+.layoutRoot.dark .support-textarea {
+  background: #0f172a;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.support-textarea:focus {
+  border-color: #00b85a;
+}
+
+.support-actions-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.file-upload-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.file-upload-label {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(148, 163, 184, 0.15);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.layoutRoot.dark .file-upload-label {
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.file-upload-label:hover {
+  background: rgba(148, 163, 184, 0.25);
+}
+
+.clear-file-btn {
+  background: none;
+  border: none;
+  color: #ef4444;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.support-submit-btn {
+  background: linear-gradient(135deg, #00b85a, #059669);
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 24px;
+  font-weight: 900;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 184, 90, 0.2);
+  transition: all 0.2s;
+}
+
+.support-submit-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 184, 90, 0.3);
+}
+
+.support-submit-btn:disabled {
+  background: #cbd5e1;
+  color: #94a3b8;
+  cursor: not-allowed;
+  box-shadow: none;
+}
 

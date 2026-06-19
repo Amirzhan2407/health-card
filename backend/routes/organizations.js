@@ -5,6 +5,8 @@ import crypto from "crypto";
 import { supabase } from "../lib/supabaseAdmin.js";
 import { requireAdminAuth } from "../middleware/requireAdminAuth.js";
 import { createAuditLog } from "../services/adminAuditService.js";
+import { sendOrganizationAccessEmail } from "../services/emailService.js";
+
 
 const router = express.Router();
 
@@ -403,21 +405,152 @@ if (error) {
   });
 }
 
-await createAuditLog({
-  adminId: req.admin.id,
-  action: "organization_updated",
-  entityType: "organization",
-  entityId: req.params.id,
-  title: "Данные организации изменены",
-  details: updated.organization_name,
-  oldData: current,
-  newData: updated,
-});
+    // Auto credential reset logic on email changes
+    try {
+      const { data: existingUsers } = await supabase
+        .from("organization_users")
+        .select("*")
+        .eq("organization_id", req.params.id);
 
-return res.status(200).json({
-  success: true,
-  organization: updated,
-});
+      // Check chief doctor email change
+      if (req.body.chief_doctor_email !== undefined && req.body.chief_doctor_email !== current.chief_doctor_email) {
+        const newEmail = String(req.body.chief_doctor_email).trim().toLowerCase();
+        if (newEmail) {
+          const tempPassword = Math.random().toString(36).slice(2, 6).toUpperCase() + "-" + Math.random().toString(36).slice(2, 6).toUpperCase();
+          const login = newEmail.split("@")[0] + "_" + Math.floor(1000 + Math.random() * 9000);
+          const passwordHash = hashPassword(tempPassword);
+          const existingChief = (existingUsers || []).find(u => u.role === "chief_doctor");
+
+          if (existingChief) {
+            await supabase
+              .from("organization_users")
+              .update({
+                email: newEmail,
+                login,
+                password_hash: passwordHash,
+                must_change_password: true,
+                full_name: updated.chief_doctor_full_name || current.chief_doctor_full_name || "Главный врач",
+                phone: updated.chief_doctor_phone || current.chief_doctor_phone || "",
+                status: "active",
+                updated_at: new Date().toISOString()
+              })
+              .eq("id", existingChief.id);
+          } else {
+            await supabase
+              .from("organization_users")
+              .insert({
+                organization_id: req.params.id,
+                city: updated.city || current.city,
+                bin: updated.bin || current.bin,
+                full_name: updated.chief_doctor_full_name || current.chief_doctor_full_name || "Главный врач",
+                phone: updated.chief_doctor_phone || current.chief_doctor_phone || "",
+                email: newEmail,
+                role: "chief_doctor",
+                login,
+                password_hash: passwordHash,
+                must_change_password: true,
+                status: "active",
+                updated_at: new Date().toISOString()
+              });
+          }
+
+          try {
+            await sendOrganizationAccessEmail({
+              to: newEmail,
+              application: {
+                organization_name: updated.organization_name,
+                application_number: "обновлен"
+              },
+              fullName: updated.chief_doctor_full_name || current.chief_doctor_full_name || "Главный врач",
+              roleLabel: "Главный врач",
+              login,
+              tempPassword
+            });
+          } catch (emailErr) {
+            console.error("Error sending chief doctor access email:", emailErr.message);
+          }
+        }
+      }
+
+      // Check organization admin email change
+      if (req.body.organization_email !== undefined && req.body.organization_email !== current.organization_email) {
+        const newEmail = String(req.body.organization_email).trim().toLowerCase();
+        if (newEmail) {
+          const tempPassword = Math.random().toString(36).slice(2, 6).toUpperCase() + "-" + Math.random().toString(36).slice(2, 6).toUpperCase();
+          const login = newEmail.split("@")[0] + "_" + Math.floor(1000 + Math.random() * 9000);
+          const passwordHash = hashPassword(tempPassword);
+          const existingAdmin = (existingUsers || []).find(u => u.role === "organization_admin");
+
+          if (existingAdmin) {
+            await supabase
+              .from("organization_users")
+              .update({
+                email: newEmail,
+                login,
+                password_hash: passwordHash,
+                must_change_password: true,
+                full_name: "Администратор клиники",
+                phone: updated.organization_phone || current.organization_phone || "",
+                status: "active",
+                updated_at: new Date().toISOString()
+              })
+              .eq("id", existingAdmin.id);
+          } else {
+            await supabase
+              .from("organization_users")
+              .insert({
+                organization_id: req.params.id,
+                city: updated.city || current.city,
+                bin: updated.bin || current.bin,
+                full_name: "Администратор клиники",
+                phone: updated.organization_phone || current.organization_phone || "",
+                email: newEmail,
+                role: "organization_admin",
+                login,
+                password_hash: passwordHash,
+                must_change_password: true,
+                status: "active",
+                updated_at: new Date().toISOString()
+              });
+          }
+
+          try {
+            await sendOrganizationAccessEmail({
+              to: newEmail,
+              application: {
+                organization_name: updated.organization_name,
+                application_number: "обновлен"
+              },
+              fullName: "Администратор клиники",
+              roleLabel: "Администратор организации",
+              login,
+              tempPassword
+            });
+          } catch (emailErr) {
+            console.error("Error sending admin access email:", emailErr.message);
+          }
+        }
+      }
+    } catch (dbErr) {
+      console.error("Error resetting organization credentials:", dbErr.message);
+    }
+
+    await createAuditLog({
+      adminId: req.admin.id,
+      action: "organization_updated",
+      entityType: "organization",
+      entityId: req.params.id,
+      title: "Данные организации изменены",
+      details: updated.organization_name,
+      oldData: current,
+      newData: updated,
+    });
+
+    return res.status(200).json({
+      success: true,
+      organization: updated,
+    });
+
 
 
 } catch (error) {

@@ -82,6 +82,13 @@ export default function GovClinicSystemAdmin() {
     status: "all",
   });
 
+  // Support Chat States
+  const [supportMessages, setSupportMessages] = useState([]);
+  const [newSupportMsg, setNewSupportMsg] = useState("");
+  const [supportFile, setSupportFile] = useState(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+
+
   useEffect(() => {
     if (!organizationId) return;
     loadData();
@@ -122,6 +129,85 @@ export default function GovClinicSystemAdmin() {
       setMessage(error.message || "Ошибка загрузки данных.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Load Support Messages periodically
+  useEffect(() => {
+    if (tab !== "support" || !organizationId) return;
+    loadSupportMessages();
+    const interval = setInterval(loadSupportMessages, 3000);
+    return () => clearInterval(interval);
+  }, [tab, organizationId]);
+
+  async function loadSupportMessages() {
+    try {
+      const res = await fetch(`${API_URL}/api/organization-structure/support-messages`, {
+        headers: { "x-organization-id": organizationId }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSupportMessages(data.messages || []);
+      }
+    } catch (err) {
+      console.warn("Error loading support messages:", err);
+    }
+  }
+
+  async function sendSupportMessage(e) {
+    e.preventDefault();
+    if (!newSupportMsg.trim() && !supportFile) return;
+
+    setLoading(true);
+    let finalMessage = newSupportMsg.trim();
+
+    try {
+      if (supportFile) {
+        setUploadingFile(true);
+        const formData = new FormData();
+        formData.append("file", supportFile);
+
+        const uploadRes = await fetch(`${API_URL}/api/organization-structure/support-upload`, {
+          method: "POST",
+          headers: {
+            "x-organization-id": organizationId
+          },
+          body: formData
+        });
+        const uploadData = await uploadRes.json();
+        if (uploadRes.ok && uploadData.file_url) {
+          finalMessage += (finalMessage ? "\n" : "") + `[Документ: ${uploadData.file_name}](${uploadData.file_url})`;
+        } else {
+          throw new Error(uploadData.message || "Ошибка при загрузке файла");
+        }
+      }
+
+      const res = await fetch(`${API_URL}/api/organization-structure/support-messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-organization-id": organizationId
+        },
+        body: JSON.stringify({
+          message: finalMessage,
+          senderUsername: organizationUser?.login,
+          senderFullName: organizationUser?.full_name || "Администратор клиники"
+        })
+      });
+
+      const result = await res.json();
+      if (res.ok) {
+        setNewSupportMsg("");
+        setSupportFile(null);
+        loadSupportMessages();
+      } else {
+        throw new Error(result.message || "Ошибка отправки сообщения");
+      }
+    } catch (err) {
+      setMessage(err.message || "Ошибка чата");
+    } finally {
+      setLoading(false);
+      setUploadingFile(false);
     }
   }
 
@@ -680,6 +766,88 @@ export default function GovClinicSystemAdmin() {
             )}
           </div>
         </section>
+      )}
+
+      {tab === "support" && (
+        <div className="gov-card support-chat-card-container">
+          <h3>Техническая поддержка</h3>
+          <p className="gov-page-subtitle">
+            Здесь вы можете общаться с технической поддержкой Clinic OS, отправлять тексты и подтверждающие документы (например, при смене главного врача, администратора или кадрового специалиста).
+          </p>
+
+          <div className="support-messages-box">
+            {supportMessages.length === 0 ? (
+              <p className="empty-chat-text">Нет сообщений. Напишите первое сообщение техподдержке.</p>
+            ) : (
+              supportMessages.map((msg) => {
+                const isOwn = msg.sender_role === "organization_admin";
+                // Simple parser for markdown links to render clickable documents
+                const renderMessageText = (textStr) => {
+                  const linkRegex = /\[Документ: (.+?)\]\((.+?)\)/g;
+                  const parts = [];
+                  let lastIndex = 0;
+                  let match;
+                  while ((match = linkRegex.exec(textStr)) !== null) {
+                     if (match.index > lastIndex) {
+                       parts.push(textStr.slice(lastIndex, match.index));
+                     }
+                     parts.push(
+                       <a key={match[2]} href={match[2]} target="_blank" rel="noopener noreferrer" className="chat-doc-link">
+                         📎 {match[1]} (скачать)
+                       </a>
+                     );
+                     lastIndex = linkRegex.lastIndex;
+                  }
+                  if (lastIndex < textStr.length) {
+                     parts.push(textStr.slice(lastIndex));
+                  }
+                  return parts.length > 0 ? parts : textStr;
+                };
+
+                return (
+                  <div key={msg.id} className={`support-message-item ${isOwn ? "own" : "support"}`}>
+                    <div className="msg-header">
+                      <b>{msg.sender_full_name}</b>
+                      <small>{new Date(msg.created_at).toLocaleString("ru-RU")}</small>
+                    </div>
+                     <p className="msg-body">{renderMessageText(msg.message)}</p>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <form onSubmit={sendSupportMessage} className="support-send-form">
+            <textarea
+              placeholder="Введите текст обращения в техподдержку..."
+              value={newSupportMsg}
+              onChange={(e) => setNewSupportMsg(e.target.value)}
+              className="support-textarea"
+              required={!supportFile}
+            />
+
+            <div className="support-actions-bar">
+              <div className="file-upload-wrapper">
+                <input 
+                  type="file" 
+                  id="support-file-input"
+                  onChange={(e) => setSupportFile(e.target.files[0])}
+                  style={{ display: "none" }}
+                />
+                <label htmlFor="support-file-input" className="file-upload-label">
+                  📎 {supportFile ? supportFile.name : "Прикрепить документ"}
+                </label>
+                {supportFile && (
+                  <button type="button" onClick={() => setSupportFile(null)} className="clear-file-btn">×</button>
+                )}
+              </div>
+
+              <button type="submit" disabled={loading || uploadingFile} className="support-submit-btn">
+                {uploadingFile ? "Загрузка файла..." : loading ? "Отправка..." : "Отправить"}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
       {selectedEmployee && (
