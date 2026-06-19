@@ -63,20 +63,20 @@ app.get("/api/check-version", (req, res) => {
 
 app.get("/api/test-db-insert", async (req, res) => {
   const rolesToTest = [
-    "chief",
+    "HR",
+    "Staff",
+    "staff",
+    "manager",
+    "admin_hr",
+    "hr_admin",
+    "user",
+    "SystemAdmin",
+    "systemadmin",
     "chief_doctor",
-    "admin",
     "organization_admin",
-    "hr",
-    "hr_specialist",
-    "hr_manager",
-    "employee",
-    "deputy_chief_doctor",
-    "department_head",
-    "registrar",
-    "doctor",
-    "nurse"
+    "employee"
   ];
+
   const results = {};
 
   try {
