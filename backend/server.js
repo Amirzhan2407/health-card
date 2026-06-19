@@ -68,9 +68,14 @@ app.get("/api/test-db-insert", async (req, res) => {
     "admin",
     "organization_admin",
     "hr",
+    "hr_specialist",
+    "hr_manager",
+    "employee",
+    "deputy_chief_doctor",
+    "department_head",
+    "registrar",
     "doctor",
-    "nurse",
-    "employee"
+    "nurse"
   ];
   const results = {};
 
@@ -108,6 +113,7 @@ app.get("/api/test-db-insert", async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
 
 app.use("/api/pharmacy", pharmacyRoutes);
 app.use("/api/ai", aiRoutes);
