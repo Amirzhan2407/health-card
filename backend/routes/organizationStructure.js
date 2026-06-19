@@ -172,7 +172,7 @@ if (!organizationId) {
 
 let query = supabase
   .from("organization_employees")
-  .select("*")
+  .select("*, organization_departments(name)")
   .eq("organization_id", organizationId)
   .order("created_at", { ascending: true });
 
@@ -212,6 +212,7 @@ const employeesWithDocuments = (employees || []).map((employee) => {
 
   return {
     ...employee,
+    department: employee.organization_departments ? employee.organization_departments.name : (employee.department || "—"),
     documents: employeeDocuments,
   };
 });
@@ -254,7 +255,7 @@ if (!organizationId) {
   });
 }
 
-if (!fullName || !position || !department) {
+if (!fullName || !position || !departmentId) {
   return res.status(400).json({
     success: false,
     message: "ФИО, должность и отделение обязательны.",
@@ -272,7 +273,6 @@ const { data: employee, error } = await supabase
     phone,
     email,
     position,
-    department,
     cabinet,
     role,
     login: null,
@@ -329,9 +329,6 @@ if (req.body.position !== undefined) {
   payload.position = safeText(req.body.position);
 }
 
-if (req.body.department !== undefined) {
-  payload.department = safeText(req.body.department);
-}
 
 if (req.body.department_id !== undefined || req.body.departmentId !== undefined) {
   payload.department_id = req.body.department_id || req.body.departmentId || null;

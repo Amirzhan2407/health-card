@@ -1,9 +1,11 @@
 
-import { Outlet, useNavigate, Navigate, useSearchParams } from "react-router-dom";
+import { useEffect } from "react";
+import { Outlet, useNavigate, Navigate, useSearchParams, useLocation } from "react-router-dom";
 import "./govClinic.css";
 
 export default function GovClinicLayout() {
 const navigate = useNavigate();
+const location = useLocation();
 const [searchParams] = useSearchParams();
 const currentTab = searchParams.get("tab") || "dashboard";
 
@@ -18,6 +20,17 @@ return <Navigate to="/organization-login" replace />;
 const isChiefDoctor = user.role === "chief_doctor" || user.role === "chief";
 const isAdmin = user.role === "organization_admin" || user.role === "admin";
 const isHr = user.role === "hr" || user.role === "employee";
+
+useEffect(() => {
+  const path = location.pathname;
+  if (isAdmin && !path.includes("system-admin")) {
+    navigate("/organization/gov-clinic/system-admin?tab=dashboard", { replace: true });
+  } else if (isHr && !path.includes("/hr")) {
+    navigate("/organization/gov-clinic/hr?tab=dashboard", { replace: true });
+  } else if (isChiefDoctor && !path.includes("chief-doctor")) {
+    navigate("/organization/gov-clinic/chief-doctor?tab=dashboard", { replace: true });
+  }
+}, [location.pathname, isAdmin, isHr, isChiefDoctor]);
 
 
 function logout() {

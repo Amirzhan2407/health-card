@@ -197,7 +197,6 @@ try {
     phone: form.phone.trim(),
     email: form.email.trim(),
     position: form.position.trim(),
-    department: form.department.trim(),
     department_id: form.department_id || null,
     cabinet: form.cabinet.trim(),
     role: form.role,
