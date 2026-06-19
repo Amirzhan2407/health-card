@@ -62,7 +62,7 @@ const bin = String(req.body.bin || "").trim();
 const login = String(req.body.login || "").trim();
 const password = String(req.body.password || "");
 
-```
+
 if (!city || !bin || !login || !password) {
   return res.status(400).json({
     success: false,
@@ -117,7 +117,7 @@ return res.status(200).json({
   },
   organization: user.organizations || null,
 });
-```
+
 
 } catch (error) {
 return res.status(500).json({
@@ -133,7 +133,7 @@ const userId = req.body.userId;
 const currentPassword = String(req.body.currentPassword || "");
 const newPassword = String(req.body.newPassword || "");
 
-```
+
 if (!userId || !currentPassword || !newPassword) {
   return res.status(400).json({
     success: false,
@@ -201,7 +201,7 @@ return res.status(200).json({
     must_change_password: false,
   },
 });
-```
+
 
 } catch (error) {
 return res.status(500).json({
@@ -218,7 +218,7 @@ let query = supabase
 .select("*")
 .order("created_at", { ascending: false });
 
-```
+
 if (req.admin.role !== "super_admin") {
   query = query.eq("assigned_admin_id", req.admin.id);
 }
@@ -236,7 +236,7 @@ return res.status(200).json({
   success: true,
   organizations: data || [],
 });
-```
+
 
 } catch (error) {
 return res.status(500).json({
@@ -254,7 +254,7 @@ const { data, error } = await supabase
 .eq("id", req.params.id)
 .single();
 
-```
+
 if (error || !data) {
   return res.status(404).json({
     success: false,
@@ -266,7 +266,7 @@ return res.status(200).json({
   success: true,
   organization: data,
 });
-```
+
 
 } catch (error) {
 return res.status(500).json({
@@ -284,7 +284,7 @@ const { data: current, error: currentError } = await supabase
 .eq("id", req.params.id)
 .single();
 
-```
+
 if (currentError || !current) {
   return res.status(404).json({
     success: false,
@@ -347,7 +347,7 @@ return res.status(200).json({
   success: true,
   organization: updated,
 });
-```
+
 
 } catch (error) {
 return res.status(500).json({

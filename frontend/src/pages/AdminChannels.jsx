@@ -62,7 +62,7 @@ export default function AdminChannels() {
 
     try {
       const result = await adminRequest("/api/admin-channels");
-      const list = result.channels || [];
+      const list = result?.channels || [];
 
       setChannels(list);
 
@@ -106,7 +106,7 @@ export default function AdminChannels() {
         `/api/admin-channels/${category}/messages`
       );
 
-      const nextMessages = result.messages || [];
+      const nextMessages = result?.messages || [];
       const nextSignature = getMessagesSignature(nextMessages);
 
       if (nextSignature === messagesSignatureRef.current) {

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/organizationLogin.css";
 
-const API_URL = "[https://health-card.onrender.com](https://health-card.onrender.com)";
+const API_URL = "https://health-card.onrender.com";
 
 export default function OrganizationLogin() {
 const navigate = useNavigate();
@@ -37,14 +37,14 @@ function updateField(event) {
 const name = event.target.name;
 const value = event.target.value;
 
-```
+
 setForm({
   ...form,
   [name]: value,
 });
 
 setError("");
-```
+
 
 }
 
@@ -52,14 +52,14 @@ function updatePasswordField(event) {
 const name = event.target.name;
 const value = event.target.value;
 
-```
+
 setPasswordForm({
   ...passwordForm,
   [name]: value,
 });
 
 setError("");
-```
+
 
 }
 
@@ -68,7 +68,7 @@ event.preventDefault();
 setError("");
 setLoading(true);
 
-```
+
 try {
   const response = await fetch(API_URL + "/api/organizations/login", {
     method: "POST",
@@ -113,7 +113,7 @@ try {
 } finally {
   setLoading(false);
 }
-```
+
 
 }
 
@@ -121,7 +121,7 @@ async function changePassword(event) {
 event.preventDefault();
 setError("");
 
-```
+
 if (!loggedUser) {
   setError("Пользователь не найден. Войдите заново.");
   return;
@@ -168,7 +168,7 @@ try {
 } finally {
   setLoading(false);
 }
-```
+
 
 }
 
@@ -181,7 +181,7 @@ onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
 >
 {theme === "dark" ? "☀️ Светлая" : "🌙 Тёмная"} </button>
 
-```
+  
   <section className="org-login-card">
     <div className="org-login-left">
       <img

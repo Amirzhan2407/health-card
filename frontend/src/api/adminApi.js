@@ -1,7 +1,4 @@
-
-
-const API_URL = "[https://health-card.onrender.com](https://health-card.onrender.com)";
-
+const API_URL = "https://health-card.onrender.com";
 export function getAdminData() {
 try {
 return JSON.parse(localStorage.getItem("adminData") || "null");

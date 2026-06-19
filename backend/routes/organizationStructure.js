@@ -75,7 +75,7 @@ router.get("/departments", async (req, res) => {
 try {
 const organizationId = getOrganizationId(req);
 
-```
+
 if (!organizationId) {
   return res.status(400).json({
     success: false,
@@ -100,7 +100,7 @@ return res.status(200).json({
   success: true,
   departments: data || [],
 });
-```
+
 
 } catch (error) {
 return res.status(500).json({
@@ -117,7 +117,7 @@ const name = safeText(req.body.name);
 const floor = safeText(req.body.floor);
 const rooms = safeText(req.body.rooms);
 
-```
+
 if (!organizationId || !name) {
   return res.status(400).json({
     success: false,
@@ -147,7 +147,7 @@ return res.status(201).json({
   success: true,
   department: data,
 });
-```
+
 
 } catch (error) {
 return res.status(500).json({
@@ -162,7 +162,7 @@ try {
 const organizationId = getOrganizationId(req);
 const status = req.query.status ? String(req.query.status) : null;
 
-```
+
 if (!organizationId) {
   return res.status(400).json({
     success: false,
@@ -220,7 +220,7 @@ return res.status(200).json({
   success: true,
   employees: employeesWithDocuments,
 });
-```
+
 
 } catch (error) {
 return res.status(500).json({
@@ -234,7 +234,7 @@ router.post("/employees", async (req, res) => {
 try {
 const organizationId = getOrganizationId(req);
 
-```
+
 const fullName = safeText(req.body.full_name || req.body.fullName);
 const iin = safeText(req.body.iin);
 const age = safeText(req.body.age);
@@ -299,7 +299,7 @@ return res.status(201).json({
   message: "Сотрудник добавлен.",
   employee,
 });
-```
+
 
 } catch (error) {
 return res.status(500).json({
@@ -313,7 +313,7 @@ router.patch("/employees/:id", async (req, res) => {
 try {
 const employeeId = req.params.id;
 
-```
+
 const payload = {};
 
 if (req.body.full_name !== undefined || req.body.fullName !== undefined) {
@@ -397,7 +397,7 @@ return res.status(200).json({
   message: "Данные сотрудника обновлены.",
   employee: updatedEmployee,
 });
-```
+
 
 } catch (error) {
 return res.status(500).json({
@@ -411,7 +411,7 @@ router.delete("/employees/:id", async (req, res) => {
 try {
 const employeeId = req.params.id;
 
-```
+
 const { data: employee, error: employeeError } = await supabase
   .from("organization_employees")
   .select("*")
@@ -454,7 +454,7 @@ return res.status(200).json({
   success: true,
   message: "Сотрудник удалён.",
 });
-```
+
 
 } catch (error) {
 return res.status(500).json({
@@ -469,7 +469,7 @@ try {
 const organizationId = getOrganizationId(req);
 const employeeId = req.body.employee_id || req.body.employeeId;
 
-```
+
 if (!organizationId || !employeeId) {
   return res.status(400).json({
     success: false,
@@ -545,7 +545,7 @@ return res.status(201).json({
   message: "Документы загружены.",
   documents: uploadedDocuments,
 });
-```
+
 
 } catch (error) {
 return res.status(500).json({
@@ -560,7 +560,7 @@ try {
 const organizationId = getOrganizationId(req);
 const employeeId = req.params.id;
 
-```
+
 if (!organizationId || !employeeId) {
   return res.status(400).json({
     success: false,
@@ -591,7 +591,7 @@ return res.status(200).json({
   message: "Сотрудник одобрен.",
   employee: updatedEmployee,
 });
-```
+
 
 } catch (error) {
 return res.status(500).json({
@@ -607,7 +607,7 @@ const organizationId = getOrganizationId(req);
 const employeeId = req.params.id;
 const rejectReason = safeText(req.body.rejectReason || req.body.reason);
 
-```
+
 if (!organizationId || !employeeId) {
   return res.status(400).json({
     success: false,
@@ -639,7 +639,7 @@ return res.status(200).json({
   message: "Сотрудник отклонён.",
   employee: updatedEmployee,
 });
-```
+
 
 } catch (error) {
 return res.status(500).json({
@@ -654,7 +654,7 @@ try {
 const organizationId = getOrganizationId(req);
 const employeeId = req.params.id;
 
-```
+
 const login = safeText(req.body.login);
 const tempPassword = safeText(req.body.tempPassword) || generatePassword();
 
@@ -737,7 +737,7 @@ return res.status(200).json({
   tempPassword,
   employee: updatedEmployee,
 });
-```
+
 
 } catch (error) {
 return res.status(500).json({
@@ -753,7 +753,7 @@ const organizationId = getOrganizationId(req);
 const employeeId = req.params.id;
 const tempPassword = safeText(req.body.tempPassword) || generatePassword();
 
-```
+
 if (!organizationId || !employeeId) {
   return res.status(400).json({
     success: false,
@@ -826,7 +826,7 @@ return res.status(200).json({
   tempPassword,
   employee: updatedEmployee,
 });
-```
+
 
 } catch (error) {
 return res.status(500).json({
@@ -841,7 +841,7 @@ try {
 const organizationId = getOrganizationId(req);
 const employeeId = req.params.id;
 
-```
+
 const { data: employee, error: employeeError } = await supabase
   .from("organization_employees")
   .select("*")
@@ -890,7 +890,7 @@ return res.status(200).json({
   message: "Доступ заблокирован.",
   employee: updatedEmployee,
 });
-```
+
 
 } catch (error) {
 return res.status(500).json({
@@ -905,7 +905,7 @@ try {
 const organizationId = getOrganizationId(req);
 const employeeId = req.params.id;
 
-```
+
 const { data: employee, error: employeeError } = await supabase
   .from("organization_employees")
   .select("*")
@@ -954,7 +954,7 @@ return res.status(200).json({
   message: "Доступ разблокирован.",
   employee: updatedEmployee,
 });
-```
+
 
 } catch (error) {
 return res.status(500).json({

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-const API_URL = "[https://health-card.onrender.com](https://health-card.onrender.com)";
+const API_URL = "https://health-card.onrender.com";
 
 const EMPTY_FORM = {
 full_name: "",
@@ -46,14 +46,14 @@ function updateField(event) {
 const name = event.target.name;
 const value = event.target.value;
 
-```
+
 setForm({
   ...form,
   [name]: value,
 });
 
 setError("");
-```
+
 
 }
 
@@ -63,12 +63,12 @@ const file = event.target.files && event.target.files.length > 0
 ? event.target.files[0]
 : null;
 
-```
+
 setDocuments({
   ...documents,
   [name]: file,
 });
-```
+
 
 }
 
@@ -85,7 +85,7 @@ setError("Организация не найдена. Войдите занов�
 return;
 }
 
-```
+
 setLoading(true);
 setError("");
 
@@ -107,14 +107,14 @@ try {
 } finally {
   setLoading(false);
 }
-```
+
 
 }
 
 async function saveEmployee(event) {
 event.preventDefault();
 
-```
+
 if (!user || !user.organization_id) {
   setError("Организация не найдена. Войдите заново.");
   return;
@@ -181,14 +181,14 @@ try {
 } finally {
   setSaving(false);
 }
-```
+
 
 }
 
 function editEmployee(employee) {
 setEditingId(employee.id);
 
-```
+
 setForm({
   full_name: employee.full_name || "",
   iin: employee.iin || "",
@@ -201,14 +201,14 @@ setForm({
 });
 
 changeTab("add");
-```
+
 
 }
 
 async function dismissEmployee(employee) {
 const confirmed = window.confirm("Уволить сотрудника " + employee.full_name + "?");
 
-```
+
 if (!confirmed) {
   return;
 }
@@ -242,14 +242,14 @@ try {
 } catch (err) {
   setError(err.message || "Ошибка увольнения сотрудника.");
 }
-```
+
 
 }
 
 async function deleteEmployee(employee) {
 const confirmed = window.confirm("Удалить сотрудника " + employee.full_name + "?");
 
-```
+
 if (!confirmed) {
   return;
 }
@@ -276,14 +276,14 @@ try {
 } catch (err) {
   setError(err.message || "Ошибка удаления сотрудника.");
 }
-```
+
 
 }
 
 async function uploadDocuments(event) {
 event.preventDefault();
 
-```
+
 if (!selectedEmployeeId) {
   setError("Выберите сотрудника.");
   return;
@@ -326,7 +326,7 @@ try {
 } finally {
   setSaving(false);
 }
-```
+
 
 }
 
@@ -344,7 +344,7 @@ return employee.status === "dismissed";
 
 return ( <div> <h2 className="gov-page-title">Отдел кадров</h2>
 
-```
+
   <p className="gov-page-subtitle">
     Добавление сотрудников, изменение данных, загрузка документов и ведение личных дел.
   </p>

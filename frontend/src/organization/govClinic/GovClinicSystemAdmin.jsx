@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-const API_URL = (
-  import.meta.env.VITE_API_URL || "https://health-card.onrender.com"
-).replace(/\/$/, "");
+const API_URL = "https://health-card.onrender.com"; 
 
 const DEPARTMENT_OPTIONS = [
   "Терапия",

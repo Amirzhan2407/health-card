@@ -37,7 +37,6 @@ function App() {
 return ( <LanguageProvider> <Routes>
 <Route path="/login" element={<Login />} />
 
-```
     <Route
       path="/organization-application"
       element={<OrganizationApplication />}

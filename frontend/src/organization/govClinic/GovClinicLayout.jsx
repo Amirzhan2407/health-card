@@ -41,7 +41,7 @@ if (isChiefDoctor) {
 return "Кабинет главного врача";
 }
 
-```
+
 if (isAdmin) {
   return "Кабинет администратора организации";
 }
@@ -51,13 +51,13 @@ if (isHr) {
 }
 
 return "Кабинет сотрудника организации";
-```
+
 
 }
 
 return ( <div className="gov-clinic-shell"> <aside className="gov-clinic-sidebar"> <div className="gov-clinic-logo"> <h2>Clinic OS</h2> <p>{getCabinetTitle()}</p> </div>
 
-```
+
     <nav className="gov-clinic-nav">
       {isAdmin ? (
         <>
