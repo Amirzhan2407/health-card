@@ -132,7 +132,7 @@ return ( <div className="gov-clinic-shell"> <aside className="gov-clinic-sidebar
             className={currentTab === "dashboard" ? "active" : ""}
             onClick={() => goAdminTab("dashboard")}
           >
-            Главная
+            Организация
           </button>
 
           <button

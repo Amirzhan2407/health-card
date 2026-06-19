@@ -1092,12 +1092,14 @@ router.get("/appointments", async (req, res) => {
         appointments: filtered,
       });
     }
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message || "Ошибка получения записей.",
-    });
-  }
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message || "Ошибка получения записей.",
+      });
+    }
+  });
+
 // GET /api/organization-structure/appointments/patient/:iin
 router.get("/appointments/patient/:iin", async (req, res) => {
   try {

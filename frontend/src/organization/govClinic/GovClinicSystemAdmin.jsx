@@ -475,6 +475,45 @@ export default function GovClinicSystemAdmin() {
 
       {tab === "dashboard" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          
+          <div className="gov-card org-info-card">
+            <h3 style={{ margin: "0 0 16px", color: "#00b85a", fontSize: "20px", fontWeight: "bold" }}>Информация об организации</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
+              <div style={{ borderBottom: "1px solid rgba(128,128,128,0.15)", paddingBottom: "8px" }}>
+                <span style={{ color: "#64748b", fontSize: "12px", display: "block", textTransform: "uppercase", fontWeight: "bold" }}>Название</span>
+                <strong style={{ fontSize: "15px" }}>{organizationData?.organization_name || "—"}</strong>
+              </div>
+              <div style={{ borderBottom: "1px solid rgba(128,128,128,0.15)", paddingBottom: "8px" }}>
+                <span style={{ color: "#64748b", fontSize: "12px", display: "block", textTransform: "uppercase", fontWeight: "bold" }}>БИН</span>
+                <strong style={{ fontSize: "15px" }}>{organizationData?.bin || "—"}</strong>
+              </div>
+              <div style={{ borderBottom: "1px solid rgba(128,128,128,0.15)", paddingBottom: "8px" }}>
+                <span style={{ color: "#64748b", fontSize: "12px", display: "block", textTransform: "uppercase", fontWeight: "bold" }}>Город</span>
+                <strong style={{ fontSize: "15px" }}>{organizationData?.city || "—"}</strong>
+              </div>
+              <div style={{ borderBottom: "1px solid rgba(128,128,128,0.15)", paddingBottom: "8px" }}>
+                <span style={{ color: "#64748b", fontSize: "12px", display: "block", textTransform: "uppercase", fontWeight: "bold" }}>Адрес</span>
+                <strong style={{ fontSize: "15px" }}>{organizationData?.address || "—"}</strong>
+              </div>
+              <div style={{ borderBottom: "1px solid rgba(128,128,128,0.15)", paddingBottom: "8px" }}>
+                <span style={{ color: "#64748b", fontSize: "12px", display: "block", textTransform: "uppercase", fontWeight: "bold" }}>Главный врач</span>
+                <strong style={{ fontSize: "15px" }}>{organizationData?.chief_doctor_full_name || "—"}</strong>
+              </div>
+              <div style={{ borderBottom: "1px solid rgba(128,128,128,0.15)", paddingBottom: "8px" }}>
+                <span style={{ color: "#64748b", fontSize: "12px", display: "block", textTransform: "uppercase", fontWeight: "bold" }}>Телефон главврача</span>
+                <strong style={{ fontSize: "15px" }}>{organizationData?.chief_doctor_phone || "—"}</strong>
+              </div>
+              <div style={{ borderBottom: "1px solid rgba(128,128,128,0.15)", paddingBottom: "8px" }}>
+                <span style={{ color: "#64748b", fontSize: "12px", display: "block", textTransform: "uppercase", fontWeight: "bold" }}>Email главврача</span>
+                <strong style={{ fontSize: "15px" }}>{organizationData?.chief_doctor_email || "—"}</strong>
+              </div>
+              <div style={{ borderBottom: "1px solid rgba(128,128,128,0.15)", paddingBottom: "8px" }}>
+                <span style={{ color: "#64748b", fontSize: "12px", display: "block", textTransform: "uppercase", fontWeight: "bold" }}>Email организации</span>
+                <strong style={{ fontSize: "15px" }}>{organizationData?.organization_email || "—"}</strong>
+              </div>
+            </div>
+          </div>
+
           <div className="admin-stat-grid">
             <div className="admin-stat-card">
               <span>Отделений</span>
