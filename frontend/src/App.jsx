@@ -32,6 +32,7 @@ import GovClinicLayout from "./organization/govClinic/GovClinicLayout";
 import GovClinicChiefDoctor from "./organization/govClinic/GovClinicChiefDoctor";
 import GovClinicSystemAdmin from "./organization/govClinic/GovClinicSystemAdmin";
 import GovClinicHR from "./organization/govClinic/GovClinicHR";
+import GovClinicEmployee from "./organization/govClinic/GovClinicEmployee";
 
 function App() {
 return ( <LanguageProvider> <Routes>
@@ -107,6 +108,11 @@ return ( <LanguageProvider> <Routes>
       <Route
         path="hr"
         element={<GovClinicHR />}
+      />
+
+      <Route
+        path="employee"
+        element={<GovClinicEmployee />}
       />
     </Route>
 

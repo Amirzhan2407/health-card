@@ -293,6 +293,7 @@ const { data: employee, error } = await supabase
     email,
     position,
     cabinet,
+    role,
     login: null,
     password_hash: null,
     must_change_password: true,
@@ -357,6 +358,10 @@ if (req.body.cabinet !== undefined) {
 
 if (req.body.status !== undefined) {
   payload.status = safeText(req.body.status);
+}
+
+if (req.body.role !== undefined) {
+  payload.role = safeText(req.body.role);
 }
 
 if (req.body.dismissed_at !== undefined) {
@@ -687,6 +692,10 @@ if (role === "chief" || role === "chief_doctor") {
   role = "chief_doctor";
 } else if (role === "admin" || role === "organization_admin") {
   role = "organization_admin";
+} else if (role === "hr") {
+  role = "hr";
+} else if (["doctor", "nurse", "registrar", "department_head", "deputy_chief_doctor"].includes(role)) {
+  // Keep the role as is
 } else {
   role = "employee";
 }
@@ -697,6 +706,7 @@ const { data: updatedEmployee, error: updateError } = await supabase
     login,
     password_hash: passwordHash,
     must_change_password: true,
+    role: role,
     status: "active",
     updated_at: new Date().toISOString(),
   })

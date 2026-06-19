@@ -27,96 +27,135 @@ const checkHash = crypto
 return hash === checkHash;
 }
 
+function getRoleByPosition(position) {
+  const value = String(position || "").toLowerCase();
+  if (value.includes("отдел кадров")) return "hr";
+  if (value.includes("заместитель")) return "deputy_chief_doctor";
+  if (value.includes("завед")) return "department_head";
+  if (value.includes("регистратор")) return "registrar";
+  if (value.includes("медсестр")) return "nurse";
+  if (value.includes("врач")) return "doctor";
+  if (value.includes("администратор")) return "organization_admin";
+  return "employee";
+}
+
 function getRedirectPath(role) {
-if (role === "chief_doctor" || role === "chief") {
-return "/organization/gov-clinic/chief-doctor";
-}
+  if (role === "chief_doctor" || role === "chief") {
+    return "/organization/gov-clinic/chief-doctor";
+  }
 
-if (role === "organization_admin" || role === "admin") {
-return "/organization/gov-clinic/system-admin";
-}
+  if (role === "organization_admin" || role === "admin") {
+    return "/organization/gov-clinic/system-admin";
+  }
 
-if (role === "hr" || role === "employee") {
-return "/organization/gov-clinic/hr";
-}
+  if (role === "hr") {
+    return "/organization/gov-clinic/hr";
+  }
 
-if (role === "deputy_chief_doctor") {
-return "/organization/gov-clinic/chief-doctor";
-}
+  if (["doctor", "nurse", "registrar", "department_head", "deputy_chief_doctor"].includes(role)) {
+    return "/organization/gov-clinic/employee";
+  }
 
-if (role === "department_head") {
-return "/organization/gov-clinic/doctor";
-}
+  if (role === "employee") {
+    return "/organization/gov-clinic/hr";
+  }
 
-if (role === "registrar") {
-return "/organization/gov-clinic/doctor";
-}
-
-return "/organization/gov-clinic/doctor";
+  return "/organization/gov-clinic/employee";
 }
 
 router.post("/login", async (req, res) => {
-try {
-const city = String(req.body.city || "").trim();
-const bin = String(req.body.bin || "").trim();
-const login = String(req.body.login || "").trim();
-const password = String(req.body.password || "");
+  try {
+    const city = String(req.body.city || "").trim();
+    const bin = String(req.body.bin || "").trim();
+    const login = String(req.body.login || "").trim();
+    const password = String(req.body.password || "");
 
+    if (!city || !bin || !login || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Город, БИН, логин и пароль обязательны.",
+      });
+    }
 
-if (!city || !bin || !login || !password) {
-  return res.status(400).json({
-    success: false,
-    message: "Город, БИН, логин и пароль обязательны.",
-  });
-}
+    let user = null;
+    const { data: dbUser, error: userError } = await supabase
+      .from("organization_users")
+      .select("*, organizations(*)")
+      .ilike("city", city)
+      .eq("bin", bin)
+      .eq("login", login)
+      .maybeSingle();
 
-const { data: user, error } = await supabase
-  .from("organization_users")
-  .select("*, organizations(*)")
-  .ilike("city", city)
-  .eq("bin", bin)
-  .eq("login", login)
-  .maybeSingle();
+    if (dbUser && !userError) {
+      user = dbUser;
+    } else {
+      // Fallback: search in organization_employees
+      const { data: emp, error: empError } = await supabase
+        .from("organization_employees")
+        .select("*, organizations!inner(*)")
+        .eq("login", login)
+        .ilike("organizations.city", city)
+        .eq("organizations.bin", bin)
+        .maybeSingle();
 
-if (error || !user) {
-  return res.status(401).json({
-    success: false,
-    message: "Пользователь не найден.",
-  });
-}
+      if (emp && !empError) {
+        const resolvedRole = emp.role || getRoleByPosition(emp.position) || "employee";
+        user = {
+          id: emp.id,
+          organization_id: emp.organization_id,
+          full_name: emp.full_name,
+          email: emp.email,
+          role: resolvedRole,
+          login: emp.login,
+          city: city,
+          bin: bin,
+          must_change_password: emp.must_change_password,
+          status: emp.status,
+          password_hash: emp.password_hash,
+          organizations: emp.organizations,
+        };
+      }
+    }
 
-if (user.status !== "active") {
-  return res.status(403).json({
-    success: false,
-    message: "Аккаунт отключён.",
-  });
-}
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Пользователь не найден.",
+      });
+    }
 
-if (!verifyPassword(password, user.password_hash)) {
-  return res.status(401).json({
-    success: false,
-    message: "Неверный пароль.",
-  });
-}
+    if (user.status !== "active") {
+      return res.status(403).json({
+        success: false,
+        message: "Аккаунт отключён.",
+      });
+    }
 
-return res.status(200).json({
-  success: true,
-  message: "Вход выполнен.",
-  mustChangePassword: user.must_change_password,
-  redirectPath: getRedirectPath(user.role),
-  user: {
-    id: user.id,
-    organization_id: user.organization_id,
-    full_name: user.full_name,
-    email: user.email,
-    role: user.role,
-    login: user.login,
-    city: user.city,
-    bin: user.bin,
-    must_change_password: user.must_change_password,
-  },
-  organization: user.organizations || null,
-});
+    if (!verifyPassword(password, user.password_hash)) {
+      return res.status(401).json({
+        success: false,
+        message: "Неверный пароль.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Вход выполнен.",
+      mustChangePassword: user.must_change_password,
+      redirectPath: getRedirectPath(user.role),
+      user: {
+        id: user.id,
+        organization_id: user.organization_id,
+        full_name: user.full_name,
+        email: user.email,
+        role: user.role,
+        login: user.login,
+        city: user.city,
+        bin: user.bin,
+        must_change_password: user.must_change_password,
+      },
+      organization: user.organizations || null,
+    });
 
 
 } catch (error) {

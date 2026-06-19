@@ -242,24 +242,19 @@ function buildOrganizationAccessEmail({
     application?.organization_name || "Медицинская организация"
   );
 
-  const applicationNumber = escapeHtml(
-    application?.application_number || "не указан"
-  );
-
   const safeFullName = escapeHtml(fullName || "Не указано");
-  const safeRoleLabel = escapeHtml(roleLabel || "Пользователь организации");
   const safeLogin = escapeHtml(login);
   const safeTempPassword = escapeHtml(tempPassword);
   const loginUrl = `${FRONTEND_URL}/organization-login`;
 
-  const subject = `Clinic OS — доступ для ${roleLabel}`;
+  const subject = "Доступ к Clinic OS";
 
   const html = `
     <!doctype html>
     <html lang="ru">
       <head>
         <meta charset="UTF-8" />
-        <title>${escapeHtml(subject)}</title>
+        <title>Доступ к Clinic OS</title>
       </head>
       <body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
         <div style="max-width:660px;margin:28px auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:24px;overflow:hidden;">
@@ -271,73 +266,46 @@ function buildOrganizationAccessEmail({
           </div>
 
           <div style="padding:30px;">
-            <h1 style="color:#0f172a;font-size:24px;margin:0 0 14px;">
-              Доступ предоставлен
+            <h1 style="color:#0f172a;font-size:22px;margin:0 0 14px;">
+              Здравствуйте, ${safeFullName}.
             </h1>
 
             <p style="color:#475569;font-size:15px;line-height:1.7;margin:0;">
-              ${safeRoleLabel} медицинской организации <b>«${organizationName}»</b>
-              по уникальному номеру заявки <b>${applicationNumber}</b>
-              предоставляется доступ к веб-системе Clinic OS.
+              Вам создан доступ к Clinic OS.
             </p>
 
             <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;padding:20px;margin-top:20px;">
-              <div style="margin-bottom:14px;">
-                <div style="color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase;">ФИО</div>
-                <div style="color:#0f172a;font-size:16px;font-weight:800;margin-top:5px;">${safeFullName}</div>
-              </div>
-
-              <div style="margin-bottom:14px;">
-                <div style="color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase;">Роль</div>
-                <div style="color:#0f172a;font-size:16px;font-weight:800;margin-top:5px;">${safeRoleLabel}</div>
-              </div>
-
               <div style="margin-bottom:14px;">
                 <div style="color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase;">Логин</div>
                 <div style="color:#0369a1;font-size:20px;font-weight:900;margin-top:5px;">${safeLogin}</div>
               </div>
 
               <div>
-                <div style="color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase;">Одноразовый пароль</div>
+                <div style="color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase;">Временный пароль</div>
                 <div style="color:#16a34a;font-size:22px;font-weight:900;margin-top:5px;">${safeTempPassword}</div>
               </div>
             </div>
 
             <div style="background:#ecfdf5;border:1px solid #bbf7d0;border-radius:18px;padding:18px;margin-top:20px;">
               <p style="margin:0;color:#166534;font-size:15px;font-weight:800;line-height:1.7;">
-                При первом входе обязательно смените одноразовый пароль на постоянный.
+                При первом входе система попросит сменить пароль.
               </p>
             </div>
 
             <a href="${loginUrl}" style="display:inline-block;margin-top:22px;background:#16a34a;color:#ffffff;text-decoration:none;padding:13px 20px;border-radius:14px;font-weight:900;">
               Перейти ко входу
             </a>
-
-            <p style="color:#64748b;font-size:13px;line-height:1.6;margin-top:24px;">
-              От лучшей веб-системы <b>Clinic OS</b>.
-            </p>
           </div>
         </div>
       </body>
     </html>
   `;
 
-  const text = `
-Clinic OS
-
-${roleLabel} организации "${application?.organization_name || "Медицинская организация"}" по заявке ${application?.application_number || "не указан"} предоставляется доступ.
-
-ФИО: ${fullName || "Не указано"}
-Роль: ${roleLabel}
+  const text = `Здравствуйте, ${fullName}.
+Вам создан доступ к Clinic OS.
 Логин: ${login}
-Одноразовый пароль: ${tempPassword}
-
-При первом входе обязательно смените одноразовый пароль на постоянный.
-
-Вход: ${loginUrl}
-
-От лучшей веб-системы Clinic OS.
-`;
+Временный пароль: ${tempPassword}
+При первом входе система попросит сменить пароль.`;
 
   return {
     subject,

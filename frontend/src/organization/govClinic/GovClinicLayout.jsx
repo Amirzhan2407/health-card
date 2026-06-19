@@ -17,9 +17,10 @@ if (!user) {
 return <Navigate to="/organization-login" replace />;
 }
 
-const isChiefDoctor = user.role === "chief_doctor" || user.role === "chief";
-const isAdmin = user.role === "organization_admin" || user.role === "admin";
-const isHr = user.role === "hr" || user.role === "employee";
+const isEmployeeRole = ["doctor", "nurse", "registrar", "department_head", "deputy_chief_doctor"].includes(user?.role);
+const isChiefDoctor = user?.role === "chief_doctor" || user?.role === "chief";
+const isAdmin = user?.role === "organization_admin" || user?.role === "admin";
+const isHr = user?.role === "hr" || (user?.role === "employee" && !isEmployeeRole);
 
 useEffect(() => {
   const path = location.pathname;
@@ -29,46 +30,95 @@ useEffect(() => {
     navigate("/organization/gov-clinic/hr?tab=dashboard", { replace: true });
   } else if (isChiefDoctor && !path.includes("chief-doctor")) {
     navigate("/organization/gov-clinic/chief-doctor?tab=dashboard", { replace: true });
+  } else if (isEmployeeRole && !path.includes("employee")) {
+    navigate("/organization/gov-clinic/employee?tab=dashboard", { replace: true });
   }
-}, [location.pathname, isAdmin, isHr, isChiefDoctor]);
+}, [location.pathname, isAdmin, isHr, isChiefDoctor, isEmployeeRole]);
 
 
 function logout() {
-localStorage.removeItem("organizationUser");
-localStorage.removeItem("organizationData");
-localStorage.removeItem("organizationToken");
-navigate("/organization-login");
+  localStorage.removeItem("organizationUser");
+  localStorage.removeItem("organizationData");
+  localStorage.removeItem("organizationToken");
+  navigate("/organization-login");
 }
 
 function goAdminTab(tab) {
-navigate("/organization/gov-clinic/system-admin?tab=" + tab);
+  navigate("/organization/gov-clinic/system-admin?tab=" + tab);
 }
 
 function goChiefTab(tab) {
-navigate("/organization/gov-clinic/chief-doctor?tab=" + tab);
+  navigate("/organization/gov-clinic/chief-doctor?tab=" + tab);
 }
 
 function goHrTab(tab) {
-navigate("/organization/gov-clinic/hr?tab=" + tab);
+  navigate("/organization/gov-clinic/hr?tab=" + tab);
 }
+
+function goEmployeeTab(tab) {
+  navigate("/organization/gov-clinic/employee?tab=" + tab);
+}
+
+const employeeTabs = {
+  doctor: [
+    { id: "dashboard", label: "Главная" },
+    { id: "appointments", label: "Записи" },
+    { id: "patients", label: "Пациенты" },
+    { id: "medical_records", label: "Медицинская карта" },
+    { id: "documents", label: "Документы" },
+    { id: "notifications", label: "Уведомления" }
+  ],
+  nurse: [
+    { id: "dashboard", label: "Главная" },
+    { id: "appointments", label: "Записи" },
+    { id: "patients", label: "Пациенты" },
+    { id: "documents", label: "Документы" },
+    { id: "notifications", label: "Уведомления" }
+  ],
+  registrar: [
+    { id: "dashboard", label: "Главная" },
+    { id: "appointments", label: "Записи" },
+    { id: "patients", label: "Пациенты" },
+    { id: "notifications", label: "Уведомления" }
+  ],
+  department_head: [
+    { id: "dashboard", label: "Главная" },
+    { id: "appointments", label: "Записи" },
+    { id: "patients", label: "Пациенты" },
+    { id: "medical_records", label: "Медицинская карта" },
+    { id: "documents", label: "Документы" },
+    { id: "notifications", label: "Уведомления" },
+    { id: "department_staff", label: "Сотрудники отделения" }
+  ],
+  deputy_chief_doctor: [
+    { id: "dashboard", label: "Главная" },
+    { id: "appointments", label: "Записи" },
+    { id: "patients", label: "Пациенты" },
+    { id: "medical_records", label: "Медицинская карта" },
+    { id: "documents", label: "Документы" },
+    { id: "notifications", label: "Уведомления" },
+    { id: "control", label: "Контроль" }
+  ]
+};
 
 function getCabinetTitle() {
-if (isChiefDoctor) {
-return "Кабинет главного врача";
-}
+  if (isChiefDoctor) {
+    return "Кабинет главного врача";
+  }
 
+  if (isAdmin) {
+    return "Кабинет администратора организации";
+  }
 
-if (isAdmin) {
-  return "Кабинет администратора организации";
-}
+  if (isHr) {
+    return "Кабинет отдела кадров";
+  }
 
-if (isHr) {
-  return "Кабинет отдела кадров";
-}
+  if (isEmployeeRole) {
+    return "Кабинет сотрудника";
+  }
 
-return "Кабинет сотрудника организации";
-
-
+  return "Кабинет сотрудника организации";
 }
 
 return ( <div className="gov-clinic-shell"> <aside className="gov-clinic-sidebar"> <div className="gov-clinic-logo"> <h2>Clinic OS</h2> <p>{getCabinetTitle()}</p> </div>
@@ -164,6 +214,21 @@ return ( <div className="gov-clinic-shell"> <aside className="gov-clinic-sidebar
           >
             Отчёты
           </button>
+        </>
+      ) : null}
+
+      {isEmployeeRole ? (
+        <>
+          {(employeeTabs[user?.role] || []).map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={currentTab === tab.id ? "active" : ""}
+              onClick={() => goEmployeeTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
         </>
       ) : null}
     </nav>
