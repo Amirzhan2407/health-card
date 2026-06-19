@@ -293,7 +293,6 @@ const { data: employee, error } = await supabase
     email,
     position,
     cabinet,
-    role,
     login: null,
     password_hash: null,
     must_change_password: true,
@@ -358,10 +357,6 @@ if (req.body.cabinet !== undefined) {
 
 if (req.body.status !== undefined) {
   payload.status = safeText(req.body.status);
-}
-
-if (req.body.role !== undefined) {
-  payload.role = safeText(req.body.role);
 }
 
 if (req.body.dismissed_at !== undefined) {
@@ -706,7 +701,6 @@ const { data: updatedEmployee, error: updateError } = await supabase
     login,
     password_hash: passwordHash,
     must_change_password: true,
-    role: role,
     status: "active",
     updated_at: new Date().toISOString(),
   })
