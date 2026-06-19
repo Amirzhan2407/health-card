@@ -197,7 +197,6 @@ try {
     position: form.position.trim(),
     department_id: form.department_id || null,
     cabinet: form.cabinet.trim(),
-    role: form.role,
     status: "active",
   };
 

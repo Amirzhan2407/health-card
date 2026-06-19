@@ -272,7 +272,6 @@ const { data: employee, error } = await supabase
     email,
     position,
     cabinet,
-    role,
     login: null,
     password_hash: null,
     must_change_password: true,
@@ -333,10 +332,6 @@ if (req.body.department_id !== undefined || req.body.departmentId !== undefined)
 
 if (req.body.cabinet !== undefined) {
   payload.cabinet = safeText(req.body.cabinet);
-}
-
-if (req.body.role !== undefined) {
-  payload.role = safeText(req.body.role);
 }
 
 if (req.body.status !== undefined) {
