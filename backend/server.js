@@ -12,6 +12,7 @@ import auditLogsRoutes from "./routes/auditLogs.js";
 import organizationsRoutes from "./routes/organizations.js";
 import adminDashboardRoutes from "./routes/adminDashboard.js";
 import organizationStructureRoutes from "./routes/organizationStructure.js";
+import { supabase } from "./lib/supabaseAdmin.js";
 
 dotenv.config();
 
@@ -59,6 +60,54 @@ app.get("/api/check-version", (req, res) => {
 });
 
 
+
+app.get("/api/test-db-insert", async (req, res) => {
+  const rolesToTest = [
+    "chief",
+    "chief_doctor",
+    "admin",
+    "organization_admin",
+    "hr",
+    "doctor",
+    "nurse",
+    "employee"
+  ];
+  const results = {};
+
+  try {
+    for (const role of rolesToTest) {
+      const login = "test_role_" + role + "_" + Math.floor(Math.random() * 100000);
+      const dummyUser = {
+        organization_id: "00000000-0000-0000-0000-000000000000",
+        city: "TestCity",
+        bin: "123456789012",
+        full_name: "Test User",
+        phone: "123456",
+        email: "test@test.com",
+        role: role,
+        login: login,
+        password_hash: "hash",
+        must_change_password: true,
+        status: "active"
+      };
+
+      const { error } = await supabase
+        .from("organization_users")
+        .insert(dummyUser);
+
+      if (error) {
+        results[role] = { success: false, code: error.code, message: error.message };
+      } else {
+        results[role] = { success: true };
+        // Clean up
+        await supabase.from("organization_users").delete().eq("login", login);
+      }
+    }
+    res.status(200).json({ success: true, results });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 app.use("/api/pharmacy", pharmacyRoutes);
 app.use("/api/ai", aiRoutes);
