@@ -346,44 +346,83 @@ async function getGmailAccessToken() {
   return result.access_token;
 }
 
-function buildRawMimeEmail({ from, to, subject, text, html }) {
-  const boundary = `clinic_os_boundary_${Date.now()}_${Math.random()
-    .toString(36)
-    .slice(2)}`;
+function buildRawMimeEmail({ from, to, subject, text, html, attachments = [] }) {
+  const mainBoundary = `clinic_os_main_boundary_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const alternativeBoundary = `clinic_os_alt_boundary_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
   const textBase64 = Buffer.from(text || "", "utf8").toString("base64");
   const htmlBase64 = Buffer.from(html || "", "utf8").toString("base64");
 
-  const message = [
+  const messageParts = [
     `From: Clinic OS <${from}>`,
     `To: ${to}`,
     `Subject: ${encodeMimeSubject(subject)}`,
     `Date: ${new Date().toUTCString()}`,
-    `Message-ID: <${Date.now()}.${Math.random()
-      .toString(36)
-      .slice(2)}@clinic-os.kz>`,
+    `Message-ID: <${Date.now()}.${Math.random().toString(36).slice(2)}@clinic-os.kz>`,
     "MIME-Version: 1.0",
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
-    "",
-    `--${boundary}`,
-    'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: base64",
-    "",
-    textBase64,
-    "",
-    `--${boundary}`,
-    'Content-Type: text/html; charset="UTF-8"',
-    "Content-Transfer-Encoding: base64",
-    "",
-    htmlBase64,
-    "",
-    `--${boundary}--`,
-  ].join("\r\n");
+  ];
 
+  if (attachments.length > 0) {
+    messageParts.push(`Content-Type: multipart/related; boundary="${mainBoundary}"`, "");
+    
+    // Alternative boundary block for text/html
+    messageParts.push(`--${mainBoundary}`);
+    messageParts.push(`Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`, "");
+    
+    // Plain text part
+    messageParts.push(`--${alternativeBoundary}`);
+    messageParts.push('Content-Type: text/plain; charset="UTF-8"');
+    messageParts.push("Content-Transfer-Encoding: base64", "");
+    messageParts.push(textBase64, "");
+    
+    // HTML part
+    messageParts.push(`--${alternativeBoundary}`);
+    messageParts.push('Content-Type: text/html; charset="UTF-8"');
+    messageParts.push("Content-Transfer-Encoding: base64", "");
+    messageParts.push(htmlBase64, "");
+    
+    messageParts.push(`--${alternativeBoundary}--`, "");
+
+    // Attachments block
+    for (const attach of attachments) {
+      messageParts.push(`--${mainBoundary}`);
+      messageParts.push(`Content-Type: ${attach.contentType}; name="${attach.filename}"`);
+      messageParts.push("Content-Transfer-Encoding: base64");
+      if (attach.cid) {
+        messageParts.push(`Content-ID: <${attach.cid}>`);
+      }
+      messageParts.push(`Content-Disposition: inline; filename="${attach.filename}"`, "");
+      
+      const fileBase64 = Buffer.isBuffer(attach.content) 
+        ? attach.content.toString("base64") 
+        : Buffer.from(attach.content).toString("base64");
+        
+      messageParts.push(fileBase64, "");
+    }
+    
+    messageParts.push(`--${mainBoundary}--`);
+  } else {
+    // Standard text/html alternative message
+    messageParts.push(`Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`, "");
+    
+    messageParts.push(`--${alternativeBoundary}`);
+    messageParts.push('Content-Type: text/plain; charset="UTF-8"');
+    messageParts.push("Content-Transfer-Encoding: base64", "");
+    messageParts.push(textBase64, "");
+    
+    messageParts.push(`--${alternativeBoundary}`);
+    messageParts.push('Content-Type: text/html; charset="UTF-8"');
+    messageParts.push("Content-Transfer-Encoding: base64", "");
+    messageParts.push(htmlBase64, "");
+    
+    messageParts.push(`--${alternativeBoundary}--`);
+  }
+
+  const message = messageParts.join("\r\n");
   return encodeBase64Url(message);
 }
 
-async function sendGmailMessage({ to, subject, text, html }) {
+async function sendGmailMessage({ to, subject, text, html, attachments = [] }) {
   const accessToken = await getGmailAccessToken();
 
   const raw = buildRawMimeEmail({
@@ -392,6 +431,7 @@ async function sendGmailMessage({ to, subject, text, html }) {
     subject,
     text,
     html,
+    attachments,
   });
 
   const response = await fetch(
@@ -569,6 +609,24 @@ export async function sendAppointmentBookingEmail({
   const subject = "Запись к врачу — Clinic OS";
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ClinicOS_Appointment_${appointmentId}`;
 
+  let attachments = [];
+  try {
+    const qrResponse = await fetch(qrCodeUrl);
+    if (qrResponse.ok) {
+      const arrayBuffer = await qrResponse.arrayBuffer();
+      attachments.push({
+        filename: "talon_qr.png",
+        contentType: "image/png",
+        content: Buffer.from(arrayBuffer),
+        cid: "qrcode"
+      });
+    }
+  } catch (qrErr) {
+    console.error("Failed to fetch QR image for email attachment:", qrErr.message);
+  }
+
+  const qrImgSrc = attachments.length > 0 ? "cid:qrcode" : qrCodeUrl;
+
   const html = `
     <!doctype html>
     <html lang="ru">
@@ -612,7 +670,7 @@ export async function sendAppointmentBookingEmail({
 
             <div style="text-align:center;margin:24px 0;padding:20px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:18px;">
               <p style="margin:0 0 12px;color:#166534;font-weight:800;font-size:14px;">Ваш электронный талон (QR-код):</p>
-              <img src="${qrCodeUrl}" alt="QR Талон" style="border:4px solid #ffffff;border-radius:10px;box-shadow:0 4px 10px rgba(0,0,0,0.1);" />
+              <img src="${qrImgSrc}" alt="QR Талон" style="border:4px solid #ffffff;border-radius:10px;box-shadow:0 4px 10px rgba(0,0,0,0.1);" />
               <p style="margin:8px 0 0;color:#64748b;font-size:11px;">Покажите этот код при входе в клинику или в кабинете врача</p>
             </div>
 
@@ -648,6 +706,7 @@ ${qrCodeUrl}
       subject,
       text,
       html,
+      attachments,
     });
 
     return {

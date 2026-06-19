@@ -240,7 +240,11 @@ export default function GovClinicEmployee() {
         );
         if (empRes.ok) {
           const empData = await empRes.json();
-          const match = (empData.employees || []).find(e => e.login === user.login);
+          const match = (empData.employees || []).find(e => 
+            (e.login && user.login && e.login.toLowerCase() === user.login.toLowerCase()) ||
+            (e.email && user.email && e.email.toLowerCase() === user.email.toLowerCase()) ||
+            (e.full_name && user.full_name && e.full_name.toLowerCase().trim() === user.full_name.toLowerCase().trim())
+          );
           if (match) {
             setEmployeeProfile(match);
             empId = match.id;
