@@ -46,6 +46,14 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+app.get("/api/check-version", (req, res) => {
+  res.status(200).json({
+    success: true,
+    version: "v2-roles-fix"
+  });
+});
+
+
 app.use("/api/pharmacy", pharmacyRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/admin", adminRoutes);
