@@ -16,6 +16,7 @@ import Login from "./pages/Login";
 import Passport from "./pages/Passport";
 import OrganizationApplication from "./pages/OrganizationApplication";
 import BookAppointmentPage from "./pages/BookAppointmentPage";
+import VisitsHistoryPage from "./pages/VisitsHistoryPage";
 
 
 import AdminLogin from "./pages/AdminLogin";
@@ -60,6 +61,7 @@ return ( <LanguageProvider> <Routes>
       <Route path="ai-assistant" element={<AiAssistantPage />} />
       <Route path="passport" element={<Passport />} />
       <Route path="book-appointment" element={<BookAppointmentPage />} />
+      <Route path="visits-history" element={<VisitsHistoryPage />} />
     </Route>
 
     <Route path="/admin" element={<AdminLogin />} />

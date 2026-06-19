@@ -424,3 +424,445 @@
     font-size: 15px;
   }
 }
+
+/* ======================================================
+   VISITS HISTORY TABS
+   ====================================================== */
+.visitsTabs {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 30px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 12px;
+}
+
+.layoutRoot.light .visitsTabs {
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+.visitTabBtn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 16px;
+  font-weight: 800;
+  padding: 8px 16px;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: all 0.22s ease;
+}
+
+.layoutRoot.light .visitTabBtn {
+  color: #64748b;
+}
+
+.visitTabBtn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.layoutRoot.light .visitTabBtn:hover {
+  color: #0f172a;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.visitTabBtn.active {
+  color: #00ffff;
+  background: rgba(0, 255, 255, 0.12);
+  box-shadow: 0 4px 12px rgba(0, 255, 255, 0.08);
+}
+
+.layoutRoot.light .visitTabBtn.active {
+  color: #047857;
+  background: rgba(0, 165, 80, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 165, 80, 0.06);
+}
+
+/* ======================================================
+   VISIT CARD DETAILS
+   ====================================================== */
+.visitGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 24px;
+}
+
+@media (max-width: 700px) {
+  .visitGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.visitCard {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(17, 24, 39, 0.98));
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.2);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.25s ease;
+}
+
+.layoutRoot.light .visitCard {
+  background: linear-gradient(135deg, rgba(242, 248, 249, 0.88), rgba(232, 241, 243, 0.94));
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.04);
+}
+
+.visitCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.28);
+}
+
+.layoutRoot.light .visitCard:hover {
+  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.07);
+}
+
+.visitCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.visitOrgName {
+  font-size: 18px;
+  font-weight: 900;
+  color: #ffffff;
+  line-height: 1.4;
+}
+
+.layoutRoot.light .visitOrgName {
+  color: #0f172a;
+}
+
+.visitStatusBadge {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.visitStatusBadge.pending {
+  background: rgba(234, 179, 8, 0.15);
+  border: 1px solid rgba(234, 179, 8, 0.25);
+  color: #facc15;
+}
+
+.layoutRoot.light .visitStatusBadge.pending {
+  background: rgba(234, 179, 8, 0.1);
+  color: #a16207;
+}
+
+.visitStatusBadge.approved {
+  background: rgba(0, 255, 255, 0.12);
+  border: 1px solid rgba(0, 255, 255, 0.2);
+  color: #00ffff;
+}
+
+.layoutRoot.light .visitStatusBadge.approved {
+  background: rgba(0, 165, 80, 0.15);
+  color: #047857;
+}
+
+.visitStatusBadge.completed {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+}
+
+.layoutRoot.light .visitStatusBadge.completed {
+  background: rgba(34, 197, 94, 0.08);
+  color: #15803d;
+}
+
+.visitStatusBadge.cancelled,
+.visitStatusBadge.rejected {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.layoutRoot.light .visitStatusBadge.cancelled,
+.layoutRoot.light .visitStatusBadge.rejected {
+  background: rgba(239, 68, 68, 0.08);
+  color: #b91c1c;
+}
+
+.visitBody {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.visitDoctorInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.visitDocName {
+  font-size: 16px;
+  font-weight: 800;
+  color: #e2e8f0;
+}
+
+.layoutRoot.light .visitDocName {
+  color: #1e293b;
+}
+
+.visitDocPos {
+  font-size: 13px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.layoutRoot.light .visitDocPos {
+  color: #64748b;
+}
+
+.visitDetails {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-top: 8px;
+  font-size: 14px;
+  color: #cbd5e1;
+}
+
+.layoutRoot.light .visitDetails {
+  color: #475569;
+}
+
+.visitDetailItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.visitDetailIcon {
+  font-size: 16px;
+}
+
+.visitReason {
+  font-size: 13px;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 8px 12px;
+  border-radius: 12px;
+  margin-top: 4px;
+}
+
+.layoutRoot.light .visitReason {
+  color: #475569;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.visitFooter {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 16px;
+  margin-top: 12px;
+}
+
+.layoutRoot.light .visitFooter {
+  border-top-color: rgba(0, 0, 0, 0.06);
+}
+
+.visitTicketBtn {
+  background: linear-gradient(135deg, #00a550, #00c46a);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 165, 80, 0.2);
+}
+
+.visitTicketBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 165, 80, 0.3);
+}
+
+/* ======================================================
+   TICKET / QR MODAL
+   ====================================================== */
+.ticketModalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  padding: 20px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.ticketModal {
+  background: #0f172a;
+  color: white;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  width: 100%;
+  max-width: 440px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.layoutRoot.light .ticketModal {
+  background: #ffffff;
+  color: #0f172a;
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.15);
+}
+
+@keyframes slideUp {
+  from { transform: translateY(30px) scale(0.95); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.ticketCloseBtn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
+  z-index: 10;
+  transition: all 0.2s;
+}
+
+.layoutRoot.light .ticketCloseBtn {
+  background: rgba(0, 0, 0, 0.05);
+  color: #0f172a;
+}
+
+.ticketCloseBtn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: scale(1.05);
+}
+
+.layoutRoot.light .ticketCloseBtn:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.ticketHeader {
+  background: #00a550;
+  color: white;
+  padding: 24px;
+  text-align: center;
+  position: relative;
+}
+
+.ticketHeaderTitle {
+  font-size: 20px;
+  font-weight: 900;
+  margin: 0;
+}
+
+.ticketHeaderSub {
+  font-size: 13px;
+  opacity: 0.85;
+  margin-top: 4px;
+}
+
+.ticketContent {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.ticketDetailsList {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+  border-bottom: 2px dashed rgba(255, 255, 255, 0.1);
+  padding-bottom: 20px;
+}
+
+.layoutRoot.light .ticketDetailsList {
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+.ticketDetailRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+.ticketLabel {
+  color: #94a3b8;
+}
+
+.layoutRoot.light .ticketLabel {
+  color: #64748b;
+}
+
+.ticketVal {
+  font-weight: 800;
+  text-align: right;
+  max-width: 60%;
+}
+
+.ticketQrContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: white;
+  padding: 16px;
+  border-radius: 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.ticketQrImg {
+  width: 200px;
+  height: 200px;
+  display: block;
+}
+
+.ticketQrHelp {
+  margin-top: 14px;
+  font-size: 12px;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.layoutRoot.light .ticketQrHelp {
+  color: #64748b;
+}

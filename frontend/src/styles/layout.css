@@ -58,6 +58,7 @@ body {
 ========================================= */
 
 .layoutRoot.dark {
+  --bg-color-main: #07111f;
   min-height: 100vh;
 
   background:
@@ -72,6 +73,7 @@ body {
 ========================================= */
 
 .layoutRoot.light {
+  --bg-color-main: #d9e5e7;
   min-height: 100vh;
 
   background:
@@ -497,7 +499,7 @@ body {
     overflow: hidden !important;
 
     overscroll-behavior: none !important;
-    background: #07111f;
+    background: var(--bg-color-main) !important;
   }
 
   .layoutRoot {

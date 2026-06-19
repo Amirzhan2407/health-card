@@ -10,6 +10,7 @@ export default function Topbar({ theme, setTheme, onLogout }) {
   const links = [
     { title: "Главная", path: "/home" },
     { title: "Запись к врачу", path: "/book-appointment" },
+    { title: "История посещений", path: "/visits-history" },
     { title: "Справки", path: "/documents" },
     { title: "История болезни", path: "/documents-cloud" },
     { title: "ИИ помощник", path: "/ai-assistant" },

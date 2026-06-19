@@ -1098,6 +1098,79 @@ router.get("/appointments", async (req, res) => {
       message: error.message || "Ошибка получения записей.",
     });
   }
+// GET /api/organization-structure/appointments/patient/:iin
+router.get("/appointments/patient/:iin", async (req, res) => {
+  try {
+    const { iin } = req.params;
+    if (!iin) {
+      return res.status(400).json({
+        success: false,
+        message: "ИИН обязателен.",
+      });
+    }
+
+    const { data: appointments, error } = await supabase
+      .from("organization_appointments")
+      .eq("patient_iin", iin)
+      .order("date", { ascending: false })
+      .order("time", { ascending: false });
+
+    if (error) throw error;
+
+    if (!appointments || appointments.length === 0) {
+      return res.status(200).json({
+        success: true,
+        appointments: [],
+      });
+    }
+
+    const orgIds = [...new Set(appointments.map(a => a.organization_id).filter(Boolean))];
+    const empIds = [...new Set(appointments.map(a => a.employee_id).filter(Boolean))];
+
+    let organizations = [];
+    let employees = [];
+
+    if (orgIds.length > 0) {
+      const { data: orgs } = await supabase
+        .from("organizations")
+        .select("id, organization_name")
+        .in("id", orgIds);
+      organizations = orgs || [];
+    }
+
+    if (empIds.length > 0) {
+      const { data: emps } = await supabase
+        .from("organization_employees")
+        .select("id, full_name, position, cabinet")
+        .in("id", empIds);
+      employees = emps || [];
+    }
+
+    const orgMap = Object.fromEntries(organizations.map(o => [o.id, o]));
+    const empMap = Object.fromEntries(employees.map(e => [e.id, e]));
+
+    const formatted = appointments.map(app => {
+      const org = orgMap[app.organization_id];
+      const emp = empMap[app.employee_id];
+      return {
+        ...app,
+        organization_name: org ? org.organization_name : "Медицинская организация",
+        doctor_name: emp ? emp.full_name : "Врач",
+        doctor_position: emp ? emp.position : "",
+        cabinet: app.cabinet || (emp ? emp.cabinet : "") || "—"
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      appointments: formatted,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Ошибка получения истории посещений.",
+    });
+  }
 });
 
 // POST /api/organization-structure/appointments

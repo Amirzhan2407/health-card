@@ -244,7 +244,7 @@ export default function AdminAuditLogs() {
 
     try {
       const result = await adminRequest("/api/audit-logs");
-      setLogs(result?.logs || []);
+      setLogs(result.logs || []);
     } catch (err) {
       setLogs([]);
       setError(err.message || "Не удалось загрузить журнал действий.");

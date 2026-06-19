@@ -609,23 +609,7 @@ export async function sendAppointmentBookingEmail({
   const subject = "Запись к врачу — Clinic OS";
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ClinicOS_Appointment_${appointmentId}`;
 
-  let attachments = [];
-  try {
-    const qrResponse = await fetch(qrCodeUrl);
-    if (qrResponse.ok) {
-      const arrayBuffer = await qrResponse.arrayBuffer();
-      attachments.push({
-        filename: "talon_qr.png",
-        contentType: "image/png",
-        content: Buffer.from(arrayBuffer),
-        cid: "qrcode"
-      });
-    }
-  } catch (qrErr) {
-    console.error("Failed to fetch QR image for email attachment:", qrErr.message);
-  }
-
-  const qrImgSrc = attachments.length > 0 ? "cid:qrcode" : qrCodeUrl;
+  const qrImgSrc = qrCodeUrl;
 
   const html = `
     <!doctype html>
@@ -706,7 +690,6 @@ ${qrCodeUrl}
       subject,
       text,
       html,
-      attachments,
     });
 
     return {
