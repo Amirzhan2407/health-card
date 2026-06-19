@@ -1,9 +1,11 @@
 
-import { Outlet, useNavigate, Navigate } from "react-router-dom";
+import { Outlet, useNavigate, Navigate, useSearchParams } from "react-router-dom";
 import "./govClinic.css";
 
 export default function GovClinicLayout() {
 const navigate = useNavigate();
+const [searchParams] = useSearchParams();
+const currentTab = searchParams.get("tab") || "dashboard";
 
 const user = JSON.parse(
 localStorage.getItem("organizationUser") || "null"
@@ -62,15 +64,27 @@ return ( <div className="gov-clinic-shell"> <aside className="gov-clinic-sidebar
     <nav className="gov-clinic-nav">
       {isAdmin ? (
         <>
-          <button type="button" onClick={() => goAdminTab("dashboard")}>
+          <button
+            type="button"
+            className={currentTab === "dashboard" ? "active" : ""}
+            onClick={() => goAdminTab("dashboard")}
+          >
             Главная
           </button>
 
-          <button type="button" onClick={() => goAdminTab("departments")}>
+          <button
+            type="button"
+            className={currentTab === "departments" ? "active" : ""}
+            onClick={() => goAdminTab("departments")}
+          >
             Отделения
           </button>
 
-          <button type="button" onClick={() => goAdminTab("access")}>
+          <button
+            type="button"
+            className={currentTab === "employees" || currentTab === "access" ? "active" : ""}
+            onClick={() => goAdminTab("employees")}
+          >
             Доступы
           </button>
         </>
@@ -78,15 +92,27 @@ return ( <div className="gov-clinic-shell"> <aside className="gov-clinic-sidebar
 
       {isHr ? (
         <>
-          <button type="button" onClick={() => goHrTab("dashboard")}>
+          <button
+            type="button"
+            className={currentTab === "dashboard" ? "active" : ""}
+            onClick={() => goHrTab("dashboard")}
+          >
             Главная
           </button>
 
-          <button type="button" onClick={() => goHrTab("employees")}>
+          <button
+            type="button"
+            className={currentTab === "employees" || currentTab === "add" ? "active" : ""}
+            onClick={() => goHrTab("employees")}
+          >
             Сотрудники
           </button>
 
-          <button type="button" onClick={() => goHrTab("documents")}>
+          <button
+            type="button"
+            className={currentTab === "documents" ? "active" : ""}
+            onClick={() => goHrTab("documents")}
+          >
             Документы
           </button>
         </>
@@ -94,19 +120,35 @@ return ( <div className="gov-clinic-shell"> <aside className="gov-clinic-sidebar
 
       {isChiefDoctor ? (
         <>
-          <button type="button" onClick={() => goChiefTab("dashboard")}>
+          <button
+            type="button"
+            className={currentTab === "dashboard" ? "active" : ""}
+            onClick={() => goChiefTab("dashboard")}
+          >
             Главная
           </button>
 
-          <button type="button" onClick={() => goChiefTab("employees")}>
+          <button
+            type="button"
+            className={currentTab === "employees" ? "active" : ""}
+            onClick={() => goChiefTab("employees")}
+          >
             Сотрудники
           </button>
 
-          <button type="button" onClick={() => goChiefTab("departments")}>
+          <button
+            type="button"
+            className={currentTab === "departments" ? "active" : ""}
+            onClick={() => goChiefTab("departments")}
+          >
             Отделения
           </button>
 
-          <button type="button" onClick={() => goChiefTab("reports")}>
+          <button
+            type="button"
+            className={currentTab === "reports" ? "active" : ""}
+            onClick={() => goChiefTab("reports")}
+          >
             Отчёты
           </button>
         </>

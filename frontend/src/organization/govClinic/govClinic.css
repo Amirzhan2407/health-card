@@ -43,7 +43,8 @@
   cursor: pointer;
 }
 
-.gov-clinic-nav button:hover {
+.gov-clinic-nav button:hover,
+.gov-clinic-nav button.active {
   background: #00b85a;
   color: #ffffff;
 }

@@ -349,49 +349,6 @@ return ( <div> <h2 className="gov-page-title">Отдел кадров</h2>
     Добавление сотрудников, изменение данных, загрузка документов и ведение личных дел.
   </p>
 
-  <div className="gov-tabs">
-    <button
-      type="button"
-      className={activeTab === "dashboard" ? "active" : ""}
-      onClick={function () {
-        changeTab("dashboard");
-      }}
-    >
-      Главная
-    </button>
-
-    <button
-      type="button"
-      className={activeTab === "employees" ? "active" : ""}
-      onClick={function () {
-        changeTab("employees");
-      }}
-    >
-      Сотрудники
-    </button>
-
-    <button
-      type="button"
-      className={activeTab === "add" ? "active" : ""}
-      onClick={function () {
-        resetForm();
-        changeTab("add");
-      }}
-    >
-      Добавить сотрудника
-    </button>
-
-    <button
-      type="button"
-      className={activeTab === "documents" ? "active" : ""}
-      onClick={function () {
-        changeTab("documents");
-      }}
-    >
-      Документы
-    </button>
-  </div>
-
   {message ? <div className="gov-success">{message}</div> : null}
   {error ? <div className="gov-error">{error}</div> : null}
 
@@ -424,9 +381,30 @@ return ( <div> <h2 className="gov-page-title">Отдел кадров</h2>
       <div className="gov-card-head">
         <h3>Список сотрудников</h3>
 
-        <button type="button" onClick={loadEmployees}>
-          {loading ? "Загрузка..." : "Обновить"}
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={function () {
+              resetForm();
+              changeTab("add");
+            }}
+            style={{
+              background: "#00b85a",
+              color: "#ffffff",
+              border: 0,
+              borderRadius: "12px",
+              padding: "8px 16px",
+              fontWeight: "700",
+              cursor: "pointer",
+            }}
+          >
+            ➕ Добавить сотрудника
+          </button>
+
+          <button type="button" onClick={loadEmployees}>
+            {loading ? "Загрузка..." : "Обновить"}
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -620,6 +598,10 @@ return ( <div> <h2 className="gov-page-title">Отдел кадров</h2>
 
         <button type="button" onClick={resetForm}>
           Очистить форму
+        </button>
+
+        <button type="button" onClick={function () { changeTab("employees"); }}>
+          Назад к списку
         </button>
       </div>
     </form>
