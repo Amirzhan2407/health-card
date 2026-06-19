@@ -15,7 +15,7 @@ return <Navigate to="/organization-login" replace />;
 
 const isChiefDoctor = user.role === "chief_doctor" || user.role === "chief";
 const isAdmin = user.role === "organization_admin" || user.role === "admin";
-const isHr = user.role === "hr";
+const isHr = user.role === "hr" || user.role === "employee";
 
 
 function logout() {

@@ -36,7 +36,7 @@ if (role === "organization_admin" || role === "admin") {
 return "/organization/gov-clinic/system-admin";
 }
 
-if (role === "hr") {
+if (role === "hr" || role === "employee") {
 return "/organization/gov-clinic/hr";
 }
 
