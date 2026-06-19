@@ -4,6 +4,7 @@ import express from "express";
 import multer from "multer";
 import crypto from "crypto";
 import { supabase } from "../lib/supabaseAdmin.js";
+import { sendOrganizationAccessEmail } from "../services/emailService.js";
 
 const router = express.Router();
 
@@ -737,6 +738,43 @@ if (userError) {
     success: false,
     message: userError.message,
   });
+}
+
+if (employee.email) {
+  try {
+    const { data: organization } = await supabase
+      .from("organizations")
+      .select("*")
+      .eq("id", organizationId)
+      .single();
+
+    const roleLabels = {
+      chief_doctor: "Главный врач",
+      organization_admin: "Администратор организации",
+      hr: "Кадровый специалист",
+      registrar: "Регистратор",
+      nurse: "Медсестра / медбрат",
+      doctor: "Врач",
+      employee: "Сотрудник"
+    };
+
+    const resolvedRole = employee.role || getRoleByPosition(employee.position);
+    const roleLabel = roleLabels[resolvedRole] || employee.position || "Сотрудник";
+
+    await sendOrganizationAccessEmail({
+      to: employee.email,
+      application: {
+        organization_name: organization?.organization_name || "Медицинская организация",
+        application_number: organization?.application_number || "не указан"
+      },
+      fullName: employee.full_name,
+      roleLabel: roleLabel,
+      login: login,
+      tempPassword: tempPassword
+    });
+  } catch (emailErr) {
+    console.error("Ошибка отправки письма сотруднику:", emailErr);
+  }
 }
 
 return res.status(200).json({
