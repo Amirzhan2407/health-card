@@ -367,6 +367,7 @@ try {
 
   setMessage("Документы загружены.");
   setDocuments({});
+  await loadEmployees();
 } catch (err) {
   setError(err.message || "Ошибка загрузки документов.");
 } finally {
@@ -685,73 +686,155 @@ return ( <div> <h2 className="gov-page-title">Отдел кадров</h2>
   ) : null}
 
   {activeTab === "documents" ? (
-    <form className="gov-card" onSubmit={uploadDocuments}>
-      <h3>Документы сотрудника</h3>
+    <div className="gov-card">
+      <div className="gov-card-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px', marginBottom: '24px' }}>
+        <h3 style={{ margin: 0 }}>📂 Документы сотрудника</h3>
+        <button
+          type="button"
+          onClick={function () { changeTab("employees"); }}
+          style={{
+            background: "#cbd5e1",
+            color: "#1e293b",
+            border: 0,
+            borderRadius: "12px",
+            padding: "8px 16px",
+            fontWeight: "700",
+            cursor: "pointer"
+          }}
+        >
+          Назад к списку
+        </button>
+      </div>
 
-      <label>
-        Выберите сотрудника
+      <div style={{ marginBottom: '24px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#1e293b' }}>
+          Выберите сотрудника
+        </label>
         <select
           value={selectedEmployeeId}
           onChange={function (event) {
             setSelectedEmployeeId(event.target.value);
+            setMessage("");
+            setError("");
           }}
+          style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '15px' }}
         >
           <option value="">Не выбран</option>
-
           {employees.map(function (employee) {
             return (
               <option key={employee.id} value={employee.id}>
-                {employee.full_name}
+                {employee.full_name} ({employee.position})
               </option>
             );
           })}
         </select>
-      </label>
-
-      <div className="gov-form-grid">
-        <label>
-          Удостоверение личности
-          <input
-            type="file"
-            name="identity_document"
-            onChange={updateDocument}
-          />
-        </label>
-
-        <label>
-          Диплом
-          <input
-            type="file"
-            name="diploma"
-            onChange={updateDocument}
-          />
-        </label>
-
-        <label>
-          Сертификат
-          <input
-            type="file"
-            name="certificate"
-            onChange={updateDocument}
-          />
-        </label>
-
-        <label>
-          Трудовой договор
-          <input
-            type="file"
-            name="employment_contract"
-            onChange={updateDocument}
-          />
-        </label>
       </div>
 
-      <div className="gov-actions">
-        <button type="submit" disabled={saving}>
-          {saving ? "Загрузка..." : "Загрузить документы"}
-        </button>
-      </div>
-    </form>
+      {selectedEmployeeId ? (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+          {/* Левая колонка: Загрузка новых */}
+          <form onSubmit={uploadDocuments} style={{ borderRight: '1px solid #e2e8f0', paddingRight: '32px' }}>
+            <h4 style={{ marginBottom: '20px', color: '#0f172a', fontWeight: 'bold' }}>📤 Загрузить новые документы</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#475569', fontSize: '14px' }}>
+                Удостоверение личности
+                <input type="file" name="identity_document" onChange={updateDocument} style={{ padding: '6px 0' }} />
+              </label>
+
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#475569', fontSize: '14px' }}>
+                Диплом
+                <input type="file" name="diploma" onChange={updateDocument} style={{ padding: '6px 0' }} />
+              </label>
+
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#475569', fontSize: '14px' }}>
+                Сертификат
+                <input type="file" name="certificate" onChange={updateDocument} style={{ padding: '6px 0' }} />
+              </label>
+
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#475569', fontSize: '14px' }}>
+                Трудовой договор
+                <input type="file" name="employment_contract" onChange={updateDocument} style={{ padding: '6px 0' }} />
+              </label>
+            </div>
+
+            <div style={{ marginTop: '24px' }}>
+              <button
+                type="submit"
+                disabled={saving}
+                style={{
+                  background: '#00b85a',
+                  color: '#fff',
+                  border: 0,
+                  padding: '10px 20px',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  fontWeight: '700',
+                  fontSize: '15px'
+                }}
+              >
+                {saving ? "Загрузка..." : "Загрузить файлы"}
+              </button>
+            </div>
+          </form>
+
+          {/* Правая колонка: Список уже загруженных */}
+          <div>
+            <h4 style={{ marginBottom: '20px', color: '#0f172a', fontWeight: 'bold' }}>📋 Загруженные документы</h4>
+            {employees.find(emp => emp.id === selectedEmployeeId)?.documents?.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {employees.find(emp => emp.id === selectedEmployeeId).documents.map(function (doc) {
+                  const docLabels = {
+                    identity_document: "Удостоверение личности",
+                    diploma: "Диплом",
+                    certificate: "Сертификат",
+                    employment_contract: "Трудовой договор"
+                  };
+                  return (
+                    <div key={doc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ marginRight: '12px' }}>
+                        <div style={{ fontWeight: '700', fontSize: '14px', color: '#1e293b' }}>
+                          {docLabels[doc.document_type] || doc.document_type}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#64748b', wordBreak: 'break-all', marginTop: '2px' }}>
+                          {doc.file_name}
+                        </div>
+                      </div>
+                      {doc.file_url ? (
+                        <a
+                          href={doc.file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            background: '#3b82f6',
+                            color: '#fff',
+                            textDecoration: 'none',
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            fontSize: '13px',
+                            fontWeight: '700',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          Открыть
+                        </a>
+                      ) : (
+                        <span style={{ fontSize: '12px', color: '#94a3b8' }}>Нет ссылки</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p style={{ color: '#64748b', fontStyle: 'italic', margin: 0 }}>Документы пока не загружены.</p>
+            )}
+          </div>
+        </div>
+      ) : (
+        <p style={{ color: '#64748b', fontStyle: 'italic', textAlign: 'center', marginTop: '32px', margin: 0 }}>
+          Выберите сотрудника из списка выше, чтобы просмотреть его документы или загрузить новые.
+        </p>
+      )}
+    </div>
   ) : null}
 </div>
 

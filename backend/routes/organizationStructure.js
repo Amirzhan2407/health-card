@@ -49,12 +49,32 @@ return String(value).trim();
 }
 
 function safeFileName(name) {
-return String(name || "document")
-.replaceAll(" ", "")
-.replaceAll("/", "")
-.replaceAll("\"", "")  
-.replaceAll(":", "")
-.slice(0, 160);
+  const ext = name.includes(".") ? name.slice(name.lastIndexOf(".")) : "";
+  const baseName = name.includes(".") ? name.slice(0, name.lastIndexOf(".")) : name;
+
+  const ru = {
+    'а':'a', 'б':'b', 'в':'v', 'г':'g', 'д':'d', 'е':'e', 'ё':'e', 'ж':'zh', 
+    'з':'z', 'is':'i', 'и':'i', 'й':'y', 'к':'k', 'л':'l', 'м':'m', 'н':'n', 'о':'o', 
+    'п':'p', 'р':'r', 'с':'s', 'т':'t', 'у':'u', 'ф':'f', 'х':'h', 'ц':'ts', 
+    'ч':'ch', 'ш':'sh', 'щ':'sch', 'ъ':'', 'ы':'y', 'ь':'', 'э':'e', 'ю':'yu', 'я':'ya',
+    'А':'A', 'Б':'B', 'В':'V', 'Г':'G', 'Д':'D', 'Е':'E', 'Ё':'E', 'Ж':'ZH', 
+    'З':'Z', 'И':'I', 'Й':'Y', 'К':'K', 'Л':'L', 'M':'M', 'Н':'N', 'О':'O', 
+    'П':'P', 'Р':'R', 'С':'S', 'Т':'T', 'У':'U', 'Ф':'F', 'Х':'H', 'Ц':'TS', 
+    'Ч':'CH', 'Ш':'SH', 'Щ':'SCH', 'Ъ':'', 'Ы':'Y', 'Ь':'', 'Э':'E', 'Ю':'YU', 'Я':'YA'
+  };
+  
+  let newName = "";
+  for (let i = 0; i < baseName.length; i++) {
+    const char = baseName[i];
+    newName += ru[char] !== undefined ? ru[char] : char;
+  }
+
+  newName = newName
+    .replace(/[^a-zA-Z0-9_-]/g, "_")
+    .replace(/_+/g, "_")
+    .slice(0, 100);
+
+  return newName + ext.toLowerCase().replace(/[^.a-z0-9]/g, "");
 }
 
 function getRoleByPosition(position) {
