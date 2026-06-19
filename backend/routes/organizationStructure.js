@@ -525,13 +525,8 @@ for (let index = 0; index < (req.files || []).length; index += 1) {
     .insert({
       organization_id: organizationId,
       employee_id: employeeId,
-      document_type: documentType,
-      file_name: file.originalname,
-      file_path: filePath,
+      file_name: documentType + "__" + safeFileName(file.originalname),
       file_url: publicUrlData ? publicUrlData.publicUrl : null,
-      mime_type: file.mimetype,
-      size_bytes: file.size || 0,
-      uploaded_at: new Date().toISOString(),
     })
     .select("*")
     .single();

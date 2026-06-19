@@ -789,14 +789,19 @@ return ( <div> <h2 className="gov-page-title">Отдел кадров</h2>
                     certificate: "Сертификат",
                     employment_contract: "Трудовой договор"
                   };
+                  
+                  const parts = (doc.file_name || "").split("__");
+                  const docType = parts.length > 1 ? parts[0] : "document";
+                  const displayName = parts.length > 1 ? parts.slice(1).join("__") : doc.file_name;
+
                   return (
                     <div key={doc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                       <div style={{ marginRight: '12px' }}>
                         <div style={{ fontWeight: '700', fontSize: '14px', color: '#1e293b' }}>
-                          {docLabels[doc.document_type] || doc.document_type}
+                          {docLabels[docType] || docType}
                         </div>
                         <div style={{ fontSize: '12px', color: '#64748b', wordBreak: 'break-all', marginTop: '2px' }}>
-                          {doc.file_name}
+                          {displayName}
                         </div>
                       </div>
                       {doc.file_url ? (
