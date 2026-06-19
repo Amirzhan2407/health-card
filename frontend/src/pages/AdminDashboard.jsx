@@ -50,7 +50,7 @@ function PieChart({ title, stats }) {
 }
 
 export default function AdminDashboard() {
- const [dashboard, setDashboard] = useState({ categoryStats: [] });
+  const [dashboard, setDashboard] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -60,7 +60,7 @@ export default function AdminDashboard() {
 
     try {
       const result = await adminRequest("/api/admin-dashboard");
-      setDashboard(result?.dashboard || { categoryStats: [] });
+      setDashboard(result.dashboard);
     } catch (err) {
       setError(err.message || "Не удалось загрузить главную.");
     } finally {
@@ -72,7 +72,7 @@ export default function AdminDashboard() {
     loadDashboard();
   }, []);
 
-  const categoryStats = Array.isArray(dashboard?.categoryStats) ? dashboard.categoryStats : [];
+  const categoryStats = dashboard?.categoryStats || [];
 
   return (
     <main className="dashPage">
