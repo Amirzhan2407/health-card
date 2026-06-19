@@ -5,15 +5,39 @@ import { useSearchParams } from "react-router-dom";
 
 const API_URL = "https://health-card.onrender.com";
 
+const POSITIONS = [
+  "Врач-терапевт",
+  "Врач-педиатр",
+  "Врач-хирург",
+  "Врач-травматолог",
+  "Врач-невролог",
+  "Врач-кардиолог",
+  "Врач-гинеколог",
+  "Врач-офтальмолог",
+  "Врач-отоларинголог (ЛОР)",
+  "Врач-дерматолог",
+  "Врач УЗИ",
+  "Врач-рентгенолог",
+  "Медсестра",
+  "Медбрат",
+  "Старшая медсестра",
+  "Регистратор",
+  "Заведующий отделением",
+  "Заместитель главного врача",
+  "Кадровый специалист",
+  "Бухгалтер"
+];
+
 const EMPTY_FORM = {
-full_name: "",
-iin: "",
-phone: "",
-email: "",
-position: "",
-department: "",
-cabinet: "",
-role: "doctor",
+  full_name: "",
+  iin: "",
+  phone: "",
+  email: "",
+  position: "",
+  department: "",
+  department_id: "",
+  cabinet: "",
+  role: "doctor",
 };
 
 export default function GovClinicHR() {
@@ -25,6 +49,7 @@ const organization = JSON.parse(localStorage.getItem("organizationData") || "nul
 const activeTab = searchParams.get("tab") || "dashboard";
 
 const [employees, setEmployees] = useState([]);
+const [orgDepartments, setOrgDepartments] = useState([]);
 const [form, setForm] = useState(EMPTY_FORM);
 const [editingId, setEditingId] = useState(null);
 const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
@@ -55,6 +80,31 @@ setForm({
 setError("");
 
 
+}
+
+function handlePositionChange(event) {
+  const value = event.target.value;
+  let newRole = form.role;
+
+  const lowVal = value.toLowerCase();
+  if (lowVal.includes("врач") || lowVal.includes("узи") || lowVal.includes("рентгенолог")) {
+    newRole = "doctor";
+  } else if (lowVal.includes("медсестра") || lowVal.includes("медбрат")) {
+    newRole = "nurse";
+  } else if (lowVal.includes("регистратор")) {
+    newRole = "registrar";
+  } else if (lowVal.includes("заведующий")) {
+    newRole = "department_head";
+  } else if (lowVal.includes("заместитель")) {
+    newRole = "deputy_chief_doctor";
+  }
+
+  setForm({
+    ...form,
+    position: value,
+    role: newRole,
+  });
+  setError("");
 }
 
 function updateDocument(event) {
@@ -148,6 +198,7 @@ try {
     email: form.email.trim(),
     position: form.position.trim(),
     department: form.department.trim(),
+    department_id: form.department_id || null,
     cabinet: form.cabinet.trim(),
     role: form.role,
     status: "active",
@@ -195,6 +246,7 @@ setForm({
   email: employee.email || "",
   position: employee.position || "",
   department: employee.department || "",
+  department_id: employee.department_id || employee.departmentId || "",
   cabinet: employee.cabinet || "",
   role: employee.role || "doctor",
 });
@@ -329,8 +381,24 @@ try {
 
 }
 
+async function loadDepartments() {
+  if (!user || !user.organization_id) return;
+  try {
+    const response = await fetch(
+      API_URL + "/api/organization-structure/departments?organization_id=" + user.organization_id
+    );
+    const result = await response.json();
+    if (response.ok) {
+      setOrgDepartments(result.departments || []);
+    }
+  } catch (err) {
+    console.error("Ошибка загрузки отделений:", err);
+  }
+}
+
 useEffect(function () {
-loadEmployees();
+  loadEmployees();
+  loadDepartments();
 }, []);
 
 const activeEmployees = employees.filter(function (employee) {
@@ -547,24 +615,48 @@ return ( <div> <h2 className="gov-page-title">Отдел кадров</h2>
         <div className="gov-form-grid">
           <label>
             Должность
-            <input
+            <select
               name="position"
               value={form.position}
-              onChange={updateField}
-              placeholder="Терапевт"
+              onChange={handlePositionChange}
               required
-            />
+            >
+              <option value="">Выберите должность</option>
+              {POSITIONS.map((pos) => (
+                <option key={pos} value={pos}>
+                  {pos}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label>
             Отделение
-            <input
+            <select
               name="department"
               value={form.department}
-              onChange={updateField}
-              placeholder="Терапевтическое отделение"
+              onChange={function (e) {
+                const selectedDep = orgDepartments.find(d => d.name === e.target.value);
+                setForm({
+                  ...form,
+                  department: e.target.value,
+                  department_id: selectedDep ? selectedDep.id : ""
+                });
+              }}
               required
-            />
+            >
+              <option value="">Выберите отделение</option>
+              {orgDepartments.map((dep) => (
+                <option key={dep.id} value={dep.name}>
+                  {dep.name} (этаж {dep.floor || "—"})
+                </option>
+              ))}
+            </select>
+            {orgDepartments.length === 0 && (
+              <small style={{ color: '#ef4444', marginTop: '4px', fontWeight: 'bold' }}>
+                ⚠️ Сначала добавьте отделения в кабинете администратора!
+              </small>
+            )}
           </label>
 
           <label>

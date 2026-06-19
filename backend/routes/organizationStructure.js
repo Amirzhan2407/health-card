@@ -37,8 +37,8 @@ return (
 req.headers["x-organization-id"] ||
 req.query.organization_id ||
 req.query.organizationId ||
-req.body.organization_id ||
-req.body.organizationId ||
+(req.body && req.body.organization_id) ||
+(req.body && req.body.organizationId) ||
 null
 );
 }
