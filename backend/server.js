@@ -55,9 +55,11 @@ app.get("/api/check-version", (req, res) => {
     success: true,
     version: "v2-roles-fix",
     supabaseUrl: url,
-    supabaseKeyMasked: maskedKey
+    supabaseKeyMasked: maskedKey,
+    envKeys: Object.keys(process.env)
   });
 });
+
 
 
 
