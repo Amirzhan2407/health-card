@@ -128,6 +128,25 @@ app.get("/api/debug-constraint-rpc", async (req, res) => {
   }
 });
 
+
+app.get("/api/debug-columns", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("organization_users")
+      .select("*")
+      .limit(1);
+    
+    if (error) {
+      res.status(500).json({ success: false, error: error.message });
+    } else {
+      res.status(200).json({ success: true, columns: data.length > 0 ? Object.keys(data[0]) : "No rows in table" });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
 app.use("/api/pharmacy", pharmacyRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/admin", adminRoutes);
