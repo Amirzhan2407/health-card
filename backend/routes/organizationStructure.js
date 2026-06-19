@@ -3,6 +3,8 @@
 import express from "express";
 import multer from "multer";
 import crypto from "crypto";
+import fs from "fs";
+import path from "path";
 import { supabase } from "../lib/supabaseAdmin.js";
 import { sendOrganizationAccessEmail, sendAppointmentBookingEmail } from "../services/emailService.js";
 
@@ -1026,8 +1028,35 @@ message: error.message || "Ошибка разблокировки доступ�
 }
 });
 
-// In-memory fallback for appointments if DB table does not exist
-let inMemoryAppointments = [];
+// Persistent JSON fallback for appointments if DB table does not exist
+const FALLBACK_FILE = path.resolve("appointments_fallback.json");
+
+function loadFallbackAppointments() {
+  try {
+    if (fs.existsSync(FALLBACK_FILE)) {
+      const content = fs.readFileSync(FALLBACK_FILE, "utf8");
+      return JSON.parse(content) || [];
+    }
+  } catch (err) {
+    console.error("Failed to read appointments fallback file:", err);
+  }
+  return [];
+}
+
+function saveFallbackAppointment(app) {
+  try {
+    const list = loadFallbackAppointments();
+    const idx = list.findIndex((a) => a.id === app.id);
+    if (idx !== -1) {
+      list[idx] = { ...list[idx], ...app, updated_at: new Date().toISOString() };
+    } else {
+      list.push(app);
+    }
+    fs.writeFileSync(FALLBACK_FILE, JSON.stringify(list, null, 2), "utf8");
+  } catch (err) {
+    console.error("Failed to write appointments fallback file:", err);
+  }
+}
 
 // GET /api/organization-structure/public/organizations
 router.get("/public/organizations", async (req, res) => {
@@ -1084,7 +1113,8 @@ router.get("/appointments", async (req, res) => {
       });
     } catch (dbErr) {
       console.warn("DB appointments query failed, fallback to memory:", dbErr.message);
-      const filtered = inMemoryAppointments.filter(
+      const list = loadFallbackAppointments();
+      const filtered = list.filter(
         (app) => app.employee_id === employeeId && app.date === date
       );
       return res.status(200).json({
@@ -1092,13 +1122,13 @@ router.get("/appointments", async (req, res) => {
         appointments: filtered,
       });
     }
-    } catch (error) {
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Ошибка получения записей.",
-      });
-    }
-  });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Ошибка получения записей.",
+    });
+  }
+});
 
 // GET /api/organization-structure/appointments/patient/:iin
 router.get("/appointments/patient/:iin", async (req, res) => {
@@ -1111,15 +1141,29 @@ router.get("/appointments/patient/:iin", async (req, res) => {
       });
     }
 
-    const { data: appointments, error } = await supabase
-      .from("organization_appointments")
-      .eq("patient_iin", iin)
-      .order("date", { ascending: false })
-      .order("time", { ascending: false });
+    let appointments = [];
+    try {
+      const { data, error } = await supabase
+        .from("organization_appointments")
+        .eq("patient_iin", iin)
+        .order("date", { ascending: false })
+        .order("time", { ascending: false });
 
-    if (error) throw error;
+      if (error) throw error;
+      appointments = data || [];
+    } catch (dbErr) {
+      console.warn("DB patient appointments query failed, fallback to memory:", dbErr.message);
+      const list = loadFallbackAppointments();
+      appointments = list.filter((app) => app.patient_iin === iin);
+      // Sort desc by date, time
+      appointments.sort((a, b) => {
+        const ad = `${a.date}T${a.time}`;
+        const bd = `${b.date}T${b.time}`;
+        return bd.localeCompare(ad);
+      });
+    }
 
-    if (!appointments || appointments.length === 0) {
+    if (appointments.length === 0) {
       return res.status(200).json({
         success: true,
         appointments: [],
@@ -1133,19 +1177,23 @@ router.get("/appointments/patient/:iin", async (req, res) => {
     let employees = [];
 
     if (orgIds.length > 0) {
-      const { data: orgs } = await supabase
-        .from("organizations")
-        .select("id, organization_name")
-        .in("id", orgIds);
-      organizations = orgs || [];
+      try {
+        const { data: orgs } = await supabase
+          .from("organizations")
+          .select("id, organization_name")
+          .in("id", orgIds);
+        organizations = orgs || [];
+      } catch (e) {}
     }
 
     if (empIds.length > 0) {
-      const { data: emps } = await supabase
-        .from("organization_employees")
-        .select("id, full_name, position, cabinet")
-        .in("id", empIds);
-      employees = emps || [];
+      try {
+        const { data: emps } = await supabase
+          .from("organization_employees")
+          .select("id, full_name, position, cabinet")
+          .in("id", empIds);
+        employees = emps || [];
+      } catch (e) {}
     }
 
     const orgMap = Object.fromEntries(organizations.map(o => [o.id, o]));
@@ -1229,9 +1277,10 @@ router.post("/appointments", async (req, res) => {
 
       if (error) throw error;
       savedApp = data;
+      saveFallbackAppointment(savedApp);
     } catch (dbErr) {
       console.warn("DB appointments insert failed, fallback to memory:", dbErr.message);
-      inMemoryAppointments.push(newApp);
+      saveFallbackAppointment(newApp);
       savedApp = newApp;
       isInMemory = true;
     }
@@ -1251,8 +1300,10 @@ router.post("/appointments", async (req, res) => {
           savedApp.cabinet = emp.cabinet;
           if (isInMemory) {
             newApp.cabinet = emp.cabinet;
+            saveFallbackAppointment(newApp);
           } else {
             await supabase.from("organization_appointments").update({ cabinet: emp.cabinet }).eq("id", savedApp.id);
+            saveFallbackAppointment(savedApp);
           }
         }
       }
@@ -1314,6 +1365,8 @@ router.patch("/appointments/:id/status", async (req, res) => {
 
       if (error) throw error;
 
+      saveFallbackAppointment(data);
+
       return res.status(200).json({
         success: true,
         message: "Статус записи обновлен.",
@@ -1321,14 +1374,16 @@ router.patch("/appointments/:id/status", async (req, res) => {
       });
     } catch (dbErr) {
       console.warn("DB appointments status patch failed, fallback to memory:", dbErr.message);
-      const appIndex = inMemoryAppointments.findIndex((app) => app.id === appId);
+      const list = loadFallbackAppointments();
+      const appIndex = list.findIndex((app) => app.id === appId);
       if (appIndex !== -1) {
-        inMemoryAppointments[appIndex].status = status;
-        inMemoryAppointments[appIndex].updated_at = new Date().toISOString();
+        list[appIndex].status = status;
+        list[appIndex].updated_at = new Date().toISOString();
+        saveFallbackAppointment(list[appIndex]);
         return res.status(200).json({
           success: true,
           message: "Статус записи обновлен (memory).",
-          appointment: inMemoryAppointments[appIndex],
+          appointment: list[appIndex],
         });
       }
       return res.status(404).json({
