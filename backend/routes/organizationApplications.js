@@ -671,14 +671,14 @@ router.post("/:id/send-access", requireAdminAuth, async (req, res) => {
 
     const roleLabel =
       role === "chief"
-        ? "Главный врач"
+        ? "Администратор организации"
         : role === "hr"
         ? "Отдел кадров"
         : `Администратор #${Number(index) + 1}`;
 
     const userRole =
       role === "chief"
-        ? "chief_doctor"
+        ? "organization_admin"
         : role === "hr"
         ? "employee"
         : "organization_admin";

@@ -318,15 +318,15 @@ export default function AdminOrganizations() {
                     <td>{selectedOrg.address || "—"}</td>
                   </tr>
                   <tr>
-                    <td>Главный врач:</td>
+                    <td>Администратор организации:</td>
                     <td>{selectedOrg.chief_doctor_full_name || "—"}</td>
                   </tr>
                   <tr>
-                    <td>Почта главврача:</td>
+                    <td>Почта администратора:</td>
                     <td>{selectedOrg.chief_doctor_email || "—"}</td>
                   </tr>
                   <tr>
-                    <td>Телефон главврача:</td>
+                    <td>Телефон администратора:</td>
                     <td>{selectedOrg.chief_doctor_phone || "—"}</td>
                   </tr>
                   <tr>
@@ -538,9 +538,9 @@ export default function AdminOrganizations() {
               </div>
 
               <div className="formSection">
-                <h4>Сведения о главном враче</h4>
+                <h4>Сведения об администраторе организации</h4>
                 <label>
-                  ФИО Главврача
+                  ФИО администратора организации
                   <input
                     type="text"
                     value={editForm.chief_doctor_full_name || ""}
@@ -555,7 +555,7 @@ export default function AdminOrganizations() {
 
                 <div className="formRow">
                   <label>
-                    Почта Главврача (смена сбросит пароль!)
+                    Почта администратора (смена сбросит пароль!)
                     <input
                       type="email"
                       value={editForm.chief_doctor_email || ""}
@@ -569,7 +569,7 @@ export default function AdminOrganizations() {
                   </label>
 
                   <label>
-                    Телефон главврача
+                    Телефон администратора
                     <input
                       type="text"
                       value={editForm.chief_doctor_phone || ""}

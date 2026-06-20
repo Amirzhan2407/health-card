@@ -212,8 +212,8 @@ async function uploadApplicationFile(applicationId, documentType, file, index = 
 export async function createOrganizationApplication({ body, files }) {
   const applicationType = normalizeApplicationType(body.application_type);
   const applicationNumber = generateApplicationNumber();
-  const administrators = normalizeAdministrators(body.administrators);
-  const hrSpecialist = normalizeHrSpecialist(body.hr_specialist);
+  const administrators = [];
+  const hrSpecialist = null;
 
   const organizationEmail = normalizeEmail(body.organization_email);
 
@@ -276,22 +276,9 @@ export async function createOrganizationApplication({ body, files }) {
   if (!payload.organization_email) throw new Error("Корпоративная почта организации обязательна.");
 
   if (applicationType === "new_organization") {
-    if (!payload.chief_doctor_full_name) throw new Error("ФИО главного врача обязательно.");
-    if (!payload.chief_doctor_phone) throw new Error("Телефон главного врача обязателен.");
-    if (!payload.chief_doctor_email) throw new Error("Почта главного врача обязательна.");
-
-    if (administrators.length === 0) throw new Error("Нужно указать хотя бы одного администратора.");
-    if (administrators.length > 3) throw new Error("Можно указать максимум 3 администратора.");
-
-    administrators.forEach((admin, index) => {
-      if (!admin.full_name) throw new Error(`ФИО администратора #${index + 1} обязательно.`);
-      if (!admin.phone) throw new Error(`Телефон администратора #${index + 1} обязателен.`);
-      if (!admin.email) throw new Error(`Почта администратора #${index + 1} обязательна.`);
-    });
-
-    if (!hrSpecialist?.full_name) throw new Error("ФИО сотрудника отдела кадров обязательно.");
-    if (!hrSpecialist?.phone) throw new Error("Телефон сотрудника отдела кадров обязателен.");
-    if (!hrSpecialist?.email) throw new Error("Почта сотрудника отдела кадров обязательна.");
+    if (!payload.chief_doctor_full_name) throw new Error("ФИО администратора организации обязательно.");
+    if (!payload.chief_doctor_phone) throw new Error("Телефон администратора организации обязателен.");
+    if (!payload.chief_doctor_email) throw new Error("Почта администратора организации обязательна.");
   }
 
   if (applicationType === "change_chief_doctor") {

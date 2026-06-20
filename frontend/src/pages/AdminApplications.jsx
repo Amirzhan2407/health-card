@@ -15,8 +15,7 @@ const STATUS_LABELS = {
 
 const TYPE_LABELS = {
   new_organization: "Подключение новой организации",
-  change_chief_doctor: "Изменение главного врача",
-  change_administrator: "Изменение администратора",
+  change_chief_doctor: "Изменение администратора организации",
   change_organization_data: "Изменение данных организации",
 };
 
@@ -426,7 +425,7 @@ export default function AdminApplications() {
 
       if (status === "waiting_first_login") {
         setAccessMessage(
-          "Заявка одобрена. Теперь создайте и отправьте доступы главному врачу, администраторам и сотруднику отдела кадров."
+          "Заявка одобрена. Теперь создайте и отправьте доступ администратору организации."
         );
       } else if (status === "in_progress") {
         setAccessMessage(
@@ -579,19 +578,7 @@ export default function AdminApplications() {
 
       if (role === "chief") {
         setAccessMessage(
-          "Логин и одноразовый пароль главного врача отправлены."
-        );
-      }
-
-      if (role === "admin") {
-        setAccessMessage(
-          `Логин и одноразовый пароль администратора #${index + 1} отправлены.`
-        );
-      }
-
-      if (role === "hr") {
-        setAccessMessage(
-          "Логин и одноразовый пароль сотрудника отдела кадров отправлены."
+          "Логин и одноразовый пароль администратора организации отправлены."
         );
       }
     } catch (err) {
@@ -633,9 +620,7 @@ export default function AdminApplications() {
           <h1>Заявления организаций</h1>
 
           <p>
-            Проверка заявок и создание доступов для
-            главного врача, администраторов организации
-            и отдела кадров.
+            Проверка заявок и создание доступов для администратора организации.
           </p>
         </div>
 
@@ -883,7 +868,7 @@ export default function AdminApplications() {
               </div>
 
               <div className="section">
-                <h3>Главный врач</h3>
+                <h3>Администратор организации</h3>
 
                 <div className="infoGrid">
                   <div>
@@ -910,7 +895,7 @@ export default function AdminApplications() {
 
                   <div>
                     <span>
-                      Почта главного врача
+                      Почта администратора организации
                     </span>
 
                     <b>
@@ -922,110 +907,6 @@ export default function AdminApplications() {
                   </div>
                 </div>
               </div>
-
-              <div className="section">
-                <h3>Администраторы</h3>
-
-                {administrators.length > 0 ? (
-                  <div className="adminUsersList">
-                    {administrators.map(
-                      (admin, index) => (
-                        <div
-                          className="adminUserBox"
-                          key={`admin-${index}`}
-                        >
-                          <h4>
-                            Администратор #
-                            {index + 1}
-                          </h4>
-
-                          <div className="infoGrid">
-                            <div>
-                              <span>ФИО</span>
-                              <b>
-                                {text(
-                                  admin.full_name ||
-                                    admin.fullName
-                                )}
-                              </b>
-                            </div>
-
-                            <div>
-                              <span>Телефон</span>
-                              <b>
-                                {text(admin.phone)}
-                              </b>
-                            </div>
-
-                            <div>
-                              <span>
-                                Почта администратора
-                              </span>
-
-                              <b>
-                                {text(admin.email)}
-                              </b>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    )}
-                  </div>
-                ) : (
-                  <p className="muted">
-                    Администраторы не указаны.
-                  </p>
-                )}
-              </div>
-
-              {isNewOrganization && (
-                <div className="section">
-                  <h3>Отдел кадров</h3>
-
-                  {hrSpecialist ? (
-                    <div className="adminUserBox">
-                      <h4>
-                        Ответственный сотрудник
-                        отдела кадров
-                      </h4>
-
-                      <div className="infoGrid">
-                        <div>
-                          <span>ФИО</span>
-                          <b>
-                            {text(
-                              hrSpecialist.full_name
-                            )}
-                          </b>
-                        </div>
-
-                        <div>
-                          <span>Телефон</span>
-                          <b>
-                            {text(
-                              hrSpecialist.phone
-                            )}
-                          </b>
-                        </div>
-
-                        <div>
-                          <span>Почта</span>
-                          <b>
-                            {text(
-                              hrSpecialist.email
-                            )}
-                          </b>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="muted">
-                      Сотрудник отдела кадров не
-                      указан.
-                    </p>
-                  )}
-                </div>
-              )}
 
               <div className="section">
                 <h3>Документы</h3>
@@ -1119,20 +1000,17 @@ export default function AdminApplications() {
               {showAccessBlocks && (
                 <div className="section accessSection">
                   <h3>
-                    Доступы сотрудников организации
+                    Доступ администратора организации
                   </h3>
 
                   <p className="muted">
-                    Для каждого пользователя укажите
-                    логин и одноразовый пароль. После
-                    первого входа пользователь должен
-                    установить новый пароль.
+                    Укажите логин и одноразовый пароль для администратора организации. После первого входа пользователь должен установить новый пароль.
                   </p>
 
                   {accessForms.chief?.email ? (
                     <div className="accessBox">
                       <h4>
-                        Доступ главного врача
+                        Доступ администратора организации
                       </h4>
 
                       <div className="infoGrid">
@@ -1168,7 +1046,7 @@ export default function AdminApplications() {
                               event.target.value
                             )
                           }
-                          placeholder="Логин главного врача"
+                          placeholder="Логин администратора организации"
                         />
 
                         <input
@@ -1211,188 +1089,6 @@ export default function AdminApplications() {
                         >
                           {sendingAccess ===
                           "chief"
-                            ? "Отправка..."
-                            : "Отправить"}
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {accessForms.admins.map(
-                    (admin, index) => (
-                      <div
-                        className="accessBox"
-                        key={`access-admin-${index}`}
-                      >
-                        <h4>
-                          Доступ администратора #
-                          {index + 1}
-                        </h4>
-
-                        <div className="infoGrid">
-                          <div>
-                            <span>ФИО</span>
-                            <b>
-                              {text(
-                                admin.fullName
-                              )}
-                            </b>
-                          </div>
-
-                          <div>
-                            <span>Почта</span>
-                            <b>
-                              {text(admin.email)}
-                            </b>
-                          </div>
-                        </div>
-
-                        <div className="accessFormGrid">
-                          <input
-                            value={admin.login}
-                            onChange={(event) =>
-                              updateAdminAccess(
-                                index,
-                                "login",
-                                event.target.value
-                              )
-                            }
-                            placeholder={`Логин администратора #${index + 1}`}
-                          />
-
-                          <input
-                            value={
-                              admin.tempPassword
-                            }
-                            onChange={(event) =>
-                              updateAdminAccess(
-                                index,
-                                "tempPassword",
-                                event.target.value
-                              )
-                            }
-                            placeholder="Одноразовый пароль"
-                          />
-
-                          <button
-                            type="button"
-                            className="miniBtn"
-                            onClick={() =>
-                              updateAdminAccess(
-                                index,
-                                "tempPassword",
-                                generateTempCode()
-                              )
-                            }
-                          >
-                            Сгенерировать
-                          </button>
-
-                          <button
-                            type="button"
-                            className="approve"
-                            disabled={
-                              sendingAccess ===
-                              `admin-${index}`
-                            }
-                            onClick={() =>
-                              sendAccess(
-                                "admin",
-                                index
-                              )
-                            }
-                          >
-                            {sendingAccess ===
-                            `admin-${index}`
-                              ? "Отправка..."
-                              : "Отправить"}
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  )}
-
-                  {isNewOrganization &&
-                  accessForms.hr?.email ? (
-                    <div className="accessBox">
-                      <h4>
-                        Доступ сотрудника отдела
-                        кадров
-                      </h4>
-
-                      <div className="infoGrid">
-                        <div>
-                          <span>ФИО</span>
-                          <b>
-                            {text(
-                              accessForms.hr
-                                .fullName
-                            )}
-                          </b>
-                        </div>
-
-                        <div>
-                          <span>Почта</span>
-                          <b>
-                            {text(
-                              accessForms.hr.email
-                            )}
-                          </b>
-                        </div>
-                      </div>
-
-                      <div className="accessFormGrid">
-                        <input
-                          value={
-                            accessForms.hr.login
-                          }
-                          onChange={(event) =>
-                            updateHrAccess(
-                              "login",
-                              event.target.value
-                            )
-                          }
-                          placeholder="Логин отдела кадров"
-                        />
-
-                        <input
-                          value={
-                            accessForms.hr
-                              .tempPassword
-                          }
-                          onChange={(event) =>
-                            updateHrAccess(
-                              "tempPassword",
-                              event.target.value
-                            )
-                          }
-                          placeholder="Одноразовый пароль"
-                        />
-
-                        <button
-                          type="button"
-                          className="miniBtn"
-                          onClick={() =>
-                            updateHrAccess(
-                              "tempPassword",
-                              generateTempCode()
-                            )
-                          }
-                        >
-                          Сгенерировать
-                        </button>
-
-                        <button
-                          type="button"
-                          className="approve"
-                          disabled={
-                            sendingAccess === "hr"
-                          }
-                          onClick={() =>
-                            sendAccess("hr")
-                          }
-                        >
-                          {sendingAccess === "hr"
                             ? "Отправка..."
                             : "Отправить"}
                         </button>

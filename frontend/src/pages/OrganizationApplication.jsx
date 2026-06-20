@@ -6,7 +6,6 @@ const API_URL = "https://health-card.onrender.com";
 const APPLICATION_TYPES = {
   NEW_ORGANIZATION: "new_organization",
   CHANGE_CHIEF_DOCTOR: "change_chief_doctor",
-  CHANGE_ADMINISTRATOR: "change_administrator",
 };
 
 const ORGANIZATION_TYPES = [
@@ -104,20 +103,6 @@ export default function OrganizationApplication() {
     comment: "",
   });
 
-  const [admins, setAdmins] = useState([
-    {
-      full_name: "",
-      phone: "",
-      email: "",
-    },
-  ]);
-
-  const [hrSpecialist, setHrSpecialist] = useState({
-    full_name: "",
-    phone: "",
-    email: "",
-  });
-
   const [files, setFiles] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedApplication, setSubmittedApplication] = useState(null);
@@ -129,9 +114,6 @@ export default function OrganizationApplication() {
   const isChiefDoctorChange =
     applicationType === APPLICATION_TYPES.CHANGE_CHIEF_DOCTOR;
 
-  const isAdministratorChange =
-    applicationType === APPLICATION_TYPES.CHANGE_ADMINISTRATOR;
-
   function updateField(event) {
     const { name, value } = event.target;
 
@@ -139,50 +121,6 @@ export default function OrganizationApplication() {
       ...prev,
       [name]: value,
     }));
-  }
-
-  function updateAdmin(index, field, value) {
-    setAdmins((prev) =>
-      prev.map((admin, adminIndex) =>
-        adminIndex === index
-          ? {
-              ...admin,
-              [field]: value,
-            }
-          : admin
-      )
-    );
-  }
-
-  function updateHrSpecialist(field, value) {
-    setHrSpecialist((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  }
-
-  function addAdmin() {
-    if (admins.length >= MAX_ADMINS) {
-      setError("Можно добавить максимум 3 администратора.");
-      return;
-    }
-
-    setError("");
-
-    setAdmins((prev) => [
-      ...prev,
-      {
-        full_name: "",
-        phone: "",
-        email: "",
-      },
-    ]);
-  }
-
-  function removeAdmin(index) {
-    setAdmins((prev) =>
-      prev.filter((_, adminIndex) => adminIndex !== index)
-    );
   }
 
   function updateFile(event) {
@@ -223,20 +161,6 @@ export default function OrganizationApplication() {
       comment: "",
     });
 
-    setAdmins([
-      {
-        full_name: "",
-        phone: "",
-        email: "",
-      },
-    ]);
-
-    setHrSpecialist({
-      full_name: "",
-      phone: "",
-      email: "",
-    });
-
     setFiles({});
     setSubmittedApplication(null);
     setError("");
@@ -253,12 +177,6 @@ export default function OrganizationApplication() {
         : form.new_chief_doctor_email
     );
 
-    const adminEmails = admins.map((admin) =>
-      normalizeEmail(admin.email)
-    );
-
-    const hrEmail = normalizeEmail(hrSpecialist.email);
-
     if (!organizationEmail) {
       return "Укажите корпоративную почту организации.";
     }
@@ -267,41 +185,11 @@ export default function OrganizationApplication() {
       (isNewOrganization || isChiefDoctorChange) &&
       !chiefEmail
     ) {
-      return "Укажите почту главного врача.";
+      return "Укажите почту администратора организации.";
     }
 
-    if (
-      (isNewOrganization || isAdministratorChange) &&
-      adminEmails.some((email) => !email)
-    ) {
-      return "У каждого администратора должна быть своя почта.";
-    }
-
-    if (isNewOrganization) {
-      if (!hrSpecialist.full_name.trim()) {
-        return "Укажите ФИО сотрудника отдела кадров.";
-      }
-
-      if (!hrSpecialist.phone.trim()) {
-        return "Укажите телефон сотрудника отдела кадров.";
-      }
-
-      if (!hrEmail) {
-        return "Укажите почту сотрудника отдела кадров.";
-      }
-    }
-
-    const allEmails = [
-      organizationEmail,
-      ...(chiefEmail ? [chiefEmail] : []),
-      ...adminEmails.filter(Boolean),
-      ...(isNewOrganization && hrEmail ? [hrEmail] : []),
-    ];
-
-    const uniqueEmails = new Set(allEmails);
-
-    if (uniqueEmails.size !== allEmails.length) {
-      return "Почты не должны повторяться: корпоративная почта, почта главного врача, почты администраторов и почта отдела кадров должны быть разными.";
+    if (organizationEmail === chiefEmail) {
+      return "Почты не должны повторяться: корпоративная почта и почта администратора организации должны быть разными.";
     }
 
     return "";
@@ -324,28 +212,8 @@ export default function OrganizationApplication() {
       const formData = new FormData();
 
       formData.append("application_type", applicationType);
-
-      formData.append(
-        "administrators",
-        JSON.stringify(
-          admins.map((admin) => ({
-            full_name: admin.full_name.trim(),
-            phone: admin.phone.trim(),
-            email: normalizeEmail(admin.email),
-          }))
-        )
-      );
-
-      if (isNewOrganization) {
-        formData.append(
-          "hr_specialist",
-          JSON.stringify({
-            full_name: hrSpecialist.full_name.trim(),
-            phone: hrSpecialist.phone.trim(),
-            email: normalizeEmail(hrSpecialist.email),
-          })
-        );
-      }
+      formData.append("administrators", JSON.stringify([]));
+      formData.append("hr_specialist", JSON.stringify(null));
 
       Object.entries(form).forEach(([key, value]) => {
         formData.append(
@@ -456,9 +324,7 @@ export default function OrganizationApplication() {
         <h1>Подать заявку на подключение</h1>
 
         <p>
-          Заполните данные организации, главного врача,
-          администраторов и сотрудника отдела кадров.
-          Администраторов можно указать максимум 3.
+          Заполните данные организации и администратора организации.
         </p>
       </section>
 
@@ -502,15 +368,7 @@ export default function OrganizationApplication() {
                   APPLICATION_TYPES.CHANGE_CHIEF_DOCTOR
                 }
               >
-                Изменение главного врача
-              </option>
-
-              <option
-                value={
-                  APPLICATION_TYPES.CHANGE_ADMINISTRATOR
-                }
-              >
-                Изменение администратора
+                Изменение администратора организации
               </option>
             </select>
           </div>
@@ -651,15 +509,15 @@ export default function OrganizationApplication() {
             <div className="section-content">
               <h2>
                 {isNewOrganization
-                  ? "Данные главного врача"
-                  : "Изменение главного врача"}
+                  ? "Данные администратора организации"
+                  : "Изменение администратора организации"}
               </h2>
 
               {isChiefDoctorChange && (
                 <div className="form-grid one-column">
                   <div>
                     <label className="org-label">
-                      ФИО предыдущего главного врача
+                      ФИО предыдущего администратора организации
                       <span className="required-star">*</span>
                     </label>
 
@@ -680,7 +538,7 @@ export default function OrganizationApplication() {
               <div className="form-grid three-columns">
                 <div>
                   <label className="org-label">
-                    ФИО главного врача
+                    ФИО администратора организации
                     <span className="required-star">*</span>
                   </label>
 
@@ -728,7 +586,7 @@ export default function OrganizationApplication() {
 
                 <div>
                   <label className="org-label">
-                    Почта главного врача
+                    Почта администратора организации
                     <span className="required-star">*</span>
                   </label>
 
@@ -747,7 +605,7 @@ export default function OrganizationApplication() {
                     }
                     onChange={updateField}
                     required
-                    placeholder="doctor@clinic.kz"
+                    placeholder="admin@clinic.kz"
                   />
                 </div>
               </div>
@@ -755,219 +613,8 @@ export default function OrganizationApplication() {
           </section>
         )}
 
-        {(isNewOrganization ||
-          isAdministratorChange) && (
-          <section className="form-section">
-            <div className="section-number">4</div>
-
-            <div className="section-content">
-              <h2>Данные администраторов</h2>
-
-              <p>
-                Укажите основных администраторов организации.
-                Максимум можно добавить 3 администратора.
-              </p>
-
-              {admins.map((admin, index) => (
-                <div
-                  className="admin-box"
-                  key={index}
-                >
-                  <div className="admin-box-top">
-                    <h3>
-                      Администратор #{index + 1}
-                    </h3>
-
-                    {admins.length > 1 && (
-                      <button
-                        type="button"
-                        className="small-danger-button"
-                        onClick={() =>
-                          removeAdmin(index)
-                        }
-                      >
-                        Удалить
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="form-grid three-columns">
-                    <div>
-                      <label className="org-label">
-                        ФИО администратора
-                        <span className="required-star">*</span>
-                      </label>
-
-                      <input
-                        className="org-input"
-                        value={admin.full_name}
-                        onChange={(event) =>
-                          updateAdmin(
-                            index,
-                            "full_name",
-                            event.target.value
-                          )
-                        }
-                        required
-                        placeholder="Например: Сидоров Сергей Сергеевич"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="org-label">
-                        Телефон
-                        <span className="required-star">*</span>
-                      </label>
-
-                      <input
-                        className="org-input"
-                        value={admin.phone}
-                        onChange={(event) =>
-                          updateAdmin(
-                            index,
-                            "phone",
-                            event.target.value
-                          )
-                        }
-                        required
-                        placeholder="+7 777 000 00 00"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="org-label">
-                        Почта администратора
-                        <span className="required-star">*</span>
-                      </label>
-
-                      <input
-                        className="org-input"
-                        type="email"
-                        value={admin.email}
-                        onChange={(event) =>
-                          updateAdmin(
-                            index,
-                            "email",
-                            event.target.value
-                          )
-                        }
-                        required
-                        placeholder="admin@clinic.kz"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={addAdmin}
-                disabled={admins.length >= MAX_ADMINS}
-              >
-                + Добавить администратора
-              </button>
-
-              {admins.length >= MAX_ADMINS && (
-                <p className="limit-text">
-                  Достигнут лимит: максимум 3 администратора.
-                </p>
-              )}
-            </div>
-          </section>
-        )}
-
-        {isNewOrganization && (
-          <section className="form-section">
-            <div className="section-number">5</div>
-
-            <div className="section-content">
-              <h2>Сотрудник отдела кадров</h2>
-
-              <p>
-                Укажите сотрудника отдела кадров, который
-                будет добавлять сотрудников организации и
-                загружать кадровые документы.
-              </p>
-
-              <div className="admin-box hr-box">
-                <div className="admin-box-top">
-                  <h3>
-                    Ответственный сотрудник отдела кадров
-                  </h3>
-                </div>
-
-                <div className="form-grid three-columns">
-                  <div>
-                    <label className="org-label">
-                      ФИО сотрудника
-                      <span className="required-star">*</span>
-                    </label>
-
-                    <input
-                      className="org-input"
-                      value={hrSpecialist.full_name}
-                      onChange={(event) =>
-                        updateHrSpecialist(
-                          "full_name",
-                          event.target.value
-                        )
-                      }
-                      required
-                      placeholder="Например: Абдуллина Айгуль Сериковна"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="org-label">
-                      Телефон
-                      <span className="required-star">*</span>
-                    </label>
-
-                    <input
-                      className="org-input"
-                      value={hrSpecialist.phone}
-                      onChange={(event) =>
-                        updateHrSpecialist(
-                          "phone",
-                          event.target.value
-                        )
-                      }
-                      required
-                      placeholder="+7 777 000 00 00"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="org-label">
-                      Почта сотрудника
-                      <span className="required-star">*</span>
-                    </label>
-
-                    <input
-                      className="org-input"
-                      type="email"
-                      value={hrSpecialist.email}
-                      onChange={(event) =>
-                        updateHrSpecialist(
-                          "email",
-                          event.target.value
-                        )
-                      }
-                      required
-                      placeholder="hr@clinic.kz"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
         <section className="form-section">
-          <div className="section-number">
-            {isNewOrganization ? "6" : "5"}
-          </div>
+          <div className="section-number">4</div>
 
           <div className="section-content">
             <h2>Документы</h2>
@@ -989,22 +636,11 @@ export default function OrganizationApplication() {
             />
 
             <FileField
-              label="Документ о назначении главного врача"
+              label="Документ о назначении администратора организации"
               name="chief_doctor_order"
               required={
                 isNewOrganization ||
                 isChiefDoctorChange
-              }
-              files={files}
-              onChange={updateFile}
-            />
-
-            <FileField
-              label="Документ о назначении администратора"
-              name="administrator_order"
-              required={
-                isNewOrganization ||
-                isAdministratorChange
               }
               files={files}
               onChange={updateFile}
@@ -1021,9 +657,7 @@ export default function OrganizationApplication() {
         </section>
 
         <section className="form-section">
-          <div className="section-number">
-            {isNewOrganization ? "7" : "6"}
-          </div>
+          <div className="section-number">5</div>
 
           <div className="section-content">
             <h2>Комментарий</h2>
