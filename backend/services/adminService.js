@@ -262,9 +262,9 @@ export async function createStaffAdmin({
     };
   }
 
-  const allowedRoles = ["super_admin", "site_support"];
+  const validRoles = ["super_admin", "site_support", "support_admin"];
 
-  if (!allowedRoles.includes(role)) {
+  if (!validRoles.includes(role)) {
     return {
       success: false,
       status: 400,
