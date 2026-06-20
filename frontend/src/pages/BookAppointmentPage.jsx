@@ -235,23 +235,82 @@ export default function BookAppointmentPage() {
     (o.city && o.city.toLowerCase().includes(searchOrg.toLowerCase()))
   );
 
+  const getStepStatus = (s) => {
+    if (s === 1) {
+      if (selectedOrg) return "completed";
+      return "active";
+    }
+    if (s === 2) {
+      if (selectedDept) return "completed";
+      if (selectedOrg) return "active";
+      return "";
+    }
+    if (s === 3) {
+      if (selectedDoc) return "completed";
+      if (selectedDept) return "active";
+      return "";
+    }
+    if (s === 4) {
+      if (selectedTime) return "completed";
+      if (selectedDoc) return "active";
+      return "";
+    }
+    if (s === 5) {
+      if (step === 6) return "completed";
+      if (selectedTime) return "active";
+      return "";
+    }
+    return "";
+  };
+
+  const handleStepClick = (s) => {
+    if (s === 1 && selectedOrg) {
+      setSelectedOrg(null);
+      setSelectedDept(null);
+      setSelectedDoc(null);
+      setSelectedTime("");
+      setStep(1);
+    } else if (s === 2 && selectedDept) {
+      setSelectedDept(null);
+      setSelectedDoc(null);
+      setSelectedTime("");
+      setStep(2);
+    } else if (s === 3 && selectedDoc) {
+      setSelectedDoc(null);
+      setSelectedTime("");
+      setStep(3);
+    } else if (s === 4 && selectedTime) {
+      setSelectedTime("");
+      setStep(4);
+    }
+  };
+
   return (
     <div className="book-appointment-container">
       {/* Step Progress Header */}
       {step <= 5 && (
         <div className="booking-progress-header">
           <div className="progress-steps-row">
-            {[1, 2, 3, 4, 5].map((s) => (
-              <React.Fragment key={s}>
-                <div 
-                  className={`progress-step-node ${step === s ? "active" : step > s ? "completed" : ""}`}
-                  onClick={() => s < step && setStep(s)}
-                >
-                  {s}
-                </div>
-                {s < 5 && <div className={`progress-step-line ${step > s ? "completed" : ""}`} />}
-              </React.Fragment>
-            ))}
+            {[1, 2, 3, 4, 5].map((s) => {
+              const status = getStepStatus(s);
+              return (
+                <React.Fragment key={s}>
+                  <div 
+                    className={`progress-step-node ${status}`}
+                    onClick={() => handleStepClick(s)}
+                  >
+                    {s}
+                  </div>
+                  {s < 5 && (
+                    <div 
+                      className={`progress-step-line ${
+                        getStepStatus(s + 1) === "completed" || getStepStatus(s + 1) === "active" ? "completed" : ""
+                      }`} 
+                    />
+                  )}
+                </React.Fragment>
+              );
+            })}
           </div>
           <div className="step-label-text">
             {step === 1 && "Шаг 1: Выберите медицинскую организацию"}
@@ -264,296 +323,332 @@ export default function BookAppointmentPage() {
       )}
 
       {error && <div className="booking-error-alert">{error}</div>}
-      {loading && step !== 5 && <div className="booking-loading-spinner">Загрузка данных...</div>}
 
-      {/* STEP 1: CHOOSE CLINIC */}
-      {step === 1 && !loading && (
-        <div className="step-view">
-          <div className="search-box-row">
-            <input 
-              type="text" 
-              placeholder="Поиск по названию клиники или городу..."
-              value={searchOrg}
-              onChange={(e) => setSearchOrg(e.target.value)}
-              className="clinic-search-input"
-            />
-          </div>
-
-          <div className="cards-grid">
-            {filteredOrgs.length > 0 ? (
-              filteredOrgs.map((org) => (
-                <div key={org.id} className="clinic-card" onClick={() => handleSelectOrg(org)}>
-                  <div className="clinic-card-icon">🏥</div>
-                  <div className="clinic-card-info">
-                    <h4>{org.organization_name}</h4>
-                    <span className="clinic-city-badge">📍 {org.city || "Казахстан"}</span>
-                  </div>
-                  <div className="clinic-card-action">Выбрать ›</div>
+      {step <= 5 ? (
+        <div className="booking-flow-inline">
+          {/* SECTION 1: CLINIC */}
+          <div className={`booking-section ${!selectedOrg ? "active-section" : ""}`}>
+            <h3>Шаг 1: Выберите медицинскую организацию</h3>
+            {!selectedOrg ? (
+              <>
+                <div className="search-box-row">
+                  <input 
+                    type="text" 
+                    placeholder="Поиск по названию клиники или городу..."
+                    value={searchOrg}
+                    onChange={(e) => setSearchOrg(e.target.value)}
+                    className="clinic-search-input"
+                  />
                 </div>
-              ))
+
+                {loading && <div className="booking-loading-spinner">Загрузка списка клиник...</div>}
+
+                <div className="cards-grid">
+                  {filteredOrgs.length > 0 ? (
+                    filteredOrgs.map((org) => (
+                      <div key={org.id} className="clinic-card" onClick={() => handleSelectOrg(org)}>
+                        <div className="clinic-card-icon">🏥</div>
+                        <div className="clinic-card-info">
+                          <h4>{org.organization_name}</h4>
+                          <span className="clinic-city-badge">📍 {org.city || "Казахстан"}</span>
+                        </div>
+                        <div className="clinic-card-action">Выбрать ›</div>
+                      </div>
+                    ))
+                  ) : (
+                    !loading && <div className="empty-results">Клиники не найдены.</div>
+                  )}
+                </div>
+              </>
             ) : (
-              <div className="empty-results">Клиники не найдены.</div>
+              <div className="selected-summary-card">
+                <div className="summary-card-icon">🏥</div>
+                <div className="summary-card-info">
+                  <h4>{selectedOrg.organization_name}</h4>
+                  <span>📍 {selectedOrg.city || "Казахстан"}</span>
+                </div>
+                <button 
+                  type="button" 
+                  className="summary-change-btn" 
+                  onClick={() => {
+                    setSelectedOrg(null);
+                    setSelectedDept(null);
+                    setSelectedDoc(null);
+                    setSelectedTime("");
+                    setStep(1);
+                  }}
+                >
+                  Изменить
+                </button>
+              </div>
             )}
           </div>
-        </div>
-      )}
 
-      {/* STEP 2: CHOOSE DEPARTMENT */}
-      {step === 2 && !loading && (
-        <div className="step-view">
-          <button type="button" className="booking-back-btn" onClick={() => setStep(1)}>
-            ← Назад к выбору клиники
-          </button>
-          
-          <div className="clinic-quick-info">
-            Клиника: <b>{selectedOrg?.organization_name}</b>
-          </div>
-
-          <div className="cards-grid">
-            {departments.length > 0 ? (
-              departments.map((dept) => (
-                <div key={dept.id} className="dept-card" onClick={() => handleSelectDept(dept)}>
-                  <div className="dept-card-icon">🩺</div>
-                  <div className="dept-card-info">
-                    <h4>{dept.name}</h4>
-                    <span className="dept-meta-info">Этаж: {dept.floor} • Кабинеты: {dept.rooms}</span>
+          {/* SECTION 2: DEPARTMENT */}
+          {selectedOrg && (
+            <div className={`booking-section ${!selectedDept ? "active-section" : ""}`}>
+              <h3>Шаг 2: Выберите клиническое отделение</h3>
+              {!selectedDept ? (
+                <>
+                  {loading && <div className="booking-loading-spinner">Загрузка отделений...</div>}
+                  <div className="cards-grid">
+                    {departments.length > 0 ? (
+                      departments.map((dept) => (
+                        <div key={dept.id} className="dept-card" onClick={() => handleSelectDept(dept)}>
+                          <div className="dept-card-icon">🩺</div>
+                          <div className="dept-card-info">
+                            <h4>{dept.name}</h4>
+                            <span className="dept-meta-info">Этаж: {dept.floor} • Кабинеты: {dept.rooms}</span>
+                          </div>
+                          <div className="dept-card-action">Выбрать ›</div>
+                        </div>
+                      ))
+                    ) : (
+                      !loading && <div className="empty-results">В данной клинике не добавлены отделения.</div>
+                    )}
                   </div>
-                  <div className="dept-card-action">Выбрать ›</div>
-                </div>
-              ))
-            ) : (
-              <div className="empty-results">В данной клинике не добавлены отделения.</div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* STEP 3: CHOOSE DOCTOR */}
-      {step === 3 && !loading && (
-        <div className="step-view">
-          <button type="button" className="booking-back-btn" onClick={() => setStep(2)}>
-            ← Назад к выбору отделения
-          </button>
-          
-          <div className="clinic-quick-info">
-            Клиника: <b>{selectedOrg?.organization_name}</b> • Отделение: <b>{selectedDept?.name}</b>
-          </div>
-
-          <div className="cards-grid">
-            {doctors.length > 0 ? (
-              doctors.map((doc) => (
-                <div key={doc.id} className="doctor-card" onClick={() => handleSelectDoc(doc)}>
-                  <div className="doctor-avatar">
-                    {doc.full_name?.split(" ").slice(0,2).map(n=>n[0]).join("") || "Д"}
+                </>
+              ) : (
+                <div className="selected-summary-card">
+                  <div className="summary-card-icon">🩺</div>
+                  <div className="summary-card-info">
+                    <h4>{selectedDept.name}</h4>
+                    <span>Этаж: {selectedDept.floor} • Кабинеты: {selectedDept.rooms}</span>
                   </div>
-                  <div className="doctor-card-info">
-                    <h4>{doc.full_name}</h4>
-                    <p className="doc-pos">{doc.position || "Врач-специалист"}</p>
-                    <span className="doc-cab">Кабинет №{doc.cabinet || "—"}</span>
-                  </div>
-                  <div className="doctor-card-action">Записаться ›</div>
-                </div>
-              ))
-            ) : (
-              <div className="empty-results">В этом отделении пока нет доступных врачей.</div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* STEP 4: CHOOSE DATE AND TIME */}
-      {step === 4 && (
-        <div className="step-view">
-          <button type="button" className="booking-back-btn" onClick={() => setStep(3)}>
-            ← Назад к выбору врача
-          </button>
-
-          <div className="doctor-summary-header">
-            <div className="doctor-avatar mini">
-              {selectedDoc?.full_name?.split(" ").slice(0,2).map(n=>n[0]).join("") || "Д"}
-            </div>
-            <div>
-              <h3>{selectedDoc?.full_name}</h3>
-              <p>{selectedDoc?.position} • Кабинет №{selectedDoc?.cabinet}</p>
-            </div>
-          </div>
-
-          {/* Date Carousel Strip */}
-          <div className="horizontal-date-carousel">
-            {datesList.map((day) => (
-              <button
-                key={day.dateStr}
-                type="button"
-                className={`carousel-date-node ${selectedDate === day.dateStr ? "selected" : ""}`}
-                onClick={() => {
-                  setSelectedDate(day.dateStr);
-                  setSelectedTime("");
-                }}
-              >
-                <span className="weekday">{day.weekday}</span>
-                <span className="daynum">{day.daynum}</span>
-                <span className="month">{day.month}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="timetable-section-title">
-            Доступное время на <b>{datesList.find(d => d.dateStr === selectedDate)?.fullLabel || selectedDate}</b>
-          </div>
-
-          {/* Time Slot Grid */}
-          <div className="time-slots-grid">
-            {timeSlots
-              .filter((time) => {
-                const start = selectedDoc?.work_start || "08:00";
-                const end = selectedDoc?.work_end || "17:00";
-                return time >= start && time <= end;
-              })
-              .map((time) => {
-                const isBooked = bookedSlots.includes(time);
-                return (
-                  <button
-                    key={time}
-                    type="button"
-                    disabled={isBooked}
-                    className={`time-slot-node ${selectedTime === time ? "selected" : ""} ${isBooked ? "booked" : ""}`}
-                    onClick={() => setSelectedTime(time)}
+                  <button 
+                    type="button" 
+                    className="summary-change-btn" 
+                    onClick={() => {
+                      setSelectedDept(null);
+                      setSelectedDoc(null);
+                      setSelectedTime("");
+                      setStep(2);
+                    }}
                   >
-                    <span className="time-val">{time}</span>
-                    <span className="status-val">{isBooked ? "Занято" : "Свободно"}</span>
+                    Изменить
                   </button>
-                );
-              })}
-          </div>
+                </div>
+              )}
+            </div>
+          )}
 
-          <div className="next-step-btn-container">
-            <button
-              type="button"
-              disabled={!selectedDate || !selectedTime}
-              className="booking-action-btn"
-              onClick={() => setStep(5)}
-            >
-              Подтвердить время приёма
-            </button>
-          </div>
+          {/* SECTION 3: DOCTOR */}
+          {selectedDept && (
+            <div className={`booking-section ${!selectedDoc ? "active-section" : ""}`}>
+              <h3>Шаг 3: Выберите лечащего врача</h3>
+              {!selectedDoc ? (
+                <>
+                  {loading && <div className="booking-loading-spinner">Загрузка специалистов...</div>}
+                  <div className="cards-grid">
+                    {doctors.length > 0 ? (
+                      doctors.map((doc) => (
+                        <div key={doc.id} className="doctor-card" onClick={() => handleSelectDoc(doc)}>
+                          <div className="doctor-avatar">
+                            {doc.full_name?.split(" ").slice(0,2).map(n=>n[0]).join("") || "Д"}
+                          </div>
+                          <div className="doctor-card-info">
+                            <h4>{doc.full_name}</h4>
+                            <p className="doc-pos">{doc.position || "Врач-специалист"}</p>
+                            <span className="doc-cab">Кабинет №{doc.cabinet || "—"}</span>
+                          </div>
+                          <div className="doctor-card-action">Записаться ›</div>
+                        </div>
+                      ))
+                    ) : (
+                      !loading && <div className="empty-results">В этом отделении пока нет доступных врачей.</div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="selected-summary-card">
+                  <div className="doctor-avatar mini" style={{ marginRight: 16 }}>
+                    {selectedDoc.full_name?.split(" ").slice(0,2).map(n=>n[0]).join("") || "Д"}
+                  </div>
+                  <div className="summary-card-info">
+                    <h4>{selectedDoc.full_name}</h4>
+                    <span>{selectedDoc.position || "Врач-специалист"} • Кабинет №{selectedDoc.cabinet || "—"}</span>
+                  </div>
+                  <button 
+                    type="button" 
+                    className="summary-change-btn" 
+                    onClick={() => {
+                      setSelectedDoc(null);
+                      setSelectedTime("");
+                      setStep(3);
+                    }}
+                  >
+                    Изменить
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* SECTION 4: DATE & TIME */}
+          {selectedDoc && (
+            <div className={`booking-section ${!selectedTime ? "active-section" : ""}`}>
+              <h3>Шаг 4: Выберите удобную дату и время приёма</h3>
+              {!selectedTime ? (
+                <>
+                  {/* Date Carousel Strip */}
+                  <div className="horizontal-date-carousel">
+                    {datesList.map((day) => (
+                      <button
+                        key={day.dateStr}
+                        type="button"
+                        className={`carousel-date-node ${selectedDate === day.dateStr ? "selected" : ""}`}
+                        onClick={() => {
+                          setSelectedDate(day.dateStr);
+                        }}
+                      >
+                        <span className="weekday">{day.weekday}</span>
+                        <span className="daynum">{day.daynum}</span>
+                        <span className="month">{day.month}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="timetable-section-title">
+                    Доступное время на <b>{datesList.find(d => d.dateStr === selectedDate)?.fullLabel || selectedDate}</b>
+                  </div>
+
+                  {/* Time Slot Grid */}
+                  <div className="time-slots-grid">
+                    {timeSlots
+                      .filter((time) => {
+                        const start = selectedDoc?.work_start || "08:00";
+                        const end = selectedDoc?.work_end || "17:00";
+                        return time >= start && time <= end;
+                      })
+                      .map((time) => {
+                        const isBooked = bookedSlots.includes(time);
+                        return (
+                          <button
+                            key={time}
+                            type="button"
+                            disabled={isBooked}
+                            className={`time-slot-node ${isBooked ? "booked" : ""}`}
+                            onClick={() => {
+                              setSelectedTime(time);
+                              setStep(5);
+                            }}
+                          >
+                            <span className="time-val">{time}</span>
+                            <span className="status-val">{isBooked ? "Занято" : "Свободно"}</span>
+                          </button>
+                        );
+                      })}
+                  </div>
+                </>
+              ) : (
+                <div className="selected-summary-card">
+                  <div className="summary-card-icon">📅</div>
+                  <div className="summary-card-info">
+                    <h4>{datesList.find(d => d.dateStr === selectedDate)?.fullLabel}</h4>
+                    <span>Время приёма: <b>{selectedTime}</b></span>
+                  </div>
+                  <button 
+                    type="button" 
+                    className="summary-change-btn" 
+                    onClick={() => {
+                      setSelectedTime("");
+                      setStep(4);
+                    }}
+                  >
+                    Изменить
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* SECTION 5: PATIENT DETAILS */}
+          {selectedTime && (
+            <div className="booking-section active-section">
+              <h3>Шаг 5: Подтверждение личных данных</h3>
+              
+              <form onSubmit={handleBookingSubmit} className="booking-checkout-form" style={{ marginTop: 0, padding: 0, background: 'none', border: 'none', boxShadow: 'none' }}>
+                <div className="input-group">
+                  <label htmlFor="fullName">ФИО пациента <span className="req">*</span></label>
+                  <input 
+                    id="fullName"
+                    type="text" 
+                    placeholder="Иванов Иван Иванович"
+                    value={form.fullName}
+                    onChange={(e) => setForm(prev => ({ ...prev, fullName: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div className="input-group-row">
+                  <div className="input-group">
+                    <label htmlFor="iin">ИИН пациента <span className="req">*</span></label>
+                    <input 
+                      id="iin"
+                      type="text" 
+                      maxLength={12}
+                      placeholder="12-значный ИИН"
+                      value={form.iin}
+                      onChange={(e) => setForm(prev => ({ ...prev, iin: e.target.value.replace(/\D/g, "") }))}
+                      required
+                    />
+                  </div>
+
+                  <div className="input-group">
+                    <label htmlFor="phone">Контактный телефон</label>
+                    <input 
+                      id="phone"
+                      type="tel" 
+                      placeholder="+7 (777) 123-45-67"
+                      value={form.phone}
+                      onChange={(e) => setForm(prev => ({ ...prev, phone: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label htmlFor="email">Электронная почта <span className="req">*</span></label>
+                  <input 
+                    id="email"
+                    type="email" 
+                    placeholder="your-email@mail.ru"
+                    value={form.email}
+                    onChange={(e) => setForm(prev => ({ ...prev, email: e.target.value }))}
+                    required
+                  />
+                  <span className="input-hint">Сюда будет выслан электронный талон с QR-кодом для приёма</span>
+                </div>
+
+                <div className="input-group">
+                  <label htmlFor="reason">Причина обращения</label>
+                  <input 
+                    id="reason"
+                    type="text" 
+                    placeholder="Плановый осмотр, жалобы и т.д."
+                    value={form.reason}
+                    onChange={(e) => setForm(prev => ({ ...prev, reason: e.target.value }))}
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label htmlFor="comment">Комментарий для врача</label>
+                  <textarea 
+                    id="comment"
+                    placeholder="Дополнительные сведения, которые вы хотите передать врачу заранее"
+                    value={form.comment}
+                    onChange={(e) => setForm(prev => ({ ...prev, comment: e.target.value }))}
+                  />
+                </div>
+
+                <button type="submit" disabled={loading} className="booking-action-btn submit-btn">
+                  {loading ? "Оформление записи..." : "Подтвердить и записаться"}
+                </button>
+              </form>
+            </div>
+          )}
         </div>
-      )}
-
-      {/* STEP 5: FILL DETAILS & CONFIRM */}
-      {step === 5 && (
-        <div className="step-view">
-          <button type="button" className="booking-back-btn" onClick={() => setStep(4)}>
-            ← Назад к выбору даты и времени
-          </button>
-
-          <div className="booking-summary-checkout-card">
-            <h4>Детали вашей записи:</h4>
-            <div className="checkout-row">
-              <span>Клиника:</span>
-              <b>{selectedOrg?.organization_name}</b>
-            </div>
-            <div className="checkout-row">
-              <span>Отделение:</span>
-              <b>{selectedDept?.name}</b>
-            </div>
-            <div className="checkout-row">
-              <span>Врач:</span>
-              <b>{selectedDoc?.full_name}</b>
-            </div>
-            <div className="checkout-row">
-              <span>Кабинет:</span>
-              <b>№{selectedDoc?.cabinet || "—"}</b>
-            </div>
-            <div className="checkout-row highlight">
-              <span>Дата и время:</span>
-              <b>{datesList.find(d => d.dateStr === selectedDate)?.fullLabel} в {selectedTime}</b>
-            </div>
-          </div>
-
-          <form onSubmit={handleBookingSubmit} className="booking-checkout-form">
-            <h3>Личные данные пациента</h3>
-
-            <div className="input-group">
-              <label htmlFor="fullName">ФИО пациента <span className="req">*</span></label>
-              <input 
-                id="fullName"
-                type="text" 
-                placeholder="Иванов Иван Иванович"
-                value={form.fullName}
-                onChange={(e) => setForm(prev => ({ ...prev, fullName: e.target.value }))}
-                required
-              />
-            </div>
-
-            <div className="input-group-row">
-              <div className="input-group">
-                <label htmlFor="iin">ИИН пациента <span className="req">*</span></label>
-                <input 
-                  id="iin"
-                  type="text" 
-                  maxLength={12}
-                  placeholder="12-значный ИИН"
-                  value={form.iin}
-                  onChange={(e) => setForm(prev => ({ ...prev, iin: e.target.value.replace(/\D/g, "") }))}
-                  required
-                />
-              </div>
-
-              <div className="input-group">
-                <label htmlFor="phone">Контактный телефон</label>
-                <input 
-                  id="phone"
-                  type="tel" 
-                  placeholder="+7 (777) 123-45-67"
-                  value={form.phone}
-                  onChange={(e) => setForm(prev => ({ ...prev, phone: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div className="input-group">
-              <label htmlFor="email">Электронная почта <span className="req">*</span></label>
-              <input 
-                id="email"
-                type="email" 
-                placeholder="your-email@mail.ru"
-                value={form.email}
-                onChange={(e) => setForm(prev => ({ ...prev, email: e.target.value }))}
-                required
-              />
-              <span className="input-hint">Сюда будет выслан электронный талон с QR-кодом для приёма</span>
-            </div>
-
-            <div className="input-group">
-              <label htmlFor="reason">Причина обращения</label>
-              <input 
-                id="reason"
-                type="text" 
-                placeholder="Плановый осмотр, жалобы и т.д."
-                value={form.reason}
-                onChange={(e) => setForm(prev => ({ ...prev, reason: e.target.value }))}
-              />
-            </div>
-
-            <div className="input-group">
-              <label htmlFor="comment">Комментарий для врача</label>
-              <textarea 
-                id="comment"
-                placeholder="Дополнительные сведения, которые вы хотите передать врачу заранее"
-                value={form.comment}
-                onChange={(e) => setForm(prev => ({ ...prev, comment: e.target.value }))}
-              />
-            </div>
-
-            <button type="submit" disabled={loading} className="booking-action-btn submit-btn">
-              {loading ? "Оформление записи..." : "Подтвердить и записаться"}
-            </button>
-          </form>
-        </div>
-      )}
-
-      {/* STEP 6: SUCCESS CONFIRMATION COUPON */}
-      {step === 6 && successData && (
+      ) : (
+        /* STEP 6: SUCCESS CONFIRMATION COUPON */
         <div className="step-view success-view">
           <div className="success-checkmark-wrapper">
             <div className="checkmark-circle">✓</div>
