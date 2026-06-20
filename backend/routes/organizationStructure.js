@@ -1734,16 +1734,22 @@ router.post("/clean-slate-db", async (req, res) => {
     console.log("Starting DB clean slate reset...");
 
     // 1. Delete appointments
-    const { error: appErr } = await supabase.from("organization_appointments").delete().neq("id", "keep_nothing");
+    let appErr = null;
+    try {
+      const { error } = await supabase.from("organization_appointments").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      if (error && !error.message.includes("does not exist")) appErr = error;
+    } catch (e) {
+      console.warn("DB appointments delete failed:", e.message);
+    }
     
     // 2. Delete employee documents
-    const { error: docErr } = await supabase.from("organization_employee_documents").delete().neq("id", "keep_nothing");
+    const { error: docErr } = await supabase.from("organization_employee_documents").delete().neq("id", "00000000-0000-0000-0000-000000000000");
 
     // 3. Delete departments
-    const { error: deptErr } = await supabase.from("organization_departments").delete().neq("id", "keep_nothing");
+    const { error: deptErr } = await supabase.from("organization_departments").delete().neq("id", "00000000-0000-0000-0000-000000000000");
 
     // 4. Delete employees
-    const { error: empErr } = await supabase.from("organization_employees").delete().neq("id", "keep_nothing");
+    const { error: empErr } = await supabase.from("organization_employees").delete().neq("id", "00000000-0000-0000-0000-000000000000");
 
     // 5. Delete non-admin users from organization_users
     const { error: usersErr } = await supabase.from("organization_users").delete().not("role", "in", '("organization_admin","super_admin","admin")');
