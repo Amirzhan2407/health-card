@@ -299,7 +299,8 @@ router.get("/", requireAdminAuth, async (req, res) => {
 
     if (status) query = query.eq("status", status);
 
-    if (req.admin.role !== "super_admin") {
+    const allAccessRoles = ["super_admin", "site_support", "support_admin"];
+    if (!allAccessRoles.includes(req.admin.role)) {
       query = query.or(
         `assigned_admin_id.eq.${req.admin.id},assigned_admin_id.is.null`
       );
@@ -386,8 +387,9 @@ router.get("/:id", requireAdminAuth, async (req, res) => {
       });
     }
 
+    const allAccessRoles = ["super_admin", "site_support", "support_admin"];
     if (
-      req.admin.role !== "super_admin" &&
+      !allAccessRoles.includes(req.admin.role) &&
       application.assigned_admin_id &&
       application.assigned_admin_id !== req.admin.id
     ) {
@@ -524,10 +526,11 @@ router.patch("/:id/status", requireAdminAuth, async (req, res) => {
 
 router.patch("/:id/assign", requireAdminAuth, async (req, res) => {
   try {
-    if (req.admin.role !== "super_admin") {
+    const allAccessRoles = ["super_admin", "site_support", "support_admin"];
+    if (!allAccessRoles.includes(req.admin.role)) {
       return res.status(403).json({
         success: false,
-        message: "Назначать ответственного может только главный админ.",
+        message: "Недостаточно прав.",
       });
     }
 

@@ -5,13 +5,13 @@ import AdminChannelNotifier from "../components/AdminChannelNotifier";
 const allNavItems = [
   {
     to: "/admin-panel",
-    label: "Главная",
+    label: "Статистика",
     roles: ["super_admin", "site_support", "support_admin"],
   },
   {
     to: "/admin-panel/staff",
     label: "Админы",
-    roles: ["super_admin"],
+    roles: ["super_admin", "site_support", "support_admin"],
   },
   {
     to: "/admin-panel/applications",
@@ -33,19 +33,10 @@ const allNavItems = [
     label: "Журнал",
     roles: ["super_admin", "site_support", "support_admin"],
   },
-  {
-    to: "/admin-panel/roles",
-    label: "Роли и права",
-    roles: ["super_admin"],
-  },
 ];
 
 function roleLabel(role) {
-  if (role === "super_admin") return "Главный админ";
-  if (role === "site_support") return "Обычный админ";
-  if (role === "support_admin") return "Обычный админ";
-
-  return "Админ";
+  return "Сотрудник техподдержки";
 }
 
 function getAdminName(adminData) {

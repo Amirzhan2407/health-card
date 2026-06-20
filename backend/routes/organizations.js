@@ -292,7 +292,8 @@ let query = supabase
 .order("created_at", { ascending: false });
 
 
-if (req.admin.role !== "super_admin") {
+const allAccessRoles = ["super_admin", "site_support", "support_admin"];
+if (!allAccessRoles.includes(req.admin.role)) {
   query = query.eq("assigned_admin_id", req.admin.id);
 }
 

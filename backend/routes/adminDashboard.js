@@ -79,7 +79,8 @@ router.get("/", requireAdminAuth, async (req, res) => {
       .from("organization_applications")
       .select("id, status, application_type, organization_type, assigned_admin_id");
 
-    if (req.admin.role !== "super_admin") {
+    const allAccessRoles = ["super_admin", "site_support", "support_admin"];
+    if (!allAccessRoles.includes(req.admin.role)) {
       orgQuery = orgQuery.eq("assigned_admin_id", req.admin.id);
       appQuery = appQuery.or(
         `assigned_admin_id.eq.${req.admin.id},assigned_admin_id.is.null`

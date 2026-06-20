@@ -181,11 +181,12 @@ export async function loginAdmin({ username, password, ip, userAgent }) {
 }
 
 export async function getStaffList(currentAdmin) {
-  if (currentAdmin.role !== "super_admin") {
+  const allowedRoles = ["super_admin", "site_support", "support_admin"];
+  if (!allowedRoles.includes(currentAdmin.role)) {
     return {
       success: false,
       status: 403,
-      message: "Страница доступна только главному админу.",
+      message: "Недостаточно прав.",
     };
   }
 
@@ -236,11 +237,12 @@ export async function createStaffAdmin({
   ip,
   userAgent,
 }) {
-  if (currentAdmin.role !== "super_admin") {
+  const allowedRoles = ["super_admin", "site_support", "support_admin"];
+  if (!allowedRoles.includes(currentAdmin.role)) {
     return {
       success: false,
       status: 403,
-      message: "Только главный админ может добавлять админов.",
+      message: "Недостаточно прав.",
     };
   }
 
@@ -285,13 +287,7 @@ export async function createStaffAdmin({
     };
   }
 
-  if (role === "site_support" && category === "all") {
-    return {
-      success: false,
-      status: 400,
-      message: "Обычный админ не может иметь доступ ко всем категориям.",
-    };
-  }
+  // Убран лимит на категорию all для site_support
 
   const cleanUsername = normalizeUsername(username);
 
@@ -399,11 +395,12 @@ export async function changeStaffStatus({
   ip,
   userAgent,
 }) {
-  if (currentAdmin.role !== "super_admin") {
+  const allowedRoles = ["super_admin", "site_support", "support_admin"];
+  if (!allowedRoles.includes(currentAdmin.role)) {
     return {
       success: false,
       status: 403,
-      message: "Только главный админ может менять статус админов.",
+      message: "Недостаточно прав.",
     };
   }
 
@@ -422,7 +419,6 @@ export async function changeStaffStatus({
       updated_at: new Date().toISOString(),
     })
     .eq("id", staffId)
-    .neq("role", "super_admin")
     .select(
       `
       id,

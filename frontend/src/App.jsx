@@ -71,7 +71,6 @@ return ( <LanguageProvider> <Routes>
       <Route path="orgs" element={<AdminOrganizations />} />
       <Route path="channels" element={<AdminChannels />} />
       <Route path="logs" element={<AdminAuditLogs />} />
-      <Route path="roles" element={<AdminRoles />} />
     </Route>
 
     <Route

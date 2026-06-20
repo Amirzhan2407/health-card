@@ -24,7 +24,8 @@ function normalizeCategory(value = "") {
 }
 
 function canAccessChannel(admin, category) {
-  if (admin?.role === "super_admin") return true;
+  const allowedRoles = ["super_admin", "site_support", "support_admin"];
+  if (allowedRoles.includes(admin?.role)) return true;
 
   return normalizeCategory(admin?.category) === normalizeCategory(category);
 }
@@ -43,8 +44,9 @@ export async function getAdminChannels(currentAdmin) {
     };
   }
 
+  const allAccessRoles = ["super_admin", "site_support", "support_admin"];
   const channels =
-    currentAdmin?.role === "super_admin"
+    allAccessRoles.includes(currentAdmin?.role)
       ? data || []
       : (data || []).filter((channel) =>
           canAccessChannel(currentAdmin, channel.category)

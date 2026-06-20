@@ -23,10 +23,7 @@ function normalizeCategory(value) {
 }
 
 function roleLabel(role) {
-  if (role === "super_admin") return "главный админ";
-  if (role === "site_support") return "обычный админ";
-  if (role === "support_admin") return "обычный админ";
-  return "админ";
+  return "сотрудник техподдержки";
 }
 
 function getLogin(admin) {
@@ -60,7 +57,8 @@ function makeSenderLabel({ username, fullName, role }) {
 }
 
 function canAccess(admin, category) {
-  if (admin.role === "super_admin") return true;
+  const allowedRoles = ["super_admin", "site_support", "support_admin"];
+  if (allowedRoles.includes(admin.role)) return true;
 
   const adminCategory =
     admin.category ||

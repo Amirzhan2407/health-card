@@ -30,9 +30,7 @@ const categoryOptions = [
 ];
 
 function roleLabel(value) {
-  if (value === "super_admin") return "Главный админ";
-  if (value === "site_support") return "Обычный админ";
-  return "Не указано";
+  return "Сотрудник техподдержки";
 }
 
 function categoryLabel(value) {
@@ -60,20 +58,20 @@ export default function AdminStaff() {
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
   const [birthDate, setBirthDate] = useState("");
-  const [role, setRole] = useState("site_support");
-  const [category, setCategory] = useState("gov_polyclinics");
+  const [role, setRole] = useState("super_admin");
+  const [category, setCategory] = useState("all");
 
   const adminData = JSON.parse(localStorage.getItem("adminData") || "null");
   const token = adminData?.token;
 
-  const isSuperAdmin = adminData?.role === "super_admin";
+  const hasAccess = adminData && ["super_admin", "site_support", "support_admin"].includes(adminData.role);
 
   const resetForm = () => {
     setFullName("");
     setUsername("");
     setBirthDate("");
-    setRole("site_support");
-    setCategory("gov_polyclinics");
+    setRole("super_admin");
+    setCategory("all");
   };
 
   const loadAdmins = async () => {
@@ -103,7 +101,7 @@ export default function AdminStaff() {
   };
 
   useEffect(() => {
-    if (token && isSuperAdmin) {
+    if (token && hasAccess) {
       loadAdmins();
     } else {
       setLoading(false);
@@ -126,11 +124,6 @@ export default function AdminStaff() {
       return;
     }
 
-    if (role === "site_support" && category === "all") {
-      alert("Обычный админ не может иметь доступ ко всем категориям");
-      return;
-    }
-
     try {
       setSaving(true);
       setError("");
@@ -145,8 +138,8 @@ export default function AdminStaff() {
           fullName: fullName.trim(),
           username: username.trim(),
           birthDate,
-          role,
-          category: role === "super_admin" ? "all" : category,
+          role: "super_admin",
+          category: "all",
         }),
       });
 
@@ -172,7 +165,7 @@ export default function AdminStaff() {
   };
 
   const toggleStatus = async (admin) => {
-    if (admin.role === "super_admin") return;
+    if (admin.username === adminData?.username) return;
 
     try {
       const response = await fetch(
@@ -202,13 +195,13 @@ export default function AdminStaff() {
     }
   };
 
-  if (!isSuperAdmin) {
+  if (!hasAccess) {
     return (
       <div className="adminPage">
         <div className="adminPageHeader">
           <div>
             <h1>Нет доступа</h1>
-            <p>Страница “Админы” доступна только главному админу.</p>
+            <p>Страница “Админы” доступна только сотрудникам техподдержки.</p>
           </div>
         </div>
       </div>
@@ -221,8 +214,7 @@ export default function AdminStaff() {
         <div>
           <h1>Админы</h1>
           <p>
-            Главный админ создаёт аккаунты сотрудников и назначает им роль и
-            категорию ответственности.
+            Администраторы техподдержки могут создавать аккаунты других сотрудников техподдержки и управлять их активностью.
           </p>
         </div>
 
@@ -279,13 +271,13 @@ export default function AdminStaff() {
                 </span>
 
                 <span>
-                  {admin.role === "super_admin" ? (
+                  {admin.username === adminData?.username ? (
                     <button
                       className="adminSmallBtn disabled"
                       type="button"
                       disabled
                     >
-                      Главный
+                      Вы
                     </button>
                   ) : (
                     <button
@@ -336,44 +328,8 @@ export default function AdminStaff() {
                 />
               </div>
 
-              <div className="adminField">
-                <label>Роль</label>
-                <select value={role} onChange={(e) => setRole(e.target.value)}>
-                  {roleOptions.map((item) => (
-                    <option value={item.value} key={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {role === "site_support" && (
-                <div className="adminField">
-                  <label>Категория ответственности</label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                  >
-                    {categoryOptions.map((item) => (
-                      <option value={item.value} key={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {role === "super_admin" && (
-                <div className="adminHintBox">
-                  Для главного админа категория автоматически будет “Все
-                  категории”.
-                </div>
-              )}
-
               <div className="adminHintBox">
-                Уникальный номер создаётся автоматически. Пароль главный админ
-                не задаёт. Новый админ получит логин и уникальный номер, после
-                чего сам создаст пароль при первом входе.
+                Уникальный номер создаётся автоматически. Пароль при создании не задаётся. Новый сотрудник получит логин и уникальный номер, после чего сам создаст пароль при первом входе.
               </div>
             </div>
 

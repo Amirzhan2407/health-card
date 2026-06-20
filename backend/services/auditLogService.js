@@ -57,7 +57,7 @@ export async function createAuditLog({
 }
 
 export async function getAuditLogs({ currentAdmin, filters = {} }) {
-  const isSuperAdmin = currentAdmin?.role === "super_admin";
+  const isSuperAdmin = ["super_admin", "site_support", "support_admin"].includes(currentAdmin?.role);
 
   let query = supabase
     .from("admin_audit_logs")

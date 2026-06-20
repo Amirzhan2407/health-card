@@ -360,7 +360,8 @@ export async function getOrganizationApplications({ admin } = {}) {
     .select("*")
     .order("created_at", { ascending: false });
 
-  if (admin?.role !== "super_admin" && admin?.category) {
+  const allAccessRoles = ["super_admin", "site_support", "support_admin"];
+  if (!allAccessRoles.includes(admin?.role) && admin?.category) {
     query = query.eq("organization_type", admin.category);
   }
 

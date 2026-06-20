@@ -25,10 +25,11 @@ export function requireAdminAuth(req, res, next) {
 }
 
 export function requireSuperAdmin(req, res, next) {
-  if (req.admin?.role !== "super_admin") {
+  const allowedRoles = ["super_admin", "site_support", "support_admin"];
+  if (!req.admin || !allowedRoles.includes(req.admin.role)) {
     return res.status(403).json({
       success: false,
-      message: "Доступ только для главного администратора.",
+      message: "Доступ только для администратора техподдержки.",
     });
   }
 

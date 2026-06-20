@@ -78,7 +78,7 @@ export default function AdminDashboard() {
     <main className="dashPage">
       <section className="dashHead">
         <div>
-          <h1>Главная</h1>
+          <h1>Статистика</h1>
           <p>Статистика по организациям и заявкам.</p>
         </div>
 

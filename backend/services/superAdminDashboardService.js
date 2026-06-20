@@ -71,7 +71,8 @@ function statusToGroup(status = "") {
 }
 
 export async function getSuperAdminDashboard(currentAdmin) {
-  if (currentAdmin?.role !== "super_admin") {
+  const allAccessRoles = ["super_admin", "site_support", "support_admin"];
+  if (!allAccessRoles.includes(currentAdmin?.role)) {
     return {
       success: false,
       status: 403,
