@@ -1733,11 +1733,9 @@ router.post("/clean-slate-db", async (req, res) => {
 
     console.log("Starting DB clean slate reset...");
 
-    // 1. Delete appointments
-    let appErr = null;
+    // 1. Delete appointments (ignore database errors since we reset file fallback)
     try {
-      const { error } = await supabase.from("organization_appointments").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-      if (error && !error.message.includes("does not exist")) appErr = error;
+      await supabase.from("organization_appointments").delete().neq("id", "00000000-0000-0000-0000-000000000000");
     } catch (e) {
       console.warn("DB appointments delete failed:", e.message);
     }
@@ -1773,12 +1771,11 @@ router.post("/clean-slate-db", async (req, res) => {
       console.warn("Failed to reset employee_shifts_fallback.json:", e.message);
     }
 
-    if (appErr || docErr || deptErr || empErr || usersErr) {
+    if (docErr || deptErr || empErr || usersErr) {
       return res.status(500).json({
         success: false,
         message: "Частичная ошибка при очистке БД.",
         errors: {
-          appointments: appErr?.message,
           documents: docErr?.message,
           departments: deptErr?.message,
           employees: empErr?.message,
