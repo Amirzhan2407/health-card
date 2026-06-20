@@ -198,100 +198,135 @@ router.get("/clear-database-temp-route", async (req, res) => {
     }
 
     console.log("=== DB CLEARANCE INITIATED ===");
+    const results = {};
 
     // 1. Delete all appointments
-    const { error: appErr } = await supabase.from("organization_appointments").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    console.log("1. Appointments deleted:", !appErr, appErr?.message);
+    try {
+      const { error } = await supabase.from("organization_appointments").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      results.appointments = error ? error.message : "success";
+    } catch (e) {
+      results.appointments = e.message;
+    }
 
     // 2. Delete all employee documents
-    const { error: docErr } = await supabase.from("organization_employee_documents").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    console.log("2. Employee documents deleted:", !docErr, docErr?.message);
+    try {
+      const { error } = await supabase.from("organization_employee_documents").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      results.employee_documents = error ? error.message : "success";
+    } catch (e) {
+      results.employee_documents = e.message;
+    }
 
     // 3. Delete all employees
-    const { error: empErr } = await supabase.from("organization_employees").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    console.log("3. Employees deleted:", !empErr, empErr?.message);
+    try {
+      const { error } = await supabase.from("organization_employees").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      results.employees = error ? error.message : "success";
+    } catch (e) {
+      results.employees = e.message;
+    }
 
     // 4. Delete all departments
-    const { error: deptErr } = await supabase.from("organization_departments").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    console.log("4. Departments deleted:", !deptErr, deptErr?.message);
+    try {
+      const { error } = await supabase.from("organization_departments").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      results.departments = error ? error.message : "success";
+    } catch (e) {
+      results.departments = e.message;
+    }
 
     // 5. Delete all organization users (portal staff)
-    const { error: usrErr } = await supabase.from("organization_users").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    console.log("5. Organization users deleted:", !usrErr, usrErr?.message);
+    try {
+      const { error } = await supabase.from("organization_users").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      results.organization_users = error ? error.message : "success";
+    } catch (e) {
+      results.organization_users = e.message;
+    }
 
     // 6. Delete all organizations
-    const { error: orgErr } = await supabase.from("organizations").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    console.log("6. Organizations deleted:", !orgErr, orgErr?.message);
+    try {
+      const { error } = await supabase.from("organizations").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      results.organizations = error ? error.message : "success";
+    } catch (e) {
+      results.organizations = e.message;
+    }
 
     // 7. Delete all application history
-    const { error: histErr } = await supabase.from("organization_application_history").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    console.log("7. Application history deleted:", !histErr, histErr?.message);
+    try {
+      const { error } = await supabase.from("organization_application_history").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      results.application_history = error ? error.message : "success";
+    } catch (e) {
+      results.application_history = e.message;
+    }
 
     // 8. Delete all application documents
-    const { error: appDocErr } = await supabase.from("organization_application_documents").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    console.log("8. Application documents deleted:", !appDocErr, appDocErr?.message);
+    try {
+      const { error } = await supabase.from("organization_application_documents").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      results.application_documents = error ? error.message : "success";
+    } catch (e) {
+      results.application_documents = e.message;
+    }
 
     // 9. Delete all organization applications
-    const { error: appFormErr } = await supabase.from("organization_applications").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    console.log("9. Applications deleted:", !appFormErr, appFormErr?.message);
+    try {
+      const { error } = await supabase.from("organization_applications").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      results.applications = error ? error.message : "success";
+    } catch (e) {
+      results.applications = e.message;
+    }
 
     // 10. Delete all patient accounts (app_users)
-    const { error: patErr } = await supabase.from("app_users").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    console.log("10. Patient users deleted:", !patErr, patErr?.message);
+    try {
+      const { error } = await supabase.from("app_users").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      results.app_users = error ? error.message : "success";
+    } catch (e) {
+      results.app_users = e.message;
+    }
 
     // 11. Delete support chat messages
-    const { error: msgErr } = await supabase.from("admin_channel_messages").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    console.log("11. Support messages deleted:", !msgErr, msgErr?.message);
+    try {
+      const { error } = await supabase.from("admin_channel_messages").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      results.channel_messages = error ? error.message : "success";
+    } catch (e) {
+      results.channel_messages = e.message;
+    }
 
     // 12. Delete support chat channels
-    const { error: chanErr } = await supabase.from("admin_channels").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    console.log("12. Support channels deleted:", !chanErr, chanErr?.message);
+    try {
+      const { error } = await supabase.from("admin_channels").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      results.channels = error ? error.message : "success";
+    } catch (e) {
+      results.channels = e.message;
+    }
 
     // 13. Delete audit logs
-    const { error: logErr } = await supabase.from("admin_audit_logs").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    console.log("13. Audit logs deleted:", !logErr, logErr?.message);
+    try {
+      const { error } = await supabase.from("admin_audit_logs").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      results.audit_logs = error ? error.message : "success";
+    } catch (e) {
+      results.audit_logs = e.message;
+    }
 
     // 14. Keep only the oldest admin in site_admins
-    const { data: admins, error: fetchErr } = await supabase.from("site_admins").select("id, username").order("created_at", { ascending: true });
-    
-    let admErr = null;
-    if (fetchErr || !admins || admins.length === 0) {
-      console.error("Could not fetch admins to clean:", fetchErr?.message);
-      admErr = fetchErr || new Error("No admins found in database");
-    } else {
-      const adminToKeep = admins[0];
-      console.log(`Keeping oldest admin: ${adminToKeep.username} (${adminToKeep.id})`);
-      const { error: delErr } = await supabase.from("site_admins").delete().neq("id", adminToKeep.id);
-      admErr = delErr;
+    try {
+      const { data: admins, error: fetchErr } = await supabase.from("site_admins").select("id, username").order("created_at", { ascending: true });
+      
+      if (fetchErr || !admins || admins.length === 0) {
+        console.error("Could not fetch admins to clean:", fetchErr?.message);
+        results.site_admins = fetchErr ? fetchErr.message : "No admins found";
+      } else {
+        const adminToKeep = admins[0];
+        console.log(`Keeping oldest admin: ${adminToKeep.username} (${adminToKeep.id})`);
+        const { error: delErr } = await supabase.from("site_admins").delete().neq("id", adminToKeep.id);
+        results.site_admins = delErr ? delErr.message : `success (kept ${adminToKeep.username})`;
+      }
+    } catch (e) {
+      results.site_admins = e.message;
     }
-    console.log("14. Other support admins deleted:", !admErr, admErr?.message);
 
-    if (appErr || docErr || empErr || deptErr || usrErr || orgErr || histErr || appDocErr || appFormErr || patErr || msgErr || chanErr || logErr || admErr) {
-      return res.status(500).json({
-        success: false,
-        message: "Некоторые таблицы не удалось очистить. Проверьте консоль бэкенда.",
-        errors: {
-          appErr: appErr?.message,
-          docErr: docErr?.message,
-          empErr: empErr?.message,
-          deptErr: deptErr?.message,
-          usrErr: usrErr?.message,
-          orgErr: orgErr?.message,
-          histErr: histErr?.message,
-          appDocErr: appDocErr?.message,
-          appFormErr: appFormErr?.message,
-          patErr: patErr?.message,
-          msgErr: msgErr?.message,
-          chanErr: chanErr?.message,
-          logErr: logErr?.message,
-          admErr: admErr?.message
-        }
-      });
-    }
+    console.log("=== DB CLEARANCE COMPLETED ===", results);
 
     return res.status(200).json({
       success: true,
-      message: "База данных успешно очищена с сохранением единственного суперадминистратора."
+      message: "Операция очистки базы данных завершена.",
+      results
     });
   } catch (error) {
     console.error("CLEAR DATABASE EXCEPTION:", error);
