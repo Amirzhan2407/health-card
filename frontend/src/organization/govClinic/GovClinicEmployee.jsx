@@ -189,7 +189,17 @@ export default function GovClinicEmployee() {
   const [appointments, setAppointments] = useState([]);
   const [patients, setPatients] = useState([]);
   const [notifications, setNotifications] = useState([]);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
+  const [startDate, setStartDate] = useState(
+    new Date(new Date().getFullYear(), 0, 1).toISOString().split("T")[0]
+  );
+  const [endDate, setEndDate] = useState(
+    new Date(new Date().getFullYear(), 11, 31).toISOString().split("T")[0]
+  );
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [verificationAppId, setVerificationAppId] = useState(null);
+  const [verificationCodeInput, setVerificationCodeInput] = useState("");
+  const [verificationError, setVerificationError] = useState("");
+  const [verifying, setVerifying] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -272,7 +282,7 @@ export default function GovClinicEmployee() {
       // Load appointments from real API
       try {
         const appRes = await fetch(
-          `${API_URL}/api/organization-structure/appointments?employee_id=${empId}&date=${selectedDate}`
+          `${API_URL}/api/organization-structure/appointments?employee_id=${empId}&startDate=${startDate}&endDate=${endDate}`
         );
         if (appRes.ok) {
           const appData = await appRes.json();
@@ -313,7 +323,7 @@ export default function GovClinicEmployee() {
     }
 
     loadAllData();
-  }, [user, selectedDate]);
+  }, [user, startDate, endDate]);
 
   // Handle Tab changes
   function changeTab(tabId) {
@@ -405,6 +415,128 @@ export default function GovClinicEmployee() {
     setMessage("Запись успешно добавлена в медицинскую карту.");
     setError("");
   }
+
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  const getCategorizedAppointments = () => {
+    const todayList = [];
+    const futureList = [];
+    const pastList = [];
+
+    appointments.forEach((app) => {
+      if (app.status === "completed" || app.status === "cancelled" || app.status === "rejected" || app.date < todayStr) {
+        pastList.push(app);
+      } else if (app.date === todayStr) {
+        todayList.push(app);
+      } else {
+        futureList.push(app);
+      }
+    });
+
+    const sortByTime = (a, b) => {
+      const da = `${a.date}T${a.time}`;
+      const db = `${b.date}T${b.time}`;
+      return da.localeCompare(db);
+    };
+    const sortByTimeDesc = (a, b) => {
+      const da = `${a.date}T${a.time}`;
+      const db = `${b.date}T${b.time}`;
+      return db.localeCompare(da);
+    };
+
+    todayList.sort(sortByTime);
+    futureList.sort(sortByTime);
+    pastList.sort(sortByTimeDesc);
+
+    return { todayList, futureList, pastList };
+  };
+
+  async function submitVerificationCode(e) {
+    e.preventDefault();
+    if (!verificationCodeInput || verificationCodeInput.length !== 4) {
+      setVerificationError("Код должен состоять из 4 цифр.");
+      return;
+    }
+
+    setVerifying(true);
+    setVerificationError("");
+
+    try {
+      const res = await fetch(`${API_URL}/api/organization-structure/appointments/${verificationAppId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "completed", verificationCode: verificationCodeInput })
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setVerificationError(result.message || "Неверный код подтверждения.");
+      } else {
+        setMessage("Прием успешно завершен.");
+        setAppointments(prev =>
+          prev.map(app => (app.id === verificationAppId ? { ...app, status: "completed" } : app))
+        );
+        if (selectedAppointment && selectedAppointment.id === verificationAppId) {
+          setSelectedAppointment(prev => ({ ...prev, status: "completed" }));
+        }
+        setShowVerificationModal(false);
+      }
+    } catch (err) {
+      setVerificationError("Сетевая ошибка при проверке кода.");
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  const renderAppointmentCard = (app) => {
+    const isToday = app.date === todayStr;
+    const isPast = app.status === "completed" || app.status === "cancelled" || app.status === "rejected" || app.date < todayStr;
+    const isFuture = !isToday && !isPast;
+
+    let borderLeftColor = '#94a3b8';
+    if (app.status === "completed") borderLeftColor = '#10b981';
+    else if (app.status === "cancelled" || app.status === "rejected") borderLeftColor = '#ef4444';
+    else if (isToday) borderLeftColor = '#10b981';
+    else if (isFuture) borderLeftColor = '#f59e0b';
+
+    return (
+      <div
+        key={app.id}
+        onClick={() => setSelectedAppointment(app)}
+        style={{
+          background: '#fff',
+          border: '1px solid #e2e8f0',
+          borderLeft: `5px solid ${borderLeftColor}`,
+          borderRadius: '12px',
+          padding: '14px',
+          marginBottom: '10px',
+          cursor: 'pointer',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+          transition: 'transform 0.15s, box-shadow 0.15s'
+        }}
+        className="appointment-card-hover"
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <span style={{ fontWeight: 'bold', fontSize: '15px', color: '#1e293b' }}>{app.time}</span>
+          <span className={`status-badge-mini ${app.status}`} style={{ fontSize: '11px', padding: '2px 6px' }}>
+            {app.status === "pending" && "Ожидается"}
+            {app.status === "arrived" && "Пришел"}
+            {app.status === "completed" && "Завершен"}
+            {app.status === "cancelled" && "Отменен"}
+            {app.status === "rejected" && "Отклонен"}
+          </span>
+        </div>
+        <div style={{ fontWeight: '600', fontSize: '14px', color: '#0f172a', marginBottom: '4px' }}>
+          {app.patient_name}
+        </div>
+        <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}>
+          ИИН: {app.patient_iin} {app.cabinet ? `• Каб. ${app.cabinet}` : ''}
+        </div>
+        <div style={{ fontSize: '12px', color: '#475569', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+          {app.reason}
+        </div>
+      </div>
+    );
+  };
 
   // Action helpers
   function openPatientCard(patientId) {
@@ -605,66 +737,80 @@ export default function GovClinicEmployee() {
         {/* TABS 2: ЗАПИСИ (APPOINTMENTS) */}
         {currentTab === "appointments" && (
           <div className="gov-employee-appointments">
-            <div className="appointments-header">
-              <h3 className="gov-section-title">Расписание приемов</h3>
-              
-              {/* Date Calendar strip */}
-              <div className="calendar-strip">
-                {datesList.map((day) => (
-                  <button
-                    key={day.dateStr}
-                    type="button"
-                    className={`calendar-day-btn ${selectedDate === day.dateStr ? "selected" : ""}`}
-                    onClick={() => setSelectedDate(day.dateStr)}
-                  >
-                    <span className="weekday">{day.label.split(" ")[0]}</span>
-                    <span className="daynum">{day.label.split(" ")[1]}</span>
-                  </button>
-                ))}
+            <h3 className="gov-section-title">Расписание приемов</h3>
+            
+            <div className="appointments-filter-row gov-card" style={{ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', padding: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontWeight: 'bold', fontSize: '14px', color: '#475569' }}>Период с:</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '15px' }}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontWeight: 'bold', fontSize: '14px', color: '#475569' }}>По:</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '15px' }}
+                />
               </div>
             </div>
 
-            {/* Timetable Grid */}
-            <div className="timetable-container gov-card">
-              <div className="timetable-header-date">
-                Расписание на <b>{datesList.find(d => d.dateStr === selectedDate)?.fullLabel || selectedDate}</b>
-              </div>
-
-              <div className="timetable-list">
-                {timeSlots.map((time) => {
-                  // Find appointment matching selectedDate and slot time
-                  const app = appointments.find(a => a.date === selectedDate && a.time === time);
-                  
-                  return (
-                    <div key={time} className={`timetable-row ${app ? "has-appointment " + app.status : "empty"}`}>
-                      <div className="time-slot-label">{time}</div>
-                      
-                      <div className="slot-content">
-                        {app ? (
-                          <div className="appointment-card-inner" onClick={() => setSelectedAppointment(app)}>
-                            <div className="appointment-info">
-                              <span className="patient-name-field">{app.patient_name}</span>
-                              <span className="patient-reason-field">{app.reason}</span>
-                            </div>
-                            <div className="appointment-meta-right">
-                              <span className={`status-badge-mini ${app.status}`}>
-                                {app.status === "pending" && "Ожидается"}
-                                {app.status === "arrived" && "Пришел"}
-                                {app.status === "completed" && "Завершен"}
-                                {app.status === "cancelled" && "Отменен"}
-                              </span>
-                              <span className="cabinet-number-field">Каб. {app.cabinet}</span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="empty-slot-label">Свободно</div>
-                        )}
-                      </div>
+            {(() => {
+              const { todayList, futureList, pastList } = getCategorizedAppointments();
+              return (
+                <div className="appointments-categorized-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', marginBottom: '32px' }}>
+                  {/* Today Section */}
+                  <div className="appointment-category-col" style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                    <h4 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', color: '#0f172a', fontWeight: 'bold', fontSize: '16px' }}>
+                      <span>🟢 Сегодня</span>
+                      <span style={{ background: '#10b981', color: '#fff', borderRadius: '20px', padding: '2px 8px', fontSize: '12px' }}>{todayList.length}</span>
+                    </h4>
+                    <div className="category-cards-list">
+                      {todayList.length > 0 ? (
+                        todayList.map(renderAppointmentCard)
+                      ) : (
+                        <p style={{ color: '#64748b', fontStyle: 'italic', textAlign: 'center', margin: '24px 0' }}>На сегодня записей нет</p>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
+                  </div>
+
+                  {/* Future Section */}
+                  <div className="appointment-category-col" style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                    <h4 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', color: '#0f172a', fontWeight: 'bold', fontSize: '16px' }}>
+                      <span>🟡 Предстоящие</span>
+                      <span style={{ background: '#f59e0b', color: '#fff', borderRadius: '20px', padding: '2px 8px', fontSize: '12px' }}>{futureList.length}</span>
+                    </h4>
+                    <div className="category-cards-list">
+                      {futureList.length > 0 ? (
+                        futureList.map(renderAppointmentCard)
+                      ) : (
+                        <p style={{ color: '#64748b', fontStyle: 'italic', textAlign: 'center', margin: '24px 0' }}>Предстоящих записей нет</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Past Section */}
+                  <div className="appointment-category-col" style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                    <h4 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', color: '#0f172a', fontWeight: 'bold', fontSize: '16px' }}>
+                      <span>⚪ Прошедшие и завершенные</span>
+                      <span style={{ background: '#94a3b8', color: '#fff', borderRadius: '20px', padding: '2px 8px', fontSize: '12px' }}>{pastList.length}</span>
+                    </h4>
+                    <div className="category-cards-list" style={{ maxHeight: '600px', overflowY: 'auto' }}>
+                      {pastList.length > 0 ? (
+                        pastList.map(renderAppointmentCard)
+                      ) : (
+                        <p style={{ color: '#64748b', fontStyle: 'italic', textAlign: 'center', margin: '24px 0' }}>История записей пуста</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Appointment Detail Modal / Sidebar Panel */}
             {selectedAppointment && (
@@ -762,14 +908,19 @@ export default function GovClinicEmployee() {
                         <button 
                           type="button" 
                           className="modal-btn status-completed-btn"
-                          onClick={() => updateAppointmentStatus(selectedAppointment.id, "completed")}
+                          onClick={() => {
+                            setVerificationAppId(selectedAppointment.id);
+                            setVerificationCodeInput("");
+                            setVerificationError("");
+                            setShowVerificationModal(true);
+                          }}
                         >
                           Завершить прием
                         </button>
                       )}
 
                       {/* Cancel Record */}
-                      {selectedAppointment.status !== "completed" && selectedAppointment.status !== "cancelled" && (
+                      {role !== "doctor" && selectedAppointment.status !== "completed" && selectedAppointment.status !== "cancelled" && (
                         <button 
                           type="button" 
                           className="modal-btn status-cancel-btn"
@@ -780,6 +931,72 @@ export default function GovClinicEmployee() {
                       )}
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* VERIFICATION CODE MODAL */}
+            {showVerificationModal && (
+              <div className="employee-modal" style={{ zIndex: 1100 }} onClick={() => setShowVerificationModal(false)}>
+                <div className="employee-modal-content" style={{ maxWidth: '400px' }} onClick={(e) => e.stopPropagation()}>
+                  <div className="modal-header-row">
+                    <h3>Подтверждение приема</h3>
+                    <button type="button" className="close-modal-btn" onClick={() => setShowVerificationModal(false)}>×</button>
+                  </div>
+                  <form onSubmit={submitVerificationCode} style={{ padding: '16px 0' }}>
+                    <p style={{ fontSize: '14px', color: '#475569', marginBottom: '20px' }}>
+                      Для завершения приема, пожалуйста, введите 4-значный код подтверждения, отправленный пациенту при бронировании (или отображаемый в его личном кабинете).
+                    </p>
+                    
+                    <div style={{ marginBottom: '20px' }}>
+                      <label htmlFor="verCode" style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px' }}>
+                        Код подтверждения (4 цифры)
+                      </label>
+                      <input
+                        id="verCode"
+                        type="text"
+                        maxLength={4}
+                        pattern="\d{4}"
+                        placeholder="0000"
+                        value={verificationCodeInput}
+                        onChange={(e) => setVerificationCodeInput(e.target.value.replace(/\D/g, ""))}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          fontSize: '24px',
+                          letterSpacing: '8px',
+                          textAlign: 'center',
+                          borderRadius: '8px',
+                          border: '1px solid #cbd5e1'
+                        }}
+                        required
+                      />
+                    </div>
+
+                    {verificationError && (
+                      <div style={{ color: '#ef4444', fontSize: '14px', marginBottom: '16px', fontWeight: 'bold' }}>
+                        ⚠️ {verificationError}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                      <button
+                        type="button"
+                        className="modal-btn outline-btn"
+                        onClick={() => setShowVerificationModal(false)}
+                      >
+                        Отмена
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={verifying}
+                        className="modal-btn status-completed-btn"
+                        style={{ background: '#00b85a', color: '#fff', border: 0 }}
+                      >
+                        {verifying ? "Проверка..." : "Подтвердить"}
+                      </button>
+                    </div>
+                  </form>
                 </div>
               </div>
             )}

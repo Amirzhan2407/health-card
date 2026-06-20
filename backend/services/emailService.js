@@ -591,6 +591,7 @@ export async function sendAppointmentBookingEmail({
   time,
   cabinet,
   appointmentId,
+  verificationCode,
 }) {
   if (!to) {
     return {
@@ -649,6 +650,10 @@ export async function sendAppointmentBookingEmail({
                   <td style="padding:6px 0;color:#64748b;font-weight:700;">Кабинет:</td>
                   <td style="padding:6px 0;color:#0f172a;font-weight:800;">№${escapeHtml(cabinet)}</td>
                 </tr>
+                <tr>
+                  <td style="padding:6px 0;color:#64748b;font-weight:700;">Код подтверждения:</td>
+                  <td style="padding:6px 0;color:#c2410c;font-weight:900;font-size:18px;">${verificationCode || "—"}</td>
+                </tr>
               </table>
             </div>
 
@@ -677,6 +682,7 @@ Clinic OS - У вас назначена запись
 Врач: ${doctorName}
 Дата и время: ${date} в ${time}
 Кабинет: №${cabinet}
+Код подтверждения приема: ${verificationCode || "—"}
 
 Вы можете предъявить ваш QR-код на входе:
 ${qrCodeUrl}

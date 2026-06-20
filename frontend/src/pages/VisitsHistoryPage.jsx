@@ -184,6 +184,13 @@ export default function VisitsHistoryPage() {
                     </div>
                   </div>
 
+                  {app.verification_code && (app.status === "pending" || app.status === "approved") && (
+                    <div style={{ marginTop: '12px', padding: '8px 12px', background: '#fef08a', borderRadius: '8px', color: '#854d0e', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
+                      <span className="visitDetailIcon" style={{ fontSize: '16px' }}>🔑</span>
+                      <span>Код приёма: <b style={{ fontSize: '16px' }}>{app.verification_code}</b></span>
+                    </div>
+                  )}
+
                   {app.reason && (
                     <div className="visitReason">
                       <strong>Причина:</strong> {app.reason}
@@ -266,6 +273,12 @@ export default function VisitsHistoryPage() {
                     №{selectedApp.cabinet}
                   </span>
                 </div>
+                {selectedApp.verification_code && (
+                  <div className="ticketDetailRow" style={{ background: '#fef08a', padding: '8px 12px', borderRadius: '8px', marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="ticketLabel" style={{ color: '#854d0e', fontWeight: 'bold' }}>Код подтверждения:</span>
+                    <span className="ticketVal" style={{ color: '#854d0e', fontSize: '18px', fontWeight: 'bold' }}>{selectedApp.verification_code}</span>
+                  </div>
+                )}
               </div>
 
               <div className="ticketQrContainer">

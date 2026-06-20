@@ -19,6 +19,33 @@ fileSize: 30 * 1024 * 1024,
 
 const BUCKET_NAME = "organization-documents";
 
+const SHIFTS_FILE = path.resolve("employee_shifts_fallback.json");
+
+function loadFallbackShifts() {
+  try {
+    if (fs.existsSync(SHIFTS_FILE)) {
+      const content = fs.readFileSync(SHIFTS_FILE, "utf8");
+      return JSON.parse(content) || {};
+    }
+  } catch (err) {
+    console.error("Failed to read employee shifts fallback file:", err);
+  }
+  return {};
+}
+
+function saveFallbackShift(employeeId, shift) {
+  try {
+    const map = loadFallbackShifts();
+    map[employeeId] = {
+      work_start: shift.work_start || "08:00",
+      work_end: shift.work_end || "17:00"
+    };
+    fs.writeFileSync(SHIFTS_FILE, JSON.stringify(map, null, 2), "utf8");
+  } catch (err) {
+    console.error("Failed to write employee shifts fallback file:", err);
+  }
+}
+
 function hashPassword(password) {
 if (!password) return null;
 
@@ -106,7 +133,7 @@ if (!organizationId) {
   });
 }
 
-const { data, error } = await supabase
+let { data, error } = await supabase
   .from("organization_departments")
   .select("*")
   .eq("organization_id", organizationId)
@@ -117,6 +144,34 @@ if (error) {
     success: false,
     message: error.message,
   });
+}
+
+// Auto-initialize standard departments if list is empty
+if (!data || data.length === 0) {
+  const defaultDepartments = [
+    "Терапия", "Педиатрия", "Хирургия", "Травматология", "Неврология",
+    "Кардиология", "Эндокринология", "ЛОР", "Офтальмология", "Гинекология",
+    "Дерматология", "Инфекционный кабинет", "Рентген кабинет", "УЗИ кабинет",
+    "Функциональная диагностика", "Лаборатория", "Регистратура",
+    "Доврачебный кабинет", "Процедурный кабинет", "Прививочный кабинет",
+    "Отдел кадров", "Бухгалтерия", "ИТ отдел"
+  ];
+  
+  const inserts = defaultDepartments.map((name, idx) => ({
+    organization_id: organizationId,
+    name,
+    floor: String(Math.floor(idx / 5) + 1),
+    rooms: `${Math.floor(idx / 5) + 1}0${(idx % 5) + 1}`
+  }));
+
+  const { data: insertedData, error: insertError } = await supabase
+    .from("organization_departments")
+    .insert(inserts)
+    .select("*");
+
+  if (!insertError && insertedData) {
+    data = insertedData;
+  }
 }
 
 return res.status(200).json({
@@ -228,15 +283,19 @@ if (employeeIds.length > 0) {
   }
 }
 
+const shifts = loadFallbackShifts();
 const employeesWithDocuments = (employees || []).map((employee) => {
   const employeeDocuments = documents.filter((doc) => {
     return doc.employee_id === employee.id;
   });
+  const shift = shifts[employee.id] || { work_start: "08:00", work_end: "17:00" };
 
   return {
     ...employee,
     department: employee.organization_departments ? employee.organization_departments.name : (employee.department || "—"),
     documents: employeeDocuments,
+    work_start: shift.work_start,
+    work_end: shift.work_end
   };
 });
 
@@ -311,6 +370,14 @@ if (error) {
   });
 }
 
+const workStart = req.body.work_start || req.body.workStart || "08:00";
+const workEnd = req.body.work_end || req.body.workEnd || "17:00";
+if (employee) {
+  saveFallbackShift(employee.id, { work_start: workStart, work_end: workEnd });
+  employee.work_start = workStart;
+  employee.work_end = workEnd;
+}
+
 return res.status(201).json({
   success: true,
   message: "Сотрудник добавлен.",
@@ -357,7 +424,12 @@ if (req.body.cabinet !== undefined) {
   payload.cabinet = safeText(req.body.cabinet);
 }
 
-if (req.body.status !== undefined) {
+if (req.body.status === "dismissed") {
+  payload.organization_id = null;
+  payload.department_id = null;
+  payload.status = "dismissed";
+  payload.dismissed_at = new Date().toISOString();
+} else if (req.body.status !== undefined) {
   payload.status = safeText(req.body.status);
 }
 
@@ -387,18 +459,44 @@ if (error) {
   });
 }
 
-if (currentEmployee && currentEmployee.login && payload.status) {
+if (currentEmployee && currentEmployee.login && payload.status === "dismissed") {
+  await supabase
+    .from("organization_users")
+    .update({
+      organization_id: null,
+      status: "blocked",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("organization_id", currentEmployee.organization_id)
+    .eq("login", currentEmployee.login);
+} else if (currentEmployee && currentEmployee.login && payload.status) {
   await supabase
     .from("organization_users")
     .update({
       status:
-        payload.status === "dismissed" || payload.status === "blocked"
+        payload.status === "blocked"
           ? "blocked"
           : "active",
       updated_at: new Date().toISOString(),
     })
     .eq("organization_id", currentEmployee.organization_id)
     .eq("login", currentEmployee.login);
+}
+
+const workStart = req.body.work_start || req.body.workStart;
+const workEnd = req.body.work_end || req.body.workEnd;
+if (updatedEmployee && (workStart !== undefined || workEnd !== undefined)) {
+  const currentShift = loadFallbackShifts()[employeeId] || { work_start: "08:00", work_end: "17:00" };
+  saveFallbackShift(employeeId, {
+    work_start: workStart !== undefined ? workStart : currentShift.work_start,
+    work_end: workEnd !== undefined ? workEnd : currentShift.work_end
+  });
+  updatedEmployee.work_start = workStart !== undefined ? workStart : currentShift.work_start;
+  updatedEmployee.work_end = workEnd !== undefined ? workEnd : currentShift.work_end;
+} else if (updatedEmployee) {
+  const shift = loadFallbackShifts()[employeeId] || { work_start: "08:00", work_end: "17:00" };
+  updatedEmployee.work_start = shift.work_start;
+  updatedEmployee.work_end = shift.work_end;
 }
 
 return res.status(200).json({
@@ -1089,22 +1187,32 @@ router.get("/appointments", async (req, res) => {
   try {
     const employeeId = req.query.employee_id || req.query.employeeId;
     const date = req.query.date;
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
 
-    if (!employeeId || !date) {
+    if (!employeeId) {
       return res.status(400).json({
         success: false,
-        message: "employee_id и date обязательны.",
+        message: "employee_id обязателен.",
       });
     }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("organization_appointments")
         .select("*")
-        .eq("employee_id", employeeId)
-        .eq("date", date)
-        .order("time", { ascending: true });
+        .eq("employee_id", employeeId);
 
+      if (date) {
+        query = query.eq("date", date);
+      } else {
+        if (startDate) query = query.gte("date", startDate);
+        if (endDate) query = query.lte("date", endDate);
+      }
+
+      query = query.order("date", { ascending: true }).order("time", { ascending: true });
+
+      const { data, error } = await query;
       if (error) throw error;
 
       return res.status(200).json({
@@ -1114,9 +1222,21 @@ router.get("/appointments", async (req, res) => {
     } catch (dbErr) {
       console.warn("DB appointments query failed, fallback to memory:", dbErr.message);
       const list = loadFallbackAppointments();
-      const filtered = list.filter(
-        (app) => app.employee_id === employeeId && app.date === date
-      );
+      let filtered = list.filter((app) => app.employee_id === employeeId);
+
+      if (date) {
+        filtered = filtered.filter((app) => app.date === date);
+      } else {
+        if (startDate) filtered = filtered.filter((app) => app.date >= startDate);
+        if (endDate) filtered = filtered.filter((app) => app.date <= endDate);
+      }
+
+      filtered.sort((a, b) => {
+        const da = `${a.date}T${a.time}`;
+        const db = `${b.date}T${b.time}`;
+        return da.localeCompare(db);
+      });
+
       return res.status(200).json({
         success: true,
         appointments: filtered,
@@ -1247,6 +1367,41 @@ router.post("/appointments", async (req, res) => {
       });
     }
 
+    // Check for double booking
+    let existingApp = null;
+    try {
+      const { data, error } = await supabase
+        .from("organization_appointments")
+        .select("id")
+        .eq("employee_id", employee_id)
+        .eq("date", date)
+        .eq("time", time)
+        .not("status", "in", '("cancelled","rejected")')
+        .maybeSingle();
+      if (!error && data) {
+        existingApp = data;
+      }
+    } catch (dbErr) {
+      const list = loadFallbackAppointments();
+      existingApp = list.find(
+        (app) =>
+          app.employee_id === employee_id &&
+          app.date === date &&
+          app.time === time &&
+          app.status !== "cancelled" &&
+          app.status !== "rejected"
+      );
+    }
+
+    if (existingApp) {
+      return res.status(400).json({
+        success: false,
+        message: "Этот временной слот уже занят другим пациентом. Пожалуйста, выберите другое время.",
+      });
+    }
+
+    const verification_code = Math.floor(1000 + Math.random() * 9000).toString();
+
     const newApp = {
       id: crypto.randomUUID ? crypto.randomUUID() : "app-" + Date.now(),
       organization_id,
@@ -1261,6 +1416,7 @@ router.post("/appointments", async (req, res) => {
       status: "pending",
       cabinet: cabinet || "",
       comment: comment || "",
+      verification_code,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -1322,7 +1478,8 @@ router.post("/appointments", async (req, res) => {
           date,
           time,
           cabinet: savedApp.cabinet || cabinet || "—",
-          appointmentId: savedApp.id
+          appointmentId: savedApp.id,
+          verificationCode: savedApp.verification_code || verification_code
         });
       } catch (emailErr) {
         console.error("Booking email dispatch failed:", emailErr.message);
@@ -1346,13 +1503,50 @@ router.post("/appointments", async (req, res) => {
 router.patch("/appointments/:id/status", async (req, res) => {
   try {
     const appId = req.params.id;
-    const { status } = req.body;
+    const { status, verificationCode } = req.body;
 
     if (!status) {
       return res.status(400).json({
         success: false,
         message: "Статус обязателен.",
       });
+    }
+
+    // Fetch current appointment to check code
+    let appointment = null;
+    try {
+      const { data, error } = await supabase
+        .from("organization_appointments")
+        .select("*")
+        .eq("id", appId)
+        .maybeSingle();
+      if (!error && data) {
+        appointment = data;
+      } else {
+        const list = loadFallbackAppointments();
+        appointment = list.find((a) => a.id === appId);
+      }
+    } catch (e) {
+      const list = loadFallbackAppointments();
+      appointment = list.find((a) => a.id === appId);
+    }
+
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: "Запись не найдена.",
+      });
+    }
+
+    if (status === "completed") {
+      const expectedCode = String(appointment.verification_code || "").trim();
+      const providedCode = String(verificationCode || "").trim();
+      if (expectedCode && expectedCode !== providedCode) {
+        return res.status(400).json({
+          success: false,
+          message: "Неверный код подтверждения визита. Пожалуйста, введите правильный 4-значный код из талона пациента.",
+        });
+      }
     }
 
     try {

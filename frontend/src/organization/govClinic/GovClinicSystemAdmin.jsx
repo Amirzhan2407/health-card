@@ -29,6 +29,29 @@ const DEPARTMENT_OPTIONS = [
   "ИТ отдел",
 ];
 
+const POSITIONS = [
+  "Врач-терапевт",
+  "Врач-педиатр",
+  "Врач-хирург",
+  "Врач-tравматолог",
+  "Врач-невролог",
+  "Врач-кардиолог",
+  "Врач-гинеколог",
+  "Врач-офтальмолог",
+  "Врач-отоларинголог (ЛОР)",
+  "Врач-дерматолог",
+  "Врач УЗИ",
+  "Врач-рентгенолог",
+  "Медсестра",
+  "Медбрат",
+  "Старшая медсестра",
+  "Регистратор",
+  "Заведующий отделением",
+  "Заместитель главного врача",
+  "Кадровый специалист",
+  "Бухгалтер"
+];
+
 function generatePassword() {
   const a = Math.random().toString(36).slice(2, 6).toUpperCase();
   const b = Math.random().toString(36).slice(2, 6).toUpperCase();
@@ -81,6 +104,28 @@ export default function GovClinicSystemAdmin() {
     departmentId: "all",
     status: "all",
   });
+
+  // Employee Management States
+  const [showEmployeeForm, setShowEmployeeForm] = useState(false);
+  const [editingEmployeeId, setEditingEmployeeId] = useState(null);
+  const [savingEmployee, setSavingEmployee] = useState(false);
+  
+  const EMPTY_EMPLOYEE_FORM = {
+    full_name: "",
+    phone: "",
+    email: "",
+    position: "",
+    department: "",
+    department_id: "",
+    cabinet: "",
+    role: "doctor",
+    work_start: "08:00",
+    work_end: "17:00",
+  };
+  
+  const [employeeForm, setEmployeeForm] = useState(EMPTY_EMPLOYEE_FORM);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+  const [documents, setDocuments] = useState({});
 
   // Support Chat States
   const [supportMessages, setSupportMessages] = useState([]);
@@ -456,7 +501,252 @@ export default function GovClinicSystemAdmin() {
       login: employee.login || "",
       status: employee.login ? employee.status || "active" : "no_access",
       documents: employee.documents || [],
+      work_start: employee.work_start || employee.workStart || "08:00",
+      work_end: employee.work_end || employee.workEnd || "17:00",
     };
+  }
+
+  async function saveEmployee(e) {
+    e.preventDefault();
+
+    if (!organizationId) {
+      setMessage("Организация не найдена. Войдите заново.");
+      return;
+    }
+
+    if (!employeeForm.full_name.trim()) {
+      setMessage("Укажите ФИО сотрудника.");
+      return;
+    }
+
+    if (!employeeForm.position.trim()) {
+      setMessage("Укажите должность.");
+      return;
+    }
+
+    if (!employeeForm.department_id) {
+      setMessage("Укажите отделение.");
+      return;
+    }
+
+    setSavingEmployee(true);
+    setMessage("");
+
+    try {
+      const payload = {
+        organization_id: organizationId,
+        full_name: employeeForm.full_name.trim(),
+        phone: employeeForm.phone.trim(),
+        email: employeeForm.email.trim(),
+        position: employeeForm.position.trim(),
+        department_id: employeeForm.department_id || null,
+        cabinet: employeeForm.cabinet.trim(),
+        status: "active",
+        work_start: employeeForm.work_start,
+        work_end: employeeForm.work_end,
+      };
+
+      const url = editingEmployeeId
+        ? API_URL + "/api/organization-structure/employees/" + editingEmployeeId
+        : API_URL + "/api/organization-structure/employees";
+
+      const response = await fetch(url, {
+        method: editingEmployeeId ? "PATCH" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-organization-id": organizationId,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Не удалось сохранить сотрудника.");
+      }
+
+      setMessage(editingEmployeeId ? "Сотрудник изменён." : "Сотрудник добавлен.");
+      resetEmployeeForm();
+      loadData();
+    } catch (err) {
+      setMessage(err.message || "Ошибка сохранения сотрудника.");
+    } finally {
+      setSavingEmployee(false);
+    }
+  }
+
+  function editEmployee(employee) {
+    const item = normalizeEmployee(employee);
+    setEditingEmployeeId(item.id);
+    setEmployeeForm({
+      full_name: item.fullName,
+      phone: item.phone,
+      email: item.email,
+      position: item.position,
+      department: departments.find(d => String(d.id) === String(item.departmentId))?.name || "",
+      department_id: item.departmentId,
+      cabinet: item.cabinet,
+      role: employee.role || "doctor",
+      work_start: item.work_start,
+      work_end: item.work_end,
+    });
+    setShowEmployeeForm(true);
+  }
+
+  async function dismissEmployee(employee) {
+    const confirmed = window.confirm("Уволить сотрудника " + employee.full_name + "?");
+    if (!confirmed) return;
+
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const response = await fetch(
+        API_URL + "/api/organization-structure/employees/" + employee.id,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "x-organization-id": organizationId,
+          },
+          body: JSON.stringify({
+            status: "dismissed"
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Не удалось уволить сотрудника.");
+      }
+
+      setMessage("Сотрудник уволен.");
+      loadData();
+    } catch (err) {
+      setMessage(err.message || "Ошибка увольнения сотрудника.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function deleteEmployee(employee) {
+    const confirmed = window.confirm("Удалить сотрудника " + employee.full_name + "?");
+    if (!confirmed) return;
+
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const response = await fetch(
+        API_URL + "/api/organization-structure/employees/" + employee.id,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Не удалось удалить сотрудника.");
+      }
+
+      setMessage("Сотрудник удалён.");
+      loadData();
+    } catch (err) {
+      setMessage(err.message || "Ошибка удаления сотрудника.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function uploadDocuments(e) {
+    e.preventDefault();
+
+    if (!selectedEmployeeId) {
+      setMessage("Выберите сотрудника.");
+      return;
+    }
+
+    setSavingEmployee(true);
+    setMessage("");
+
+    try {
+      const formData = new FormData();
+      formData.append("employee_id", selectedEmployeeId);
+      formData.append("organization_id", organizationId);
+
+      Object.keys(documents).forEach((key) => {
+        if (documents[key]) {
+          formData.append(key, documents[key]);
+        }
+      });
+
+      const response = await fetch(
+        API_URL + "/api/organization-structure/employee-documents",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Не удалось загрузить документы.");
+      }
+
+      setMessage("Документы загружены.");
+      setDocuments({});
+      loadData();
+    } catch (err) {
+      setMessage(err.message || "Ошибка загрузки документов.");
+    } finally {
+      setSavingEmployee(false);
+    }
+  }
+
+  function resetEmployeeForm() {
+    setEmployeeForm(EMPTY_EMPLOYEE_FORM);
+    setEditingEmployeeId(null);
+    setShowEmployeeForm(false);
+  }
+
+  function updateEmployeeField(e) {
+    const { name, value } = e.target;
+    setEmployeeForm((prev) => ({ ...prev, [name]: value }));
+  }
+
+  function handlePositionChange(e) {
+    const value = e.target.value;
+    let newRole = employeeForm.role;
+
+    const lowVal = value.toLowerCase();
+    if (lowVal.includes("врач") || lowVal.includes("узи") || lowVal.includes("рентгенолог")) {
+      newRole = "doctor";
+    } else if (lowVal.includes("медсестра") || lowVal.includes("медбрат")) {
+      newRole = "nurse";
+    } else if (lowVal.includes("регистратор")) {
+      newRole = "registrar";
+    } else if (lowVal.includes("заведующий")) {
+      newRole = "department_head";
+    } else if (lowVal.includes("заместитель")) {
+      newRole = "deputy_chief_doctor";
+    }
+
+    setEmployeeForm((prev) => ({
+      ...prev,
+      position: value,
+      role: newRole,
+    }));
+  }
+
+  function updateDocumentFile(e) {
+    const { name, files } = e.target;
+    setDocuments((prev) => ({
+      ...prev,
+      [name]: files && files.length > 0 ? files[0] : null,
+    }));
   }
 
   return (
@@ -690,121 +980,496 @@ export default function GovClinicSystemAdmin() {
       )}
 
       {tab === "employees" && (
-        <section className="gov-card">
-          <div className="employee-top">
-            <div>
-              <h3>Доступы сотрудников</h3>
-              <p className="gov-page-subtitle">
-                Сотрудников добавляет отдел кадров. Администратор только выдает логин и пароль.
-              </p>
-            </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          {showEmployeeForm ? (
+            <form className="gov-card" onSubmit={saveEmployee} style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+              <h3 style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '16px', marginBottom: '24px' }}>
+                {editingEmployeeId ? "✏️ Редактировать профиль сотрудника" : "👤 Добавление нового сотрудника"}
+              </h3>
 
-            <div className="employee-filters">
-              <input
-                value={filters.search}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    search: e.target.value,
-                  }))
-                }
-                placeholder="Поиск по ФИО, должности, логину"
-              />
+              <div style={{ marginBottom: '32px' }}>
+                <h4 style={{ color: '#0f172a', margin: '0 0 16px', fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  📋 Личные данные
+                </h4>
+                <div className="gov-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    ФИО сотрудника
+                    <input
+                      name="full_name"
+                      value={employeeForm.full_name}
+                      onChange={updateEmployeeField}
+                      placeholder="Иванов Иван Иванович"
+                      required
+                    />
+                  </label>
 
-              <select
-                value={filters.departmentId}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    departmentId: e.target.value,
-                  }))
-                }
-              >
-                <option value="all">Все отделения</option>
-                {departments.map((department) => (
-                  <option key={department.id} value={department.id}>
-                    {department.name}
-                  </option>
-                ))}
-              </select>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    Номер телефона
+                    <input
+                      name="phone"
+                      value={employeeForm.phone}
+                      onChange={updateEmployeeField}
+                      placeholder="+7 777 000 00 00"
+                    />
+                  </label>
 
-              <select
-                value={filters.status}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    status: e.target.value,
-                  }))
-                }
-              >
-                <option value="all">Все статусы</option>
-                <option value="no_access">Нет доступа</option>
-                <option value="active">Активен</option>
-                <option value="blocked">Заблокирован</option>
-              </select>
-            </div>
-          </div>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    Электронная почта
+                    <input
+                      type="email"
+                      name="email"
+                      value={employeeForm.email}
+                      onChange={updateEmployeeField}
+                      placeholder="doctor@clinic.kz"
+                    />
+                  </label>
+                </div>
+              </div>
 
-          <div className="employee-card-list">
-            {filteredEmployees.length ? (
-              filteredEmployees.map((employee) => {
-                const item = normalizeEmployee(employee);
+              <div style={{ marginBottom: '32px' }}>
+                <h4 style={{ color: '#0f172a', margin: '0 0 16px', fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  💼 Профессиональные данные
+                </h4>
+                <div className="gov-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    Должность
+                    <select
+                      name="position"
+                      value={employeeForm.position}
+                      onChange={handlePositionChange}
+                      required
+                      style={{ padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+                    >
+                      <option value="">Выберите должность</option>
+                      {POSITIONS.map((pos) => (
+                        <option key={pos} value={pos}>
+                          {pos}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-                return (
-                  <div
-                    className="employee-card"
-                    key={item.id}
-                    onDoubleClick={() => setSelectedEmployee(item)}
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    Отделение
+                    <select
+                      name="department"
+                      value={employeeForm.department}
+                      onChange={function (e) {
+                        const selectedDep = departments.find(d => d.name === e.target.value);
+                        setEmployeeForm(prev => ({
+                          ...prev,
+                          department: e.target.value,
+                          department_id: selectedDep ? selectedDep.id : ""
+                        }));
+                      }}
+                      required
+                      style={{ padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+                    >
+                      <option value="">Выберите отделение</option>
+                      {departments.map((dep) => (
+                        <option key={dep.id} value={dep.name}>
+                          {dep.name} (этаж {dep.floor || "—"})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    Кабинет
+                    <input
+                      name="cabinet"
+                      value={employeeForm.cabinet}
+                      onChange={updateEmployeeField}
+                      placeholder="204"
+                    />
+                  </label>
+
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    Роль в системе
+                    <select 
+                      name="role" 
+                      value={employeeForm.role} 
+                      onChange={updateEmployeeField}
+                      style={{ padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+                    >
+                      <option value="doctor">🩺 Врач</option>
+                      <option value="nurse">💉 Медсестра / медбрат</option>
+                      <option value="registrar">💻 Регистратор</option>
+                      <option value="department_head">🏥 Заведующий отделением</option>
+                      <option value="deputy_chief_doctor">👨‍⚕️ Заместитель главного врача</option>
+                    </select>
+                  </label>
+
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    Начало смены (рабочее время)
+                    <input
+                      type="time"
+                      name="work_start"
+                      value={employeeForm.work_start}
+                      onChange={updateEmployeeField}
+                      required
+                    />
+                  </label>
+
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    Конец смены (рабочее время)
+                    <input
+                      type="time"
+                      name="work_end"
+                      value={employeeForm.work_end}
+                      onChange={updateEmployeeField}
+                      required
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="gov-actions" style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px', marginTop: '24px', display: 'flex', gap: '10px' }}>
+                <button type="submit" disabled={savingEmployee} style={{ background: '#00b85a', color: '#fff', border: 0, padding: '10px 20px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
+                  {savingEmployee ? "Сохранение..." : editingEmployeeId ? "Сохранить изменения" : "Добавить сотрудника"}
+                </button>
+
+                <button type="button" onClick={() => setEmployeeForm(EMPTY_EMPLOYEE_FORM)} style={{ background: '#64748b', color: '#fff', border: 0, padding: '10px 20px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
+                  Очистить
+                </button>
+
+                <button type="button" onClick={resetEmployeeForm} style={{ background: '#cbd5e1', color: '#1e293b', border: 0, padding: '10px 20px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
+                  Назад к списку
+                </button>
+              </div>
+            </form>
+          ) : (
+            <section className="gov-card">
+              <div className="employee-top" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+                <div>
+                  <h3>Список сотрудников</h3>
+                  <p className="gov-page-subtitle">
+                    Добавление сотрудников организации, настройка графиков работы, выдача и блокировка доступов.
+                  </p>
+                </div>
+
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetEmployeeForm();
+                      setShowEmployeeForm(true);
+                    }}
+                    style={{
+                      background: "#00b85a",
+                      color: "#ffffff",
+                      border: 0,
+                      borderRadius: "12px",
+                      padding: "10px 20px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                    }}
                   >
-                    <div>
-                      <h4>{item.fullName}</h4>
-                      <p>{item.position || "Должность не указана"}</p>
-                    </div>
+                    ➕ Добавить сотрудника
+                  </button>
+                </div>
+              </div>
 
-                    <div className="employee-card-info">
-                      <span>Отделение: {getDepartmentName(item.departmentId)}</span>
-                      <span>Кабинет: {item.cabinet || "—"}</span>
-                      <span>Логин: {item.login || "не создан"}</span>
-                      <span>Статус: {getStatusText(item.status)}</span>
-                    </div>
+              <div className="employee-filters" style={{ display: "flex", gap: "12px", marginBottom: "20px", flexWrap: "wrap" }}>
+                <input
+                  value={filters.search}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      search: e.target.value,
+                    }))
+                  }
+                  placeholder="Поиск по ФИО, должности, логину"
+                  style={{ flex: 1, padding: "8px 12px", borderRadius: "10px", border: "1px solid #cbd5e1" }}
+                />
 
-                    <div className="employee-actions">
-                      {!item.login ? (
-                        <button type="button" onClick={() => openAccessModal(employee)}>
-                          Создать доступ
-                        </button>
-                      ) : (
-                        <>
-                          <button type="button" onClick={() => resetPassword(employee)}>
-                            Сбросить пароль
+                <select
+                  value={filters.departmentId}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      departmentId: e.target.value,
+                    }))
+                  }
+                  style={{ padding: "8px 12px", borderRadius: "10px", border: "1px solid #cbd5e1" }}
+                >
+                  <option value="all">Все отделения</option>
+                  {departments.map((department) => (
+                    <option key={department.id} value={department.id}>
+                      {department.name}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={filters.status}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      status: e.target.value,
+                    }))
+                  }
+                  style={{ padding: "8px 12px", borderRadius: "10px", border: "1px solid #cbd5e1" }}
+                >
+                  <option value="all">Все статусы</option>
+                  <option value="no_access">Нет доступа</option>
+                  <option value="active">Активен</option>
+                  <option value="blocked">Заблокирован</option>
+                </select>
+              </div>
+
+              <div className="employee-card-list">
+                {filteredEmployees.length ? (
+                  filteredEmployees.map((employee) => {
+                    const item = normalizeEmployee(employee);
+
+                    return (
+                      <div
+                        className="employee-card"
+                        key={item.id}
+                        onDoubleClick={() => setSelectedEmployee(item)}
+                        style={{ padding: "16px", borderRadius: "16px", border: "1px solid #e2e8f0", marginBottom: "12px", background: "#ffffff" }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px" }}>
+                          <div>
+                            <h4 style={{ margin: 0, fontSize: "16px" }}>{item.fullName}</h4>
+                            <p style={{ margin: "4px 0", color: "#64748b", fontWeight: "bold" }}>{item.position || "Должность не указана"}</p>
+                            <p style={{ margin: "2px 0", fontSize: "13px", color: "#475569" }}>
+                              📞 {item.phone || "—"} | ✉️ {item.email || "—"}
+                            </p>
+                          </div>
+
+                          <div className="employee-card-info" style={{ textAlign: "right", fontSize: "13px", color: "#64748b" }}>
+                            <div style={{ fontWeight: "bold" }}>Отделение: {getDepartmentName(item.departmentId)}</div>
+                            <div>Кабинет: {item.cabinet || "—"}</div>
+                            <div>Смена: <b>{item.work_start} - {item.work_end}</b></div>
+                            <div>Логин: <b>{item.login || "не создан"}</b></div>
+                            <div>Статус: <span className={`status-badge-mini ${item.status}`}>{getStatusText(item.status)}</span></div>
+                          </div>
+                        </div>
+
+                        <div className="employee-actions" style={{ display: "flex", gap: "8px", marginTop: "12px", borderTop: "1px solid #f1f5f9", paddingTop: "12px", flexWrap: "wrap" }}>
+                          <button type="button" onClick={() => editEmployee(employee)} style={{ background: "#3b82f6", color: "#ffffff", border: 0, borderRadius: "8px", padding: "6px 12px", cursor: "pointer", fontSize: "13px" }}>
+                            Изменить данные
                           </button>
 
-                          {item.status === "blocked" ? (
-                            <button
-                              type="button"
-                              onClick={() => changeBlockStatus(employee, "unblock")}
-                            >
-                              Разблокировать
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => changeBlockStatus(employee, "block")}
-                            >
-                              Заблокировать
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedEmployeeId(employee.id);
+                              goAdminTab("documents");
+                            }}
+                            style={{ background: "#6366f1", color: "#ffffff", border: 0, borderRadius: "8px", padding: "6px 12px", cursor: "pointer", fontSize: "13px" }}
+                          >
+                            Документы
+                          </button>
+
+                          {employee.status !== "dismissed" && (
+                            <button type="button" onClick={() => dismissEmployee(employee)} style={{ background: "#ef4444", color: "#ffffff", border: 0, borderRadius: "8px", padding: "6px 12px", cursor: "pointer", fontSize: "13px" }}>
+                              Уволить
                             </button>
                           )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <p className="empty-text">Сотрудники пока не добавлены отделом кадров.</p>
-            )}
+
+                          <button type="button" onClick={() => deleteEmployee(employee)} style={{ background: "#94a3b8", color: "#ffffff", border: 0, borderRadius: "8px", padding: "6px 12px", cursor: "pointer", fontSize: "13px" }}>
+                            Удалить
+                          </button>
+
+                          <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
+                            {!item.login ? (
+                              <button type="button" onClick={() => openAccessModal(employee)} style={{ background: "#00b85a", color: "#ffffff", border: 0, borderRadius: "8px", padding: "6px 12px", cursor: "pointer", fontSize: "13px", fontWeight: "bold" }}>
+                                Выдать доступ
+                              </button>
+                            ) : (
+                              <>
+                                <button type="button" onClick={() => resetPassword(employee)} style={{ background: "#f59e0b", color: "#ffffff", border: 0, borderRadius: "8px", padding: "6px 12px", cursor: "pointer", fontSize: "13px" }}>
+                                  Сбросить пароль
+                                </button>
+
+                                {item.status === "blocked" ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => changeBlockStatus(employee, "unblock")}
+                                    style={{ background: "#10b981", color: "#ffffff", border: 0, borderRadius: "8px", padding: "6px 12px", cursor: "pointer", fontSize: "13px" }}
+                                  >
+                                    Разблокировать
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => changeBlockStatus(employee, "block")}
+                                    style={{ background: "#ef4444", color: "#ffffff", border: 0, borderRadius: "8px", padding: "6px 12px", cursor: "pointer", fontSize: "13px" }}
+                                  >
+                                    Заблокировать
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="empty-text">Сотрудники не найдены.</p>
+                )}
+              </div>
+            </section>
+          )}
+        </div>
+      )}
+
+      {tab === "documents" && (
+        <div className="gov-card">
+          <div className="gov-card-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px', marginBottom: '24px' }}>
+            <h3 style={{ margin: 0 }}>📂 Личные дела и документы сотрудников</h3>
+            <button
+              type="button"
+              onClick={() => goAdminTab("employees")}
+              style={{
+                background: "#cbd5e1",
+                color: "#1e293b",
+                border: 0,
+                borderRadius: "12px",
+                padding: "8px 16px",
+                fontWeight: "bold",
+                cursor: "pointer"
+              }}
+            >
+              Назад к списку
+            </button>
           </div>
-        </section>
+
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#1e293b' }}>
+              Выберите сотрудника для управления документами
+            </label>
+            <select
+              value={selectedEmployeeId}
+              onChange={function (event) {
+                setSelectedEmployeeId(event.target.value);
+                setMessage("");
+              }}
+              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '15px' }}
+            >
+              <option value="">Не выбран</option>
+              {employees.map(function (employee) {
+                return (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.full_name} ({employee.position})
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          {selectedEmployeeId ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+              <form onSubmit={uploadDocuments} style={{ borderRight: '1px solid #e2e8f0', paddingRight: '32px' }}>
+                <h4 style={{ marginBottom: '20px', color: '#0f172a', fontWeight: 'bold' }}>📤 Загрузить новые документы</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#475569', fontSize: '14px' }}>
+                    Удостоверение личности
+                    <input type="file" name="identity_document" onChange={updateDocumentFile} style={{ padding: '6px 0' }} />
+                  </label>
+
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#475569', fontSize: '14px' }}>
+                    Диплом
+                    <input type="file" name="diploma" onChange={updateDocumentFile} style={{ padding: '6px 0' }} />
+                  </label>
+
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#475569', fontSize: '14px' }}>
+                    Сертификат
+                    <input type="file" name="certificate" onChange={updateDocumentFile} style={{ padding: '6px 0' }} />
+                  </label>
+
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#475569', fontSize: '14px' }}>
+                    Трудовой договор
+                    <input type="file" name="employment_contract" onChange={updateDocumentFile} style={{ padding: '6px 0' }} />
+                  </label>
+                </div>
+
+                <div style={{ marginTop: '24px' }}>
+                  <button
+                    type="submit"
+                    disabled={savingEmployee}
+                    style={{
+                      background: '#00b85a',
+                      color: '#fff',
+                      border: 0,
+                      padding: '10px 20px',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '15px'
+                    }}
+                  >
+                    {savingEmployee ? "Загрузка..." : "Загрузить файлы"}
+                  </button>
+                </div>
+              </form>
+
+              <div>
+                <h4 style={{ marginBottom: '20px', color: '#0f172a', fontWeight: 'bold' }}>📋 Загруженные документы</h4>
+                {employees.find(emp => emp.id === selectedEmployeeId)?.documents?.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {employees.find(emp => emp.id === selectedEmployeeId).documents.map(function (doc) {
+                      const docLabels = {
+                        identity_document: "Удостоверение личности",
+                        diploma: "Диплом",
+                        certificate: "Сертификат",
+                        employment_contract: "Трудовой договор"
+                      };
+                      
+                      const parts = (doc.file_name || "").split("__");
+                      const docType = parts.length > 1 ? parts[0] : "document";
+                      const displayName = parts.length > 1 ? parts.slice(1).join("__") : doc.file_name;
+
+                      return (
+                        <div key={doc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                          <div style={{ marginRight: '12px' }}>
+                            <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#1e293b' }}>
+                              {docLabels[docType] || docType}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#64748b', wordBreak: 'break-all', marginTop: '2px' }}>
+                              {displayName}
+                            </div>
+                          </div>
+                          {doc.file_url ? (
+                            <a
+                              href={doc.file_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                background: '#3b82f6',
+                                color: '#fff',
+                                textDecoration: 'none',
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                fontSize: '13px',
+                                fontWeight: 'bold',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              Открыть
+                            </a>
+                          ) : (
+                            <span style={{ fontSize: '12px', color: '#94a3b8' }}>Нет ссылки</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p style={{ color: '#64748b', fontStyle: 'italic', margin: 0 }}>Документы пока не загружены.</p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p style={{ color: '#64748b', fontStyle: 'italic', textAlign: 'center', marginTop: '32px', margin: 0 }}>
+              Выберите сотрудника из списка выше, чтобы управлять его личным делом.
+            </p>
+          )}
+        </div>
       )}
 
       {tab === "support" && (

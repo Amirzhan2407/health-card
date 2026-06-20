@@ -32,9 +32,7 @@ import AdminRoles from "./pages/AdminRoles";
 import OrganizationLogin from "./pages/OrganizationLogin";
 
 import GovClinicLayout from "./organization/govClinic/GovClinicLayout";
-import GovClinicChiefDoctor from "./organization/govClinic/GovClinicChiefDoctor";
 import GovClinicSystemAdmin from "./organization/govClinic/GovClinicSystemAdmin";
-import GovClinicHR from "./organization/govClinic/GovClinicHR";
 import GovClinicEmployee from "./organization/govClinic/GovClinicEmployee";
 
 function App() {
@@ -101,18 +99,8 @@ return ( <LanguageProvider> <Routes>
       />
 
       <Route
-        path="chief-doctor"
-        element={<GovClinicChiefDoctor />}
-      />
-
-      <Route
         path="system-admin"
         element={<GovClinicSystemAdmin />}
-      />
-
-      <Route
-        path="hr"
-        element={<GovClinicHR />}
       />
 
       <Route

@@ -403,21 +403,27 @@ export default function BookAppointmentPage() {
 
           {/* Time Slot Grid */}
           <div className="time-slots-grid">
-            {timeSlots.map((time) => {
-              const isBooked = bookedSlots.includes(time);
-              return (
-                <button
-                  key={time}
-                  type="button"
-                  disabled={isBooked}
-                  className={`time-slot-node ${selectedTime === time ? "selected" : ""} ${isBooked ? "booked" : ""}`}
-                  onClick={() => setSelectedTime(time)}
-                >
-                  <span className="time-val">{time}</span>
-                  <span className="status-val">{isBooked ? "Занято" : "Свободно"}</span>
-                </button>
-              );
-            })}
+            {timeSlots
+              .filter((time) => {
+                const start = selectedDoc?.work_start || "08:00";
+                const end = selectedDoc?.work_end || "17:00";
+                return time >= start && time <= end;
+              })
+              .map((time) => {
+                const isBooked = bookedSlots.includes(time);
+                return (
+                  <button
+                    key={time}
+                    type="button"
+                    disabled={isBooked}
+                    className={`time-slot-node ${selectedTime === time ? "selected" : ""} ${isBooked ? "booked" : ""}`}
+                    onClick={() => setSelectedTime(time)}
+                  >
+                    <span className="time-val">{time}</span>
+                    <span className="status-val">{isBooked ? "Занято" : "Свободно"}</span>
+                  </button>
+                );
+              })}
           </div>
 
           <div className="next-step-btn-container">
@@ -590,6 +596,12 @@ export default function BookAppointmentPage() {
                   <span className="label">Кабинет</span>
                   <span className="value">№{successData.cabinet || selectedDoc?.cabinet || "—"}</span>
                 </div>
+                {successData.verification_code && (
+                  <div className="talon-field highlight-field" style={{ background: '#fef08a', borderLeft: '4px solid #eab308' }}>
+                    <span className="label" style={{ color: '#854d0e' }}>Код подтверждения приёма</span>
+                    <span className="value" style={{ color: '#854d0e', fontSize: '18px', fontWeight: 'bold' }}>{successData.verification_code}</span>
+                  </div>
+                )}
               </div>
 
               <div className="talon-qrcode">

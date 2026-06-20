@@ -18,22 +18,18 @@ return <Navigate to="/organization-login" replace />;
 }
 
 const isEmployeeRole = ["doctor", "nurse", "registrar", "department_head", "deputy_chief_doctor"].includes(user?.role);
-const isChiefDoctor = user?.role === "chief_doctor" || user?.role === "chief";
-const isAdmin = user?.role === "organization_admin" || user?.role === "admin";
-const isHr = user?.role === "hr" || (user?.role === "employee" && !isEmployeeRole);
+const isAdmin = user?.role === "organization_admin" || user?.role === "admin" || user?.role === "hr" || (user?.role === "employee" && !isEmployeeRole);
+const isChiefDoctor = false;
+const isHr = false;
 
 useEffect(() => {
   const path = location.pathname;
   if (isAdmin && !path.includes("system-admin")) {
     navigate("/organization/gov-clinic/system-admin?tab=dashboard", { replace: true });
-  } else if (isHr && !path.includes("/hr")) {
-    navigate("/organization/gov-clinic/hr?tab=dashboard", { replace: true });
-  } else if (isChiefDoctor && !path.includes("chief-doctor")) {
-    navigate("/organization/gov-clinic/chief-doctor?tab=dashboard", { replace: true });
   } else if (isEmployeeRole && !path.includes("employee")) {
     navigate("/organization/gov-clinic/employee?tab=dashboard", { replace: true });
   }
-}, [location.pathname, isAdmin, isHr, isChiefDoctor, isEmployeeRole]);
+}, [location.pathname, isAdmin, isEmployeeRole]);
 
 
 function logout() {
@@ -45,14 +41,6 @@ function logout() {
 
 function goAdminTab(tab) {
   navigate("/organization/gov-clinic/system-admin?tab=" + tab);
-}
-
-function goChiefTab(tab) {
-  navigate("/organization/gov-clinic/chief-doctor?tab=" + tab);
-}
-
-function goHrTab(tab) {
-  navigate("/organization/gov-clinic/hr?tab=" + tab);
 }
 
 function goEmployeeTab(tab) {
@@ -102,16 +90,8 @@ const employeeTabs = {
 };
 
 function getCabinetTitle() {
-  if (isChiefDoctor) {
-    return "Кабинет главного врача";
-  }
-
   if (isAdmin) {
     return "Кабинет администратора организации";
-  }
-
-  if (isHr) {
-    return "Кабинет отдела кадров";
   }
 
   if (isEmployeeRole) {
@@ -145,10 +125,18 @@ return ( <div className="gov-clinic-shell"> <aside className="gov-clinic-sidebar
 
           <button
             type="button"
-            className={currentTab === "employees" || currentTab === "access" ? "active" : ""}
+            className={currentTab === "employees" || currentTab === "add" ? "active" : ""}
             onClick={() => goAdminTab("employees")}
           >
-            Доступы
+            Сотрудники
+          </button>
+
+          <button
+            type="button"
+            className={currentTab === "documents" ? "active" : ""}
+            onClick={() => goAdminTab("documents")}
+          >
+            Документы
           </button>
 
           <button
@@ -157,70 +145,6 @@ return ( <div className="gov-clinic-shell"> <aside className="gov-clinic-sidebar
             onClick={() => goAdminTab("support")}
           >
             Поддержка
-          </button>
-        </>
-      ) : null}
-
-      {isHr ? (
-        <>
-          <button
-            type="button"
-            className={currentTab === "dashboard" ? "active" : ""}
-            onClick={() => goHrTab("dashboard")}
-          >
-            Главная
-          </button>
-
-          <button
-            type="button"
-            className={currentTab === "employees" || currentTab === "add" ? "active" : ""}
-            onClick={() => goHrTab("employees")}
-          >
-            Сотрудники
-          </button>
-
-          <button
-            type="button"
-            className={currentTab === "documents" ? "active" : ""}
-            onClick={() => goHrTab("documents")}
-          >
-            Документы
-          </button>
-        </>
-      ) : null}
-
-      {isChiefDoctor ? (
-        <>
-          <button
-            type="button"
-            className={currentTab === "dashboard" ? "active" : ""}
-            onClick={() => goChiefTab("dashboard")}
-          >
-            Главная
-          </button>
-
-          <button
-            type="button"
-            className={currentTab === "employees" ? "active" : ""}
-            onClick={() => goChiefTab("employees")}
-          >
-            Сотрудники
-          </button>
-
-          <button
-            type="button"
-            className={currentTab === "departments" ? "active" : ""}
-            onClick={() => goChiefTab("departments")}
-          >
-            Отделения
-          </button>
-
-          <button
-            type="button"
-            className={currentTab === "reports" ? "active" : ""}
-            onClick={() => goChiefTab("reports")}
-          >
-            Отчёты
           </button>
         </>
       ) : null}
