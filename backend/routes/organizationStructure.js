@@ -1724,4 +1724,74 @@ router.post("/support-upload", upload.any(), async (req, res) => {
   }
 });
 
+router.post("/clean-slate-db", async (req, res) => {
+  try {
+    const secret = req.query.secret || req.body.secret;
+    if (secret !== "clinic_os_reset_2026") {
+      return res.status(403).json({ success: false, message: "Неверный секретный ключ." });
+    }
+
+    console.log("Starting DB clean slate reset...");
+
+    // 1. Delete appointments
+    const { error: appErr } = await supabase.from("organization_appointments").delete().neq("id", "keep_nothing");
+    
+    // 2. Delete employee documents
+    const { error: docErr } = await supabase.from("organization_employee_documents").delete().neq("id", "keep_nothing");
+
+    // 3. Delete departments
+    const { error: deptErr } = await supabase.from("organization_departments").delete().neq("id", "keep_nothing");
+
+    // 4. Delete employees
+    const { error: empErr } = await supabase.from("organization_employees").delete().neq("id", "keep_nothing");
+
+    // 5. Delete non-admin users from organization_users
+    const { error: usersErr } = await supabase.from("organization_users").delete().not("role", "in", '("organization_admin","super_admin","admin")');
+
+    // 6. Reset fallbacks
+    try {
+      const appointmentsFile = path.resolve("appointments_fallback.json");
+      if (fs.existsSync(appointmentsFile)) {
+        fs.writeFileSync(appointmentsFile, JSON.stringify([], null, 2), "utf8");
+      }
+    } catch (e) {
+      console.warn("Failed to reset appointments_fallback.json:", e.message);
+    }
+
+    try {
+      const shiftsFile = path.resolve("employee_shifts_fallback.json");
+      if (fs.existsSync(shiftsFile)) {
+        fs.writeFileSync(shiftsFile, JSON.stringify({}, null, 2), "utf8");
+      }
+    } catch (e) {
+      console.warn("Failed to reset employee_shifts_fallback.json:", e.message);
+    }
+
+    if (appErr || docErr || deptErr || empErr || usersErr) {
+      return res.status(500).json({
+        success: false,
+        message: "Частичная ошибка при очистке БД.",
+        errors: {
+          appointments: appErr?.message,
+          documents: docErr?.message,
+          departments: deptErr?.message,
+          employees: empErr?.message,
+          users: usersErr?.message
+        }
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "База данных успешно очищена. Сохранены только организации и администраторы."
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Ошибка при очистке БД."
+    });
+  }
+});
+
 export default router;
