@@ -42,7 +42,7 @@ const POSITIONS = [
   "Врач-дерматолог",
   "Врач УЗИ",
   "Врач-рентгенолог",
-  "Администратор организации"
+  
 ];
 
 function generatePassword() {
@@ -55,13 +55,16 @@ function getStatusText(status) {
   if (status === "active") return "Активен";
   if (status === "blocked") return "Заблокирован";
   if (status === "no_access") return "Нет доступа";
+  if (status === "dismissed") return "В архиве";
+
   return status || "Нет доступа";
 }
 
 export default function GovClinicSystemAdmin() {
   const [searchParams] = useSearchParams();
   const tab = searchParams.get("tab") || "dashboard";
-  const { t } = useLanguage();
+ 
+  useLanguage();  
 
   const organizationUser = JSON.parse(
     localStorage.getItem("organizationUser") || "null"
@@ -105,21 +108,19 @@ export default function GovClinicSystemAdmin() {
   const [savingEmployee, setSavingEmployee] = useState(false);
   
   const EMPTY_EMPLOYEE_FORM = {
-    full_name: "",
-    phone: "",
-    email: "",
-    position: "",
-    department: "",
-    department_id: "",
-    cabinet: "",
-    role: "doctor",
-    work_start: "08:00",
-    work_end: "17:00",
-  };
+  full_name: "",
+  age: "",
+  phone: "",
+  email: "",
+  position: "",
+  department: "",
+  department_id: "",
+  cabinet: "",
+  role: "doctor",
+};
   
   const [employeeForm, setEmployeeForm] = useState(EMPTY_EMPLOYEE_FORM);
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
-  const [documents, setDocuments] = useState({});
+  
 
   // Support Chat States
   const [supportMessages, setSupportMessages] = useState([]);
@@ -136,15 +137,8 @@ export default function GovClinicSystemAdmin() {
 
   // Doctor Schedules & Absences
   const [selectedDocForSched, setSelectedDocForSched] = useState("");
-  const [docSchedule, setDocSchedule] = useState(null);
-  const [schedForm, setSchedForm] = useState({
-    work_days: [1, 2, 3, 4, 5],
-    work_start: "08:00",
-    work_end: "17:00",
-    lunch_start: "13:00",
-    lunch_end: "14:00",
-    slot_duration: 30
-  });
+  
+  
   const [absenceForm, setAbsenceForm] = useState({
     absence_type: "planned",
     reason: "",
@@ -165,16 +159,8 @@ export default function GovClinicSystemAdmin() {
   });
   const [transferAlternateSlots, setTransferAlternateSlots] = useState([]);
   const [notifications, setNotifications] = useState([]);
-  const [docExceptions, setDocExceptions] = useState([]);
-  const [exceptionForm, setExceptionForm] = useState({
-    exception_date: "",
-    is_working: true,
-    work_start: "08:00",
-    work_end: "17:00",
-    lunch_start: "13:00",
-    lunch_end: "14:00",
-    slot_duration: 30
-  });
+  
+  
 
   useEffect(() => {
     if (tab === "notifications" && organizationUser?.id) {
@@ -259,7 +245,9 @@ export default function GovClinicSystemAdmin() {
       }
 
       if (!employeesResponse.ok) {
-        throw new Error(employeesResult.message || "Ошибка сотрудников.");
+                throw new Error(
+          employeesResult.message || "Ошибка загрузки врачей."
+        );
       }
 
       setDepartments(departmentsResult.departments || []);
@@ -360,84 +348,17 @@ export default function GovClinicSystemAdmin() {
     }
   }
 
-  // Load schedule and absences for a doctor
+  // Load absences for the selected doctor
   useEffect(() => {
-    if (!selectedDocForSched) return;
-    loadDocSchedule(selectedDocForSched);
-    loadDocAbsences(selectedDocForSched);
-    loadDocExceptions(selectedDocForSched);
-  }, [selectedDocForSched]);
+  if (!selectedDocForSched) return;
+  loadDocAbsences(selectedDocForSched);
+}, [selectedDocForSched]);
 
-  async function loadDocSchedule(docId) {
-    try {
-      const res = await fetch(`${API_URL}/api/organization-structure/employees/${docId}/schedule`, {
-        headers: { "x-organization-id": organizationId }
-      });
-      const data = await res.json();
-      if (res.ok && data.schedule) {
-        setDocSchedule(data.schedule);
-        setSchedForm({
-          work_days: data.schedule.work_days || [1, 2, 3, 4, 5],
-          work_start: data.schedule.work_start || "08:00",
-          work_end: data.schedule.work_end || "17:00",
-          lunch_start: data.schedule.lunch_start || "13:00",
-          lunch_end: data.schedule.lunch_end || "14:00",
-          slot_duration: data.schedule.slot_duration || 30,
-          start_date: data.schedule.start_date || new Date().toISOString().split('T')[0],
-          end_date: data.schedule.end_date || "",
-          daily_schedules: data.schedule.daily_schedules || {
-            "1": { work_start: "08:00", work_end: "17:00", lunch_start: "13:00", lunch_end: "14:00", slot_duration: 30 },
-            "2": { work_start: "08:00", work_end: "17:00", lunch_start: "13:00", lunch_end: "14:00", slot_duration: 30 },
-            "3": { work_start: "08:00", work_end: "17:00", lunch_start: "13:00", lunch_end: "14:00", slot_duration: 30 },
-            "4": { work_start: "08:00", work_end: "17:00", lunch_start: "13:00", lunch_end: "14:00", slot_duration: 30 },
-            "5": { work_start: "08:00", work_end: "17:00", lunch_start: "13:00", lunch_end: "14:00", slot_duration: 30 },
-            "6": { work_start: "08:00", work_end: "17:00", lunch_start: "13:00", lunch_end: "14:00", slot_duration: 30 },
-            "7": { work_start: "08:00", work_end: "17:00", lunch_start: "13:00", lunch_end: "14:00", slot_duration: 30 },
-          }
-        });
-      }
-    } catch (err) {
-      console.warn("Error loading doctor schedule:", err);
-    }
-  }
+  
 
-  async function saveDocSchedule(e) {
-    e.preventDefault();
-    if (!selectedDocForSched) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/api/organization-structure/employees/${selectedDocForSched}/schedule`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-organization-id": organizationId
-        },
-        body: JSON.stringify(schedForm)
-      });
-      const data = await res.json();
-      if (res.ok) {
-        alert("Рабочий график успешно сохранен.");
-        loadDocSchedule(selectedDocForSched);
-      } else {
-        alert(data.message || "Ошибка сохранения графика.");
-      }
-    } catch (err) {
-      alert("Ошибка сети при сохранении графика.");
-    } finally {
-      setLoading(false);
-    }
-  }
+  
 
-  function applyTimeToAllDays() {
-    if (!schedForm.work_days || schedForm.work_days.length === 0) return;
-    const firstDay = schedForm.work_days[0];
-    const source = schedForm.daily_schedules[String(firstDay)] || { work_start: "08:00", work_end: "17:00", lunch_start: "13:00", lunch_end: "14:00", slot_duration: 30 };
-    const copy = { ...schedForm.daily_schedules };
-    schedForm.work_days.forEach(d => {
-      copy[String(d)] = { ...source };
-    });
-    setSchedForm(prev => ({ ...prev, daily_schedules: copy }));
-  }
+  
 
   async function loadDocAbsences(docId) {
     try {
@@ -453,77 +374,11 @@ export default function GovClinicSystemAdmin() {
     }
   }
 
-  async function loadDocExceptions(docId) {
-    try {
-      const res = await fetch(`${API_URL}/api/organization-structure/employees/${docId}/exceptions`, {
-        headers: { "x-organization-id": organizationId }
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setDocExceptions(data.exceptions || []);
-      }
-    } catch (err) {
-      console.warn("Error loading exceptions:", err);
-    }
-  }
+  
 
-  async function logDocException(e) {
-    e.preventDefault();
-    if (!selectedDocForSched) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/api/organization-structure/employees/${selectedDocForSched}/exceptions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-organization-id": organizationId
-        },
-        body: JSON.stringify(exceptionForm)
-      });
-      const data = await res.json();
-      if (res.ok) {
-        alert("Исключение успешно добавлено.");
-        loadDocExceptions(selectedDocForSched);
-        setExceptionForm({
-          exception_date: "",
-          is_working: true,
-          work_start: "08:00",
-          work_end: "17:00",
-          lunch_start: "13:00",
-          lunch_end: "14:00",
-          slot_duration: 30
-        });
-      } else {
-        alert(data.message || "Ошибка добавления исключения.");
-      }
-    } catch (err) {
-      alert("Ошибка сети.");
-    } finally {
-      setLoading(false);
-    }
-  }
+  
 
-  async function removeDocException(excId) {
-    if (!selectedDocForSched) return;
-    if (!confirm("Вы уверены, что хотите удалить это исключение?")) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/api/organization-structure/employees/${selectedDocForSched}/exceptions/${excId}`, {
-        method: "DELETE",
-        headers: { "x-organization-id": organizationId }
-      });
-      if (res.ok) {
-        alert("Исключение удалено.");
-        loadDocExceptions(selectedDocForSched);
-      } else {
-        alert("Ошибка удаления.");
-      }
-    } catch (err) {
-      alert("Ошибка сети.");
-    } finally {
-      setLoading(false);
-    }
-  }
+  
 
   async function logDocAbsence(e) {
     e.preventDefault();
@@ -1009,10 +864,14 @@ export default function GovClinicSystemAdmin() {
       departmentId: employee.department_id || employee.departmentId || "",
       cabinet: employee.cabinet || "",
       login: employee.login || "",
-      status: employee.login ? employee.status || "active" : "no_access",
-      documents: employee.documents || [],
-      work_start: employee.work_start || employee.workStart || "08:00",
-      work_end: employee.work_end || employee.workEnd || "17:00",
+      status:
+  employee.status === "dismissed"
+    ? "dismissed"
+    : employee.login
+      ? employee.status || "active"
+      : "no_access",
+      
+      
     };
   }
 
@@ -1025,9 +884,19 @@ export default function GovClinicSystemAdmin() {
     }
 
     if (!employeeForm.full_name.trim()) {
-      setMessage("Укажите ФИО сотрудника.");
+      setMessage("Укажите ФИО врача.");
       return;
     }
+
+
+    if (
+  !employeeForm.age ||
+  Number(employeeForm.age) < 18 ||
+  Number(employeeForm.age) > 100
+) {
+  setMessage("Укажите корректный возраст врача.");
+  return;
+}
 
     if (!employeeForm.position.trim()) {
       setMessage("Укажите должность.");
@@ -1044,17 +913,17 @@ export default function GovClinicSystemAdmin() {
 
     try {
       const payload = {
-        organization_id: organizationId,
-        full_name: employeeForm.full_name.trim(),
-        phone: employeeForm.phone.trim(),
-        email: employeeForm.email.trim(),
-        position: employeeForm.position.trim(),
-        department_id: employeeForm.department_id || null,
-        cabinet: employeeForm.cabinet.trim(),
-        status: "active",
-        work_start: employeeForm.work_start,
-        work_end: employeeForm.work_end,
-      };
+  organization_id: organizationId,
+  full_name: employeeForm.full_name.trim(),
+  age: Number(employeeForm.age),
+  phone: employeeForm.phone.trim(),
+  email: employeeForm.email.trim(),
+  position: employeeForm.position.trim(),
+  department_id: employeeForm.department_id || null,
+  cabinet: employeeForm.cabinet.trim(),
+  role: "doctor",
+  ...(editingEmployeeId ? {} : { status: "active" }),
+};
 
       const url = editingEmployeeId
         ? API_URL + "/api/organization-structure/employees/" + editingEmployeeId
@@ -1072,14 +941,18 @@ export default function GovClinicSystemAdmin() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.message || "Не удалось сохранить сотрудника.");
+        throw new Error(result.message || "Не удалось сохранить врача.");
       }
 
-      setMessage(editingEmployeeId ? "Сотрудник изменён." : "Сотрудник добавлен.");
+     setMessage(
+  editingEmployeeId
+    ? "Данные врача успешно изменены."
+    : "Врач успешно добавлен."
+);
       resetEmployeeForm();
       loadData();
     } catch (err) {
-      setMessage(err.message || "Ошибка сохранения сотрудника.");
+      setMessage(err.message || "Ошибка сохранения врача.");
     } finally {
       setSavingEmployee(false);
     }
@@ -1090,131 +963,68 @@ export default function GovClinicSystemAdmin() {
     setEditingEmployeeId(item.id);
     setEmployeeForm({
       full_name: item.fullName,
+       age: item.age,
       phone: item.phone,
       email: item.email,
       position: item.position,
       department: departments.find(d => String(d.id) === String(item.departmentId))?.name || "",
       department_id: item.departmentId,
       cabinet: item.cabinet,
-      role: employee.role || "doctor",
-      work_start: item.work_start,
-      work_end: item.work_end,
+       role: "doctor",
+      
     });
     setShowEmployeeForm(true);
   }
 
   async function dismissEmployee(employee) {
-    const confirmed = window.confirm("Уволить сотрудника " + employee.full_name + "?");
-    if (!confirmed) return;
+  const confirmed = window.confirm(
+    "Удалить врача " +
+      employee.full_name +
+      "? Врач будет перемещён в архив, а его медицинская история сохранится."
+  );
 
-    setLoading(true);
-    setMessage("");
+  if (!confirmed) return;
 
-    try {
-      const response = await fetch(
-        API_URL + "/api/organization-structure/employees/" + employee.id,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "x-organization-id": organizationId,
-          },
-          body: JSON.stringify({
-            status: "dismissed"
-          }),
-        }
-      );
+  setLoading(true);
+  setMessage("");
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || "Не удалось уволить сотрудника.");
+  try {
+    const response = await fetch(
+      API_URL + "/api/organization-structure/employees/" + employee.id,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-organization-id": organizationId,
+        },
+        body: JSON.stringify({
+          status: "dismissed",
+        }),
       }
+    );
 
-      setMessage("Сотрудник уволен.");
-      loadData();
-    } catch (err) {
-      setMessage(err.message || "Ошибка увольнения сотрудника.");
-    } finally {
-      setLoading(false);
-    }
-  }
+    const result = await response.json();
 
-  async function deleteEmployee(employee) {
-    const confirmed = window.confirm("Удалить сотрудника " + employee.full_name + "?");
-    if (!confirmed) return;
-
-    setLoading(true);
-    setMessage("");
-
-    try {
-      const response = await fetch(
-        API_URL + "/api/organization-structure/employees/" + employee.id,
-        {
-          method: "DELETE",
-        }
+    if (!response.ok) {
+      throw new Error(
+        result.message || "Не удалось переместить врача в архив."
       );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || "Не удалось удалить сотрудника.");
-      }
-
-      setMessage("Сотрудник удалён.");
-      loadData();
-    } catch (err) {
-      setMessage(err.message || "Ошибка удаления сотрудника.");
-    } finally {
-      setLoading(false);
     }
+
+    setMessage("Врач перемещён в архив.");
+    loadData();
+  } catch (err) {
+    setMessage(
+      err.message || "Ошибка перемещения врача в архив."
+    );
+  } finally {
+    setLoading(false);
   }
+}
 
-  async function uploadDocuments(e) {
-    e.preventDefault();
+  
 
-    if (!selectedEmployeeId) {
-      setMessage("Выберите сотрудника.");
-      return;
-    }
-
-    setSavingEmployee(true);
-    setMessage("");
-
-    try {
-      const formData = new FormData();
-      formData.append("employee_id", selectedEmployeeId);
-      formData.append("organization_id", organizationId);
-
-      Object.keys(documents).forEach((key) => {
-        if (documents[key]) {
-          formData.append(key, documents[key]);
-        }
-      });
-
-      const response = await fetch(
-        API_URL + "/api/organization-structure/employee-documents",
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || "Не удалось загрузить документы.");
-      }
-
-      setMessage("Документы загружены.");
-      setDocuments({});
-      loadData();
-    } catch (err) {
-      setMessage(err.message || "Ошибка загрузки документов.");
-    } finally {
-      setSavingEmployee(false);
-    }
-  }
+  
 
   function resetEmployeeForm() {
     setEmployeeForm(EMPTY_EMPLOYEE_FORM);
@@ -1228,36 +1038,16 @@ export default function GovClinicSystemAdmin() {
   }
 
   function handlePositionChange(e) {
-    const value = e.target.value;
-    let newRole = employeeForm.role;
+  const value = e.target.value;
 
-    const lowVal = value.toLowerCase();
-    if (lowVal.includes("врач") || lowVal.includes("узи") || lowVal.includes("рентгенолог")) {
-      newRole = "doctor";
-    } else if (lowVal.includes("медсестра") || lowVal.includes("медбрат")) {
-      newRole = "nurse";
-    } else if (lowVal.includes("регистратор")) {
-      newRole = "registrar";
-    } else if (lowVal.includes("заведующий")) {
-      newRole = "department_head";
-    } else if (lowVal.includes("заместитель")) {
-      newRole = "deputy_chief_doctor";
-    }
+  setEmployeeForm((prev) => ({
+    ...prev,
+    position: value,
+    role: "doctor",
+  }));
+}
 
-    setEmployeeForm((prev) => ({
-      ...prev,
-      position: value,
-      role: newRole,
-    }));
-  }
-
-  function updateDocumentFile(e) {
-    const { name, files } = e.target;
-    setDocuments((prev) => ({
-      ...prev,
-      [name]: files && files.length > 0 ? files[0] : null,
-    }));
-  }
+  
 
   return (
     <div className="org-admin-page">
@@ -1265,7 +1055,7 @@ export default function GovClinicSystemAdmin() {
         <div>
           <h2 className="gov-page-title">Администратор организации</h2>
           <p className="gov-page-subtitle">
-            Управление отделениями и доступами сотрудников.
+            Управление отделениями, врачами и доступами.
           </p>
         </div>
       </div>
@@ -1295,18 +1085,9 @@ export default function GovClinicSystemAdmin() {
                 <span style={{ color: "#64748b", fontSize: "12px", display: "block", textTransform: "uppercase", fontWeight: "bold" }}>Адрес</span>
                 <strong style={{ fontSize: "15px" }}>{organizationData?.address || "—"}</strong>
               </div>
-              <div style={{ borderBottom: "1px solid rgba(128,128,128,0.15)", paddingBottom: "8px" }}>
-                <span style={{ color: "#64748b", fontSize: "12px", display: "block", textTransform: "uppercase", fontWeight: "bold" }}>Главный врач</span>
-                <strong style={{ fontSize: "15px" }}>{organizationData?.chief_doctor_full_name || "—"}</strong>
-              </div>
-              <div style={{ borderBottom: "1px solid rgba(128,128,128,0.15)", paddingBottom: "8px" }}>
-                <span style={{ color: "#64748b", fontSize: "12px", display: "block", textTransform: "uppercase", fontWeight: "bold" }}>Телефон главврача</span>
-                <strong style={{ fontSize: "15px" }}>{organizationData?.chief_doctor_phone || "—"}</strong>
-              </div>
-              <div style={{ borderBottom: "1px solid rgba(128,128,128,0.15)", paddingBottom: "8px" }}>
-                <span style={{ color: "#64748b", fontSize: "12px", display: "block", textTransform: "uppercase", fontWeight: "bold" }}>Email главврача</span>
-                <strong style={{ fontSize: "15px" }}>{organizationData?.chief_doctor_email || "—"}</strong>
-              </div>
+              
+              
+            
               <div style={{ borderBottom: "1px solid rgba(128,128,128,0.15)", paddingBottom: "8px" }}>
                 <span style={{ color: "#64748b", fontSize: "12px", display: "block", textTransform: "uppercase", fontWeight: "bold" }}>Email организации</span>
                 <strong style={{ fontSize: "15px" }}>{organizationData?.organization_email || "—"}</strong>
@@ -1321,7 +1102,7 @@ export default function GovClinicSystemAdmin() {
             </div>
 
             <div className="admin-stat-card">
-              <span>Сотрудников</span>
+              <span>Врачей</span>
               <b>{employees.length}</b>
             </div>
 
@@ -1347,9 +1128,9 @@ export default function GovClinicSystemAdmin() {
           </div>
 
           <div className="gov-card" style={{ marginTop: "8px" }}>
-            <h3>Сотрудники, ожидающие создания доступа ({noAccessCount})</h3>
+            <h3>Врачи, ожидающие создания доступа ({noAccessCount})</h3>
             {employees.filter((emp) => !emp.login).length === 0 ? (
-              <p className="empty-text" style={{ margin: "10px 0 0" }}>Все сотрудники имеют доступы.</p>
+              <p className="empty-text" style={{ margin: "10px 0 0" }}>Все врачи имеют доступы.</p>
             ) : (
               <div className="employee-card-list" style={{ marginTop: "16px" }}>
                 {employees
@@ -1464,7 +1245,7 @@ export default function GovClinicSystemAdmin() {
                           </p>
                         </div>
 
-                        <b>{people.length} сотрудников</b>
+                        <b>{people.length} врачей</b>
                       </div>
 
                       <div className="department-people">
@@ -1475,7 +1256,7 @@ export default function GovClinicSystemAdmin() {
                             </span>
                           ))
                         ) : (
-                          <em>Сотрудники пока не добавлены</em>
+                          <em>Врачи пока не добавлены</em>
                         )}
                       </div>
                     </div>
@@ -1494,7 +1275,7 @@ export default function GovClinicSystemAdmin() {
           {showEmployeeForm ? (
             <form className="gov-card" onSubmit={saveEmployee} style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
               <h3 style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '16px', marginBottom: '24px' }}>
-                {editingEmployeeId ? "✏️ Редактировать профиль сотрудника" : "👤 Добавление нового сотрудника"}
+                {editingEmployeeId ? "✏️ Редактировать профиль врача" : "👤 Добавление нового врача"}
               </h3>
 
               <div style={{ marginBottom: '32px' }}>
@@ -1503,7 +1284,7 @@ export default function GovClinicSystemAdmin() {
                 </h4>
                 <div className="gov-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    ФИО сотрудника
+                    ФИО врача
                     <input
                       name="full_name"
                       value={employeeForm.full_name}
@@ -1512,6 +1293,26 @@ export default function GovClinicSystemAdmin() {
                       required
                     />
                   </label>
+
+                  <label
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "6px",
+                        }}
+                      >
+                        Возраст
+                        <input
+                          type="number"
+                          name="age"
+                          min="18"
+                          max="100"
+                          value={employeeForm.age}
+                          onChange={updateEmployeeField}
+                          placeholder="Например: 35"
+                          required
+                        />
+                      </label>
 
                   <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     Номер телефона
@@ -1578,7 +1379,8 @@ export default function GovClinicSystemAdmin() {
                       <option value="">Выберите отделение</option>
                       {departments.map((dep) => (
                         <option key={dep.id} value={dep.name}>
-                          {dep.name} (этаж {dep.floor || "—"})
+                          {dep.name} — {dep.floor || "этаж не указан"}, кабинеты:{" "}
+                            {dep.rooms || "не указаны"}
                         </option>
                       ))}
                     </select>
@@ -1594,49 +1396,17 @@ export default function GovClinicSystemAdmin() {
                     />
                   </label>
 
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    Роль в системе
-                    <select 
-                      name="role" 
-                      value={employeeForm.role} 
-                      onChange={updateEmployeeField}
-                      style={{ padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
-                    >
-                      <option value="doctor">🩺 Врач</option>
-                      <option value="nurse">💉 Медсестра / медбрат</option>
-                      <option value="registrar">💻 Регистратор</option>
-                      <option value="department_head">🏥 Заведующий отделением</option>
-                      <option value="deputy_chief_doctor">👨‍⚕️ Заместитель главного врача</option>
-                    </select>
-                  </label>
+                  
 
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    Начало смены (рабочее время)
-                    <input
-                      type="time"
-                      name="work_start"
-                      value={employeeForm.work_start}
-                      onChange={updateEmployeeField}
-                      required
-                    />
-                  </label>
+                  
 
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    Конец смены (рабочее время)
-                    <input
-                      type="time"
-                      name="work_end"
-                      value={employeeForm.work_end}
-                      onChange={updateEmployeeField}
-                      required
-                    />
-                  </label>
+                  
                 </div>
               </div>
 
               <div className="gov-actions" style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px', marginTop: '24px', display: 'flex', gap: '10px' }}>
                 <button type="submit" disabled={savingEmployee} style={{ background: '#00b85a', color: '#fff', border: 0, padding: '10px 20px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
-                  {savingEmployee ? "Сохранение..." : editingEmployeeId ? "Сохранить изменения" : "Добавить сотрудника"}
+                  {savingEmployee ? "Сохранение..." : editingEmployeeId ? "Сохранить изменения" : "Добавить врача"}
                 </button>
 
                 <button type="button" onClick={() => setEmployeeForm(EMPTY_EMPLOYEE_FORM)} style={{ background: '#64748b', color: '#fff', border: 0, padding: '10px 20px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
@@ -1652,9 +1422,9 @@ export default function GovClinicSystemAdmin() {
             <section className="gov-card">
               <div className="employee-top" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
                 <div>
-                  <h3>Список сотрудников</h3>
+                  <h3>Список врачей</h3>
                   <p className="gov-page-subtitle">
-                    Добавление сотрудников организации, настройка графиков работы, выдача и блокировка доступов.
+                    Добавление врачей организации, изменение данных и управление доступом.
                   </p>
                 </div>
 
@@ -1675,7 +1445,7 @@ export default function GovClinicSystemAdmin() {
                       cursor: "pointer",
                     }}
                   >
-                    ➕ Добавить сотрудника
+                    ➕ Добавить врача
                   </button>
                 </div>
               </div>
@@ -1743,6 +1513,15 @@ export default function GovClinicSystemAdmin() {
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px" }}>
                           <div>
                             <h4 style={{ margin: 0, fontSize: "16px" }}>{item.fullName}</h4>
+                            <p
+                              style={{
+                                margin: "4px 0",
+                                fontSize: "13px",
+                                color: "#64748b",
+                              }}
+                            >
+                              Возраст: {item.age ? `${item.age} лет` : "—"}
+                            </p>
                             <p style={{ margin: "4px 0", color: "#64748b", fontWeight: "bold" }}>{item.position || "Должность не указана"}</p>
                             <p style={{ margin: "2px 0", fontSize: "13px", color: "#475569" }}>
                               📞 {item.phone || "—"} | ✉️ {item.email || "—"}
@@ -1752,7 +1531,7 @@ export default function GovClinicSystemAdmin() {
                           <div className="employee-card-info" style={{ textAlign: "right", fontSize: "13px", color: "#64748b" }}>
                             <div style={{ fontWeight: "bold" }}>Отделение: {getDepartmentName(item.departmentId)}</div>
                             <div>Кабинет: {item.cabinet || "—"}</div>
-                            <div>Смена: <b>{item.work_start} - {item.work_end}</b></div>
+                            
                             <div>Логин: <b>{item.login || "не создан"}</b></div>
                             <div>Статус: <span className={`status-badge-mini ${item.status}`}>{getStatusText(item.status)}</span></div>
                           </div>
@@ -1763,26 +1542,15 @@ export default function GovClinicSystemAdmin() {
                             Изменить данные
                           </button>
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedEmployeeId(employee.id);
-                              goAdminTab("documents");
-                            }}
-                            style={{ background: "#6366f1", color: "#ffffff", border: 0, borderRadius: "8px", padding: "6px 12px", cursor: "pointer", fontSize: "13px" }}
-                          >
-                            Документы
-                          </button>
+                          
 
                           {employee.status !== "dismissed" && (
                             <button type="button" onClick={() => dismissEmployee(employee)} style={{ background: "#ef4444", color: "#ffffff", border: 0, borderRadius: "8px", padding: "6px 12px", cursor: "pointer", fontSize: "13px" }}>
-                              Уволить
+                              Удалить 
                             </button>
                           )}
 
-                          <button type="button" onClick={() => deleteEmployee(employee)} style={{ background: "#94a3b8", color: "#ffffff", border: 0, borderRadius: "8px", padding: "6px 12px", cursor: "pointer", fontSize: "13px" }}>
-                            Удалить
-                          </button>
+                          
 
                           <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
                             {!item.login ? (
@@ -1820,7 +1588,7 @@ export default function GovClinicSystemAdmin() {
                     );
                   })
                 ) : (
-                  <p className="empty-text">Сотрудники не найдены.</p>
+                  <p className="empty-text">Врачи не найдены.</p>
                 )}
               </div>
             </section>
@@ -1828,431 +1596,9 @@ export default function GovClinicSystemAdmin() {
         </div>
       )}
 
-      {tab === "documents" && (
-        <div className="gov-card">
-          <div className="gov-card-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px', marginBottom: '24px' }}>
-            <h3 style={{ margin: 0 }}>📂 Личные дела и документы сотрудников</h3>
-            <button
-              type="button"
-              onClick={() => goAdminTab("employees")}
-              style={{
-                background: "#cbd5e1",
-                color: "#1e293b",
-                border: 0,
-                borderRadius: "12px",
-                padding: "8px 16px",
-                fontWeight: "bold",
-                cursor: "pointer"
-              }}
-            >
-              Назад к списку
-            </button>
-          </div>
+      
 
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#1e293b' }}>
-              Выберите сотрудника для управления документами
-            </label>
-            <select
-              value={selectedEmployeeId}
-              onChange={function (event) {
-                setSelectedEmployeeId(event.target.value);
-                setMessage("");
-              }}
-              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '15px' }}
-            >
-              <option value="">Не выбран</option>
-              {employees.map(function (employee) {
-                return (
-                  <option key={employee.id} value={employee.id}>
-                    {employee.full_name} ({employee.position})
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-
-          {selectedEmployeeId ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
-              <form onSubmit={uploadDocuments} style={{ borderRight: '1px solid #e2e8f0', paddingRight: '32px' }}>
-                <h4 style={{ marginBottom: '20px', color: '#0f172a', fontWeight: 'bold' }}>📤 Загрузить новые документы</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#475569', fontSize: '14px' }}>
-                    Удостоверение личности
-                    <input type="file" name="identity_document" onChange={updateDocumentFile} style={{ padding: '6px 0' }} />
-                  </label>
-
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#475569', fontSize: '14px' }}>
-                    Диплом
-                    <input type="file" name="diploma" onChange={updateDocumentFile} style={{ padding: '6px 0' }} />
-                  </label>
-
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#475569', fontSize: '14px' }}>
-                    Сертификат
-                    <input type="file" name="certificate" onChange={updateDocumentFile} style={{ padding: '6px 0' }} />
-                  </label>
-
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#475569', fontSize: '14px' }}>
-                    Трудовой договор
-                    <input type="file" name="employment_contract" onChange={updateDocumentFile} style={{ padding: '6px 0' }} />
-                  </label>
-                </div>
-
-                <div style={{ marginTop: '24px' }}>
-                  <button
-                    type="submit"
-                    disabled={savingEmployee}
-                    style={{
-                      background: '#00b85a',
-                      color: '#fff',
-                      border: 0,
-                      padding: '10px 20px',
-                      borderRadius: '12px',
-                      cursor: 'pointer',
-                      fontWeight: 'bold',
-                      fontSize: '15px'
-                    }}
-                  >
-                    {savingEmployee ? "Загрузка..." : "Загрузить файлы"}
-                  </button>
-                </div>
-              </form>
-
-              <div>
-                <h4 style={{ marginBottom: '20px', color: '#0f172a', fontWeight: 'bold' }}>📋 Загруженные документы</h4>
-                {employees.find(emp => emp.id === selectedEmployeeId)?.documents?.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {employees.find(emp => emp.id === selectedEmployeeId).documents.map(function (doc) {
-                      const docLabels = {
-                        identity_document: "Удостоверение личности",
-                        diploma: "Диплом",
-                        certificate: "Сертификат",
-                        employment_contract: "Трудовой договор"
-                      };
-                      
-                      const parts = (doc.file_name || "").split("__");
-                      const docType = parts.length > 1 ? parts[0] : "document";
-                      const displayName = parts.length > 1 ? parts.slice(1).join("__") : doc.file_name;
-
-                      return (
-                        <div key={doc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                          <div style={{ marginRight: '12px' }}>
-                            <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#1e293b' }}>
-                              {docLabels[docType] || docType}
-                            </div>
-                            <div style={{ fontSize: '12px', color: '#64748b', wordBreak: 'break-all', marginTop: '2px' }}>
-                              {displayName}
-                            </div>
-                          </div>
-                          {doc.file_url ? (
-                            <a
-                              href={doc.file_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{
-                                background: '#3b82f6',
-                                color: '#fff',
-                                textDecoration: 'none',
-                                padding: '6px 12px',
-                                borderRadius: '8px',
-                                fontSize: '13px',
-                                fontWeight: 'bold',
-                                whiteSpace: 'nowrap'
-                              }}
-                            >
-                              Открыть
-                            </a>
-                          ) : (
-                            <span style={{ fontSize: '12px', color: '#94a3b8' }}>Нет ссылки</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p style={{ color: '#64748b', fontStyle: 'italic', margin: 0 }}>Документы пока не загружены.</p>
-                )}
-              </div>
-            </div>
-          ) : (
-            <p style={{ color: '#64748b', fontStyle: 'italic', textAlign: 'center', marginTop: '32px', margin: 0 }}>
-              Выберите сотрудника из списка выше, чтобы управлять его личным делом.
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* -------------------- TAB: SCHEDULES -------------------- */}
-      {tab === "schedules" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          <div className="gov-card">
-            <h3>Управление рабочим временем врачей</h3>
-            <p className="gov-page-subtitle">
-              Выберите врача для настройки его периода действия графика, рабочих дней и индивидуальных часов работы.
-            </p>
-            
-            <label style={{ display: "flex", flexDirection: "column", gap: "8px", maxWidth: "400px", marginTop: "16px" }}>
-              Выберите врача:
-              <select
-                value={selectedDocForSched}
-                onChange={(e) => setSelectedDocForSched(e.target.value)}
-                style={{ padding: "10px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "15px" }}
-              >
-                <option value="">-- Выберите врача --</option>
-                {employees
-                  .filter(e => e.role === "doctor" || String(e.position).toLowerCase().includes("врач"))
-                  .map(doc => (
-                    <option key={doc.id} value={doc.id}>
-                      🩺 {doc.full_name} ({doc.position})
-                    </option>
-                  ))
-                }
-              </select>
-            </label>
-          </div>
-
-          {selectedDocForSched && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-              {/* Working Schedule Config */}
-              <form className="gov-card" onSubmit={saveDocSchedule}>
-                <h4>⚙️ Настройка графика работы</h4>
-                <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "16px" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                    <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                      Дата начала действия графика:
-                      <input
-                        type="date"
-                        value={schedForm.start_date || ""}
-                        onChange={(e) => setSchedForm(prev => ({ ...prev, start_date: e.target.value }))}
-                        required
-                      />
-                    </label>
-
-                    <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                      Дата окончания действия графика (необязательно):
-                      <input
-                        type="date"
-                        value={schedForm.end_date || ""}
-                        onChange={(e) => setSchedForm(prev => ({ ...prev, end_date: e.target.value }))}
-                      />
-                    </label>
-                  </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                    <strong>Рабочие дни недели:</strong>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
-                      {[
-                        { val: 1, label: "Пн" },
-                        { val: 2, label: "Вт" },
-                        { val: 3, label: "Ср" },
-                        { val: 4, label: "Чт" },
-                        { val: 5, label: "Пт" },
-                        { val: 6, label: "Сб" },
-                        { val: 7, label: "Вс" },
-                      ].map(day => {
-                        const checked = schedForm.work_days.includes(day.val);
-                        return (
-                          <label key={day.val} style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", background: "#f1f5f9", padding: "6px 12px", borderRadius: "8px" }}>
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={(e) => {
-                                let updated;
-                                if (e.target.checked) {
-                                  updated = [...schedForm.work_days, day.val].sort();
-                                } else {
-                                  updated = schedForm.work_days.filter(d => d !== day.val);
-                                }
-                                setSchedForm(prev => ({ ...prev, work_days: updated }));
-                              }}
-                            />
-                            {day.label}
-                          </label>
-                        );
-                      })}
-                    </div>
-
-                    <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
-                      <button
-                        type="button"
-                        onClick={() => setSchedForm(prev => ({ ...prev, work_days: [1, 2, 3, 4, 5, 6, 7] }))}
-                        style={{ padding: "6px 12px", background: "#3b82f6", color: "#fff", border: "0", borderRadius: "8px", cursor: "pointer", fontSize: "13px" }}
-                      >
-                        Выбрать все дни
-                      </button>
-                      <button
-                        type="button"
-                        onClick={applyTimeToAllDays}
-                        style={{ padding: "6px 12px", background: "#475569", color: "#fff", border: "0", borderRadius: "8px", cursor: "pointer", fontSize: "13px" }}
-                      >
-                        Применить одинаковое время ко всем выбранным
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "8px" }}>
-                    <strong>Часы работы по дням:</strong>
-                    {schedForm.work_days.map(dayNum => {
-                      const dayNames = { "1": "Понедельник", "2": "Вторник", "3": "Ср", "4": "Четверг", "5": "Пятница", "6": "Суббота", "7": "Воскресенье" };
-                      const daySched = (schedForm.daily_schedules && schedForm.daily_schedules[String(dayNum)]) || { work_start: "08:00", work_end: "17:00", lunch_start: "13:00", lunch_end: "14:00", slot_duration: 30 };
-                      const updateDaily = (key, val) => {
-                        const copy = { ...schedForm.daily_schedules };
-                        copy[String(dayNum)] = { ...daySched, [key]: val };
-                        setSchedForm(prev => ({ ...prev, daily_schedules: copy }));
-                      };
-
-                      return (
-                        <div key={dayNum} style={{ display: "grid", gridTemplateColumns: "130px 1fr 1fr 1fr 1fr 1.2fr", gap: "12px", alignItems: "center", padding: "10px", background: "#f8fafc", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
-                          <strong>{dayNames[String(dayNum)]}:</strong>
-                          <label style={{ display: "flex", flexDirection: "column", fontSize: "12px" }}>
-                            Начало:
-                            <input type="time" value={daySched.work_start} onChange={(e) => updateDaily("work_start", e.target.value)} required />
-                          </label>
-                          <label style={{ display: "flex", flexDirection: "column", fontSize: "12px" }}>
-                            Конец:
-                            <input type="time" value={daySched.work_end} onChange={(e) => updateDaily("work_end", e.target.value)} required />
-                          </label>
-                          <label style={{ display: "flex", flexDirection: "column", fontSize: "12px" }}>
-                            Обед с:
-                            <input type="time" value={daySched.lunch_start} onChange={(e) => updateDaily("lunch_start", e.target.value)} required />
-                          </label>
-                          <label style={{ display: "flex", flexDirection: "column", fontSize: "12px" }}>
-                            Обед до:
-                            <input type="time" value={daySched.lunch_end} onChange={(e) => updateDaily("lunch_end", e.target.value)} required />
-                          </label>
-                          <label style={{ display: "flex", flexDirection: "column", fontSize: "12px" }}>
-                            Запись (мин):
-                            <select value={daySched.slot_duration} onChange={(e) => updateDaily("slot_duration", Number(e.target.value))} style={{ padding: "6px" }}>
-                              <option value="15">15 минут</option>
-                              <option value="20">20 минут</option>
-                              <option value="30">30 минут</option>
-                              <option value="40">40 минут</option>
-                              <option value="45">45 минут</option>
-                              <option value="60">60 минут</option>
-                            </select>
-                          </label>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <button type="submit" disabled={loading} className="gov-btn" style={{ background: "#00b85a", color: "#fff", border: "0", padding: "12px", borderRadius: "10px", cursor: "pointer", fontWeight: "bold" }}>
-                    Сохранить рабочий график
-                  </button>
-                </div>
-              </form>
-
-              {/* Date Exceptions */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
-                <form className="gov-card" onSubmit={logDocException}>
-                  <h4>📅 Исключения из графика (на конкретную дату)</h4>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "16px" }}>
-                    <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                      Дата:
-                      <input
-                        type="date"
-                        value={exceptionForm.exception_date}
-                        onChange={(e) => setExceptionForm(prev => ({ ...prev, exception_date: e.target.value }))}
-                        required
-                      />
-                    </label>
-
-                    <label style={{ display: "flex", alignItems: "center", gap: "8px", margin: "8px 0", cursor: "pointer" }}>
-                      <input
-                        type="checkbox"
-                        checked={exceptionForm.is_working}
-                        onChange={(e) => setExceptionForm(prev => ({ ...prev, is_working: e.target.checked }))}
-                      />
-                      Врач работает в этот день
-                    </label>
-
-                    {exceptionForm.is_working && (
-                      <>
-                        <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                          Время начала:
-                          <input type="time" value={exceptionForm.work_start} onChange={(e) => setExceptionForm(prev => ({ ...prev, work_start: e.target.value }))} required />
-                        </label>
-                        <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                          Время окончания:
-                          <input type="time" value={exceptionForm.work_end} onChange={(e) => setExceptionForm(prev => ({ ...prev, work_end: e.target.value }))} required />
-                        </label>
-                        <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                          Начало обеда:
-                          <input type="time" value={exceptionForm.lunch_start} onChange={(e) => setExceptionForm(prev => ({ ...prev, lunch_start: e.target.value }))} required />
-                        </label>
-                        <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                          Окончание обеда:
-                          <input type="time" value={exceptionForm.lunch_end} onChange={(e) => setExceptionForm(prev => ({ ...prev, lunch_end: e.target.value }))} required />
-                        </label>
-                        <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                          Продолжительность записи (минут):
-                          <select value={exceptionForm.slot_duration} onChange={(e) => setExceptionForm(prev => ({ ...prev, slot_duration: Number(e.target.value) }))} style={{ padding: "8px" }}>
-                            <option value="15">15 минут</option>
-                            <option value="20">20 минут</option>
-                            <option value="30">30 минут</option>
-                            <option value="40">40 минут</option>
-                            <option value="45">45 минут</option>
-                            <option value="60">60 минут</option>
-                          </select>
-                        </label>
-                      </>
-                    )}
-
-                    <button type="submit" disabled={loading} className="gov-btn" style={{ background: "#3b82f6", color: "#fff", border: "0", padding: "12px", borderRadius: "10px", cursor: "pointer", fontWeight: "bold" }}>
-                      Добавить исключение
-                    </button>
-                  </div>
-                </form>
-
-                <div className="gov-card">
-                  <h4>📋 Зарегистрированные исключения</h4>
-                  <div style={{ marginTop: "16px", overflowX: "auto" }}>
-                    {docExceptions.length === 0 ? (
-                      <p style={{ color: "#64748b", fontStyle: "italic", margin: 0 }}>Исключений нет</p>
-                    ) : (
-                      <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-                        <thead>
-                          <tr style={{ borderBottom: "2px solid #cbd5e1" }}>
-                            <th style={{ padding: "8px" }}>Дата</th>
-                            <th style={{ padding: "8px" }}>Статус</th>
-                            <th style={{ padding: "8px" }}>Время</th>
-                            <th style={{ padding: "8px" }}>Действие</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {docExceptions.map(exc => (
-                            <tr key={exc.id} style={{ borderBottom: "1px solid #e2e8f0" }}>
-                              <td style={{ padding: "8px" }}>{exc.exception_date}</td>
-                              <td style={{ padding: "8px" }}>
-                                {exc.is_working ? (
-                                  <span style={{ color: "#00b85a", fontWeight: "bold" }}>Рабочий</span>
-                                ) : (
-                                  <span style={{ color: "#ef4444", fontWeight: "bold" }}>Выходной</span>
-                                )}
-                              </td>
-                              <td style={{ padding: "8px" }}>
-                                {exc.is_working ? `${exc.work_start}–${exc.work_end}` : "—"}
-                              </td>
-                              <td style={{ padding: "8px" }}>
-                                <button
-                                  onClick={() => removeDocException(exc.id)}
-                                  style={{ background: "#ef4444", color: "#fff", border: "0", padding: "4px 8px", borderRadius: "6px", cursor: "pointer" }}
-                                >
-                                  Удалить
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      
 
       {/* -------------------- TAB: ABSENCES -------------------- */}
       {tab === "absences" && (
@@ -2490,7 +1836,7 @@ export default function GovClinicSystemAdmin() {
           <div className="gov-card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
               <h3>Уведомления администратора</h3>
-              <p className="gov-page-subtitle">Важные системные уведомления о действиях сотрудников, переносах записей и запросах.</p>
+              <p className="gov-page-subtitle">Важные системные уведомления о действиях врачей, переносах записей и обращениях.</p>
             </div>
             {notifications.some(n => !n.is_read) && (
               <button
@@ -2881,6 +2227,17 @@ export default function GovClinicSystemAdmin() {
                 <span>Телефон</span>
                 <b>{selectedEmployee.phone || "—"}</b>
               </div>
+
+
+
+                                  <div>
+                      <span>Возраст</span>
+                      <b>
+                        {selectedEmployee.age
+                          ? `${selectedEmployee.age} лет`
+                          : "—"}
+                      </b>
+                    </div>
 
               <div>
                 <span>Почта</span>
