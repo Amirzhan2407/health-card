@@ -428,8 +428,6 @@ if (error) {
   });
 }
 
-const workStart = req.body.work_start || req.body.workStart || "08:00";
-const workEnd = req.body.work_end || req.body.workEnd || "17:00";
 if (employee) {
   saveFallbackShift(employee.id, { work_start: workStart, work_end: workEnd });
   employee.work_start = workStart;
@@ -1840,8 +1838,6 @@ router.post("/support-upload", upload.any(), async (req, res) => {
       message: error.message || "Ошибка загрузки документа.",
     });
   }
-});
-
 });
 
 // POST /api/organization-structure/employees/:id/schedule
