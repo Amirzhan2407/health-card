@@ -44,6 +44,36 @@ const POSITIONS = [
   "Врач-рентгенолог",
   
 ];
+const WEEK_DAYS = [
+  { id: 1, name: "Понедельник", shortName: "Пн" },
+  { id: 2, name: "Вторник", shortName: "Вт" },
+  { id: 3, name: "Среда", shortName: "Ср" },
+  { id: 4, name: "Четверг", shortName: "Чт" },
+  { id: 5, name: "Пятница", shortName: "Пт" },
+  { id: 6, name: "Суббота", shortName: "Сб" },
+  { id: 7, name: "Воскресенье", shortName: "Вс" },
+];
+
+function createInitialDoctorSchedule() {
+  const days = {};
+
+  WEEK_DAYS.forEach((day) => {
+    days[day.id] = {
+      is_working: false,
+      work_start: "09:00",
+      work_end: "17:30",
+      lunch_start: "13:00",
+      lunch_end: "14:00",
+      slot_duration: 30,
+    };
+  });
+
+  return {
+    valid_from: "",
+    valid_to: "",
+    days,
+  };
+}
 
 function generatePassword() {
   const a = Math.random().toString(36).slice(2, 6).toUpperCase();
@@ -120,6 +150,17 @@ export default function GovClinicSystemAdmin() {
 };
   
   const [employeeForm, setEmployeeForm] = useState(EMPTY_EMPLOYEE_FORM);
+  const [doctorScheduleForm, setDoctorScheduleForm] = useState(
+  createInitialDoctorSchedule
+);
+
+const [schedulePreset, setSchedulePreset] = useState({
+  work_start: "09:00",
+  work_end: "17:30",
+  lunch_start: "13:00",
+  lunch_end: "14:00",
+  slot_duration: 30,
+});
   
 
   // Support Chat States
@@ -136,17 +177,7 @@ export default function GovClinicSystemAdmin() {
   const [ticketDescription, setTicketDescription] = useState("");
 
   // Doctor Schedules & Absences
- const [selectedDocForSched, setSelectedDocForSched] = useState("");
-
-const [absenceForm, setAbsenceForm] = useState({
-  absence_type: "planned",
-  reason: "",
-  start_date: "",
-  end_date: "",
-  comment: ""
-});
-
-const [docAbsences, setDocAbsences] = useState([]);
+ 
   const [affectedApps, setAffectedApps] = useState([]);
   
   // Manual transfer modal/state
@@ -347,26 +378,6 @@ const [docAbsences, setDocAbsences] = useState([]);
       console.warn("Error loading support messages:", err);
     }
   }
-
-  // Load absences for the selected doctor
- 
-
-  
-
-  
-
-  
-
- 
-
-  
-
-  
-
-  
-
- 
-  
 
   async function createSupportTicket(e) {
     e.preventDefault();
@@ -954,10 +965,23 @@ const [docAbsences, setDocAbsences] = useState([]);
   
 
   function resetEmployeeForm() {
-    setEmployeeForm(EMPTY_EMPLOYEE_FORM);
-    setEditingEmployeeId(null);
-    setShowEmployeeForm(false);
-  }
+  setEmployeeForm(EMPTY_EMPLOYEE_FORM);
+
+  setDoctorScheduleForm(
+    createInitialDoctorSchedule()
+  );
+
+  setSchedulePreset({
+    work_start: "09:00",
+    work_end: "17:30",
+    lunch_start: "13:00",
+    lunch_end: "14:00",
+    slot_duration: 30,
+  });
+
+  setEditingEmployeeId(null);
+  setShowEmployeeForm(false);
+}
 
   function updateEmployeeField(e) {
     const { name, value } = e.target;
@@ -972,6 +996,146 @@ const [docAbsences, setDocAbsences] = useState([]);
     position: value,
     role: "doctor",
   }));
+}
+function updateSchedulePeriod(field, value) {
+  setDoctorScheduleForm((prev) => ({
+    ...prev,
+    [field]: value,
+  }));
+}
+
+function toggleScheduleDay(dayId) {
+  setDoctorScheduleForm((prev) => ({
+    ...prev,
+    days: {
+      ...prev.days,
+      [dayId]: {
+        ...prev.days[dayId],
+        is_working: !prev.days[dayId].is_working,
+      },
+    },
+  }));
+}
+
+function updateScheduleDay(dayId, field, value) {
+  setDoctorScheduleForm((prev) => ({
+    ...prev,
+    days: {
+      ...prev.days,
+      [dayId]: {
+        ...prev.days[dayId],
+        [field]:
+          field === "slot_duration"
+            ? Number(value)
+            : value,
+      },
+    },
+  }));
+}
+
+function selectAllScheduleDays() {
+  setDoctorScheduleForm((prev) => {
+    const updatedDays = {};
+
+    WEEK_DAYS.forEach((day) => {
+      updatedDays[day.id] = {
+        ...prev.days[day.id],
+        is_working: true,
+      };
+    });
+
+    return {
+      ...prev,
+      days: updatedDays,
+    };
+  });
+}
+
+function clearAllScheduleDays() {
+  setDoctorScheduleForm((prev) => {
+    const updatedDays = {};
+
+    WEEK_DAYS.forEach((day) => {
+      updatedDays[day.id] = {
+        ...prev.days[day.id],
+        is_working: false,
+      };
+    });
+
+    return {
+      ...prev,
+      days: updatedDays,
+    };
+  });
+}
+
+function updateSchedulePreset(field, value) {
+  setSchedulePreset((prev) => ({
+    ...prev,
+    [field]:
+      field === "slot_duration"
+        ? Number(value)
+        : value,
+  }));
+}
+
+function applyPresetToWorkingDays() {
+  setDoctorScheduleForm((prev) => {
+    const updatedDays = { ...prev.days };
+
+    WEEK_DAYS.forEach((day) => {
+      if (!updatedDays[day.id].is_working) {
+        return;
+      }
+
+      updatedDays[day.id] = {
+        ...updatedDays[day.id],
+        work_start: schedulePreset.work_start,
+        work_end: schedulePreset.work_end,
+        lunch_start: schedulePreset.lunch_start,
+        lunch_end: schedulePreset.lunch_end,
+        slot_duration: Number(schedulePreset.slot_duration),
+      };
+    });
+
+    return {
+      ...prev,
+      days: updatedDays,
+    };
+  });
+}
+
+function copyScheduleToOtherWorkingDays(sourceDayId) {
+  const sourceDay = doctorScheduleForm.days[sourceDayId];
+
+  if (!sourceDay) {
+    return;
+  }
+
+  setDoctorScheduleForm((prev) => {
+    const updatedDays = { ...prev.days };
+
+    WEEK_DAYS.forEach((day) => {
+      if (
+        day.id !== sourceDayId &&
+        updatedDays[day.id].is_working
+      ) {
+        updatedDays[day.id] = {
+          ...updatedDays[day.id],
+          work_start: sourceDay.work_start,
+          work_end: sourceDay.work_end,
+          lunch_start: sourceDay.lunch_start,
+          lunch_end: sourceDay.lunch_end,
+          slot_duration: sourceDay.slot_duration,
+        };
+      }
+    });
+
+    return {
+      ...prev,
+      days: updatedDays,
+    };
+  });
 }
 
   
@@ -1336,7 +1500,22 @@ const [docAbsences, setDocAbsences] = useState([]);
                   {savingEmployee ? "Сохранение..." : editingEmployeeId ? "Сохранить изменения" : "Добавить врача"}
                 </button>
 
-                <button type="button" onClick={() => setEmployeeForm(EMPTY_EMPLOYEE_FORM)} style={{ background: '#64748b', color: '#fff', border: 0, padding: '10px 20px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
+                <button type="button" onClick={() => {
+  setEmployeeForm(EMPTY_EMPLOYEE_FORM);
+
+  setDoctorScheduleForm(
+    createInitialDoctorSchedule()
+  );
+
+  setSchedulePreset({
+    work_start: "09:00",
+    work_end: "17:30",
+    lunch_start: "13:00",
+    lunch_end: "14:00",
+    slot_duration: 30,
+  });
+}}
+style={{ background: '#64748b', color: '#fff', border: 0, padding: '10px 20px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
                   Очистить
                 </button>
 
