@@ -183,7 +183,7 @@ export default function VisitsHistoryPage() {
   }, [iin]);
 
   const isAppointmentUpcoming = (app) => {
-    if (["completed", "cancelled", "rejected"].includes(app.status)) {
+    if (["completed", "cancelled", "rejected", "no_show"].includes(app.status)) {
       return false;
     }
     try {
@@ -198,6 +198,7 @@ export default function VisitsHistoryPage() {
   // Group appointments
   const upcomingApps = appointments.filter(isAppointmentUpcoming);
   const pastApps = appointments.filter(app => !isAppointmentUpcoming(app));
+  const displayedApps = activeTab === "upcoming" ? upcomingApps : pastApps;
 
   const formatDate = (dateStr) => {
     try {
@@ -215,26 +216,43 @@ export default function VisitsHistoryPage() {
 
   const getStatusLabel = (status) => {
     switch (status) {
-      case "pending":
-        return language === "en" ? "Pending Confirmation" : (language === "kz" ? "Растауды күтуде" : "Ожидает подтверждения");
-      case "approved":
+      case "scheduled":
+        return language === "en" ? "Scheduled" : (language === "kz" ? "Жоспарланған" : "Запланировано");
+      case "confirmed":
         return language === "en" ? "Confirmed" : (language === "kz" ? "Расталды" : "Подтверждено");
+      case "transfer_pending":
+        return language === "en" ? "Transfer Proposed" : (language === "kz" ? "Ауыстыру ұсынылды" : "Предложен перенос");
+      case "in_progress":
+        return language === "en" ? "In Progress" : (language === "kz" ? "Қабылдауда" : "На приеме");
+      case "waiting_finish_confirmation":
+        return language === "en" ? "Awaiting OTP" : (language === "kz" ? "OTP күтілуде" : "Ожидает OTP пациента");
       case "completed":
         return language === "en" ? "Completed" : (language === "kz" ? "Аяқталды" : "Прием завершен");
       case "cancelled":
         return language === "en" ? "Cancelled" : (language === "kz" ? "Бас тартылды" : "Отменено");
       case "rejected":
         return language === "en" ? "Rejected" : (language === "kz" ? "Қабылданбады" : "Отклонено");
+      case "no_show":
+        return language === "en" ? "No Show" : (language === "kz" ? "Келмеді" : "Не явился");
+      case "pending":
+        return language === "en" ? "Pending Confirmation" : (language === "kz" ? "Растауды күтуде" : "Ожидает подтверждения");
+      case "approved":
+        return language === "en" ? "Confirmed" : (language === "kz" ? "Расталды" : "Подтверждено");
       default:
         return language === "en" ? "In Progress" : (language === "kz" ? "Өңделуде" : "В обработке");
     }
   };
 
   const getStatusClass = (status) => {
+    if (status === "scheduled") return "approved";
+    if (status === "confirmed") return "approved";
+    if (status === "transfer_pending") return "pending";
+    if (status === "in_progress") return "pending";
+    if (status === "waiting_finish_confirmation") return "pending";
+    if (status === "completed") return "completed";
+    if (status === "cancelled" || status === "rejected" || status === "no_show") return "cancelled";
     if (status === "pending") return "pending";
     if (status === "approved") return "approved";
-    if (status === "completed") return "completed";
-    if (status === "cancelled" || status === "rejected") return "cancelled";
     return "";
   };
 
@@ -273,6 +291,50 @@ export default function VisitsHistoryPage() {
       alert("Сетевая ошибка при отправке оценки.");
     } finally {
       setRatingLoading(false);
+    }
+  };
+
+  const handleAcceptTransfer = async (appId) => {
+    if (!window.confirm(language === "en" ? "Are you sure you want to accept this transfer?" : "Вы уверены, что хотите согласиться на предложенное время переноса?")) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/organization-structure/appointments/${appId}/transfer/accept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(language === "en" ? "Appointment transferred successfully." : "Запись успешно перенесена.");
+        await fetchAppointments();
+      } else {
+        alert(data.message || "Ошибка подтверждения переноса.");
+      }
+    } catch (err) {
+      alert("Ошибка сети.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeclineTransfer = async (appId) => {
+    if (!window.confirm(language === "en" ? "Are you sure you want to decline this transfer? The appointment will be cancelled." : "Вы уверены, что хотите отказаться от переноса? Запись будет отменена.")) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/organization-structure/appointments/${appId}/transfer/decline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(language === "en" ? "Appointment cancelled." : "Запись отменена.");
+        await fetchAppointments();
+      } else {
+        alert(data.message || "Ошибка отмены.");
+      }
+    } catch (err) {
+      alert("Ошибка сети.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -430,7 +492,7 @@ export default function VisitsHistoryPage() {
                     </div>
                   </div>
 
-                  {app.start_code && (app.status === "pending" || app.status === "approved") && (
+                  {app.start_code && (app.status === "pending" || app.status === "approved" || app.status === "scheduled" || app.status === "confirmed") && (
                     <div style={{ marginTop: '12px', padding: '8px 12px', background: 'rgba(254, 240, 138, 0.15)', borderLeft: '4px solid #eab308', borderRadius: '8px', color: '#fef08a', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
                       <span className="visitDetailIcon" style={{ fontSize: '16px' }}>🔑</span>
                       <span>{t.verificationCode}: <b style={{ fontSize: '16px' }}>{app.start_code}</b></span>
@@ -451,16 +513,37 @@ export default function VisitsHistoryPage() {
                 </div>
               </div>
 
-              <div className="visitFooter" style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-                {(app.status === "pending" || app.status === "approved") && (
+              <div className="visitFooter" style={{ display: "flex", gap: "10px", marginTop: "10px", flexDirection: "column" }}>
+                {(app.status === "pending" || app.status === "approved" || app.status === "scheduled" || app.status === "confirmed") && (
                   <button
                     type="button"
                     className="booking-action-btn outline-btn"
-                    style={{ flex: 1, padding: "10px 14px", borderRadius: "12px", fontSize: "14px", fontWeight: "700" }}
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: "12px", fontSize: "14px", fontWeight: "700" }}
                     onClick={() => setSelectedApp(app)}
                   >
                     {t.btnTicket}
                   </button>
+                )}
+
+                {app.status === "transfer_pending" && (
+                  <div style={{ display: "flex", gap: "10px", width: "100%" }}>
+                    <button
+                      type="button"
+                      className="booking-action-btn"
+                      style={{ flex: 1, padding: "10px 14px", borderRadius: "12px", fontSize: "14px", fontWeight: "700", background: "linear-gradient(135deg, #10f3df, #00b85a)", color: "#020617", border: "none", cursor: "pointer" }}
+                      onClick={() => handleAcceptTransfer(app.id)}
+                    >
+                      {language === "en" ? "Accept" : "Принять"}
+                    </button>
+                    <button
+                      type="button"
+                      className="booking-action-btn outline-btn"
+                      style={{ flex: 1, padding: "10px 14px", borderRadius: "12px", fontSize: "14px", fontWeight: "700", border: "1px solid #ef4444", color: "#ef4444", background: "transparent", cursor: "pointer" }}
+                      onClick={() => handleDeclineTransfer(app.id)}
+                    >
+                      {language === "en" ? "Decline" : "Отклонить"}
+                    </button>
+                  </div>
                 )}
 
                 {app.status === "completed" && (
@@ -472,7 +555,7 @@ export default function VisitsHistoryPage() {
                     <button
                       type="button"
                       className="booking-action-btn"
-                      style={{ flex: 1, padding: "10px 14px", borderRadius: "12px", fontSize: "14px", fontWeight: "700", background: "linear-gradient(135deg, #10f3df, #00b85a)", color: "#020617" }}
+                      style={{ width: "100%", padding: "10px 14px", borderRadius: "12px", fontSize: "14px", fontWeight: "700", background: "linear-gradient(135deg, #10f3df, #00b85a)", color: "#020617" }}
                       onClick={() => {
                         setRatingApp(app);
                         setSelectedRating(10);

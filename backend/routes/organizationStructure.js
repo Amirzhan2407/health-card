@@ -426,7 +426,29 @@ if (employeeIds.length > 0) {
     .order("created_at", { ascending: true });
 
   if (!docsError) {
-    documents = docs || [];
+    const resolvedDocs = [];
+    for (const doc of (docs || [])) {
+      let signedUrl = null;
+      if (doc.file_url) {
+        if (doc.file_url.startsWith("http")) {
+          signedUrl = doc.file_url;
+        } else {
+          try {
+            const { data: sData } = await supabase.storage
+              .from(BUCKET_NAME)
+              .createSignedUrl(doc.file_url, 3600);
+            signedUrl = sData ? sData.signedUrl : null;
+          } catch (e) {
+            console.error("Error creating signed URL for doc:", doc.id, e.message);
+          }
+        }
+      }
+      resolvedDocs.push({
+        ...doc,
+        file_url: signedUrl || doc.file_url
+      });
+    }
+    documents = resolvedDocs;
   }
 }
 
@@ -882,9 +904,27 @@ for (let index = 0; index < (req.files || []).length; index += 1) {
     });
   }
 
-  const { data: publicUrlData } = supabase.storage
-    .from(BUCKET_NAME)
-    .getPublicUrl(filePath);
+  // Insert metadata to private_files
+  const { data: privFile, error: fileDbErr } = await supabase
+    .from("private_files")
+    .insert({
+      bucket: BUCKET_NAME,
+      storage_path: filePath,
+      file_name: fileName,
+      mime_type: file.mimetype,
+      file_size: file.size || file.buffer.length,
+      owner_id: ctx.userId,
+      related_record_id: employeeId
+    })
+    .select("*")
+    .single();
+
+  if (fileDbErr) {
+    return res.status(500).json({
+      success: false,
+      message: "Ошибка записи метаданных файла: " + fileDbErr.message,
+    });
+  }
 
   const { data: document, error: documentError } = await supabase
     .from("organization_employee_documents")
@@ -892,7 +932,7 @@ for (let index = 0; index < (req.files || []).length; index += 1) {
       organization_id: organizationId,
       employee_id: employeeId,
       file_name: documentType + "__" + safeFileName(file.originalname),
-      file_url: publicUrlData ? publicUrlData.publicUrl : null,
+      file_url: filePath, // Store path instead of public URL
     })
     .select("*")
     .single();
@@ -1545,7 +1585,7 @@ router.post("/appointments", async (req, res) => {
       .eq("employee_id", employee_id)
       .eq("date", date)
       .eq("time", time)
-      .not("status", "in", '("cancelled","rejected")')
+      .in("status", ["scheduled", "confirmed", "transfer_pending", "in_progress", "waiting_finish_confirmation", "completed"])
       .maybeSingle();
 
     if (checkErr) {
@@ -1694,15 +1734,46 @@ router.patch("/appointments/:id/status", async (req, res) => {
       return res.status(403).json({ success: false, message: "Доступ запрещен." });
     }
 
-    if (status === "completed") {
-      const expectedCode = String(appointment.verification_code || "").trim();
-      const providedCode = String(verificationCode || "").trim();
-      if (expectedCode && expectedCode !== providedCode) {
-        return res.status(400).json({
-          success: false,
-          message: "Неверный код подтверждения визита. Пожалуйста, введите правильный 4-значный код из талона пациента.",
-        });
+    // Strict status transitions validation
+    const oldStatus = appointment.status;
+    const newStatus = status;
+
+    const allowedRolesForStatus = ["patient", "doctor", "organization_admin", "support"];
+    if (!allowedRolesForStatus.includes(ctx.role)) {
+      return res.status(403).json({ success: false, message: "Недопустимая роль." });
+    }
+
+    const validStatuses = [
+      "scheduled", "confirmed", "transfer_pending", "transferred", 
+      "cancelled_by_patient", "cancelled_by_organization", 
+      "in_progress", "waiting_finish_confirmation", "completed", "no_show"
+    ];
+    if (!validStatuses.includes(newStatus)) {
+      return res.status(400).json({ success: false, message: `Недопустимый статус: ${newStatus}` });
+    }
+
+    let isValid = false;
+    if (oldStatus === newStatus) {
+      isValid = true;
+    } else if (ctx.role === "patient") {
+      if (newStatus === "cancelled_by_patient") {
+        isValid = ["scheduled", "confirmed", "transfer_pending"].includes(oldStatus);
       }
+    } else if (ctx.role === "doctor") {
+      if (newStatus === "no_show") {
+        isValid = ["scheduled", "confirmed"].includes(oldStatus);
+      }
+    } else if (ctx.role === "organization_admin" || ctx.role === "support") {
+      if (newStatus === "cancelled_by_organization") {
+        isValid = ["scheduled", "confirmed", "transfer_pending"].includes(oldStatus);
+      }
+    }
+
+    if (!isValid) {
+      return res.status(400).json({
+        success: false,
+        message: `Недопустимый переход статуса из "${oldStatus}" в "${newStatus}" для роли "${ctx.role}".`
+      });
     }
 
     const { data, error: updateErr } = await supabase
@@ -1852,13 +1923,32 @@ router.post("/support-upload", upload.any(), async (req, res) => {
 
     if (uploadError) throw uploadError;
 
-    const { data: publicUrlData } = supabase.storage
+    // Register upload in private_files metadata table
+    const { data: privFile, error: fileDbErr } = await supabase
+      .from("private_files")
+      .insert({
+        bucket: BUCKET_NAME,
+        storage_path: filePath,
+        file_name: fileName,
+        mime_type: file.mimetype,
+        file_size: file.size || file.buffer.length,
+        owner_id: ctx.userId,
+        related_record_id: organizationId
+      })
+      .select("*")
+      .single();
+
+    if (fileDbErr) throw fileDbErr;
+
+    // Generate signed URL
+    const { data: signedData } = await supabase.storage
       .from(BUCKET_NAME)
-      .getPublicUrl(filePath);
+      .createSignedUrl(filePath, 3600); // 1 hour expiration
 
     return res.status(201).json({
       success: true,
-      file_url: publicUrlData ? publicUrlData.publicUrl : null,
+      file_url: filePath, // Return storage path
+      signed_url: signedData ? signedData.signedUrl : null,
       file_name: fileName
     });
   } catch (error) {
@@ -2414,9 +2504,6 @@ router.post("/appointments/:id/transfer", async (req, res) => {
       .from("organization_appointments")
       .update({
         status: "transfer_pending",
-        employee_id: new_doctor_id,
-        date: new_date,
-        time: new_time,
         updated_at: new Date().toISOString()
       })
       .eq("id", appointmentId)
@@ -2436,6 +2523,122 @@ router.post("/appointments/:id/transfer", async (req, res) => {
     });
 
     return res.status(200).json({ success: true, message: "Предложение о переносе успешно отправлено.", appointment: updatedApp });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /api/organization-structure/appointments/:id/transfer/accept
+router.post("/appointments/:id/transfer/accept", async (req, res) => {
+  try {
+    const ctx = checkAuth(req, res, ["patient", "support"]);
+    if (!ctx) return;
+    const appointmentId = req.params.id;
+
+    // 1. Get the pending transfer proposal
+    const { data: transfer, error: transErr } = await supabase
+      .from("appointment_transfers")
+      .select("*")
+      .eq("appointment_id", appointmentId)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (transErr || !transfer) {
+      return res.status(404).json({ success: false, message: "Предложение о переносе не найдено или уже обработано." });
+    }
+
+    // 2. Update transfer status to confirmed
+    await supabase
+      .from("appointment_transfers")
+      .update({ status: "confirmed" })
+      .eq("id", transfer.id);
+
+    // 3. Generate a new start code for check-in
+    const newStartCode = Math.floor(1000 + Math.random() * 9000).toString();
+
+    // 4. Update the main appointment with the new doctor, date, time and status
+    const { data: updatedApp, error: updateErr } = await supabase
+      .from("organization_appointments")
+      .update({
+        employee_id: transfer.new_doctor_id,
+        date: transfer.new_date,
+        time: transfer.new_time,
+        status: "confirmed",
+        start_code: newStartCode,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", appointmentId)
+      .select("*")
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    // 5. Send notification to the patient
+    const { data: doc } = await supabase.from("organization_employees").select("full_name").eq("id", transfer.new_doctor_id).maybeSingle();
+    await supabase.from("notifications").insert({
+      user_id: updatedApp.patient_iin,
+      title: "Перенос приёма подтвержден",
+      message: `Вы подтвердили перенос приёма. Новый сеанс: ${transfer.new_date} в ${transfer.new_time} у врача ${doc?.full_name || "нового"}. Новый код талона: ${newStartCode}`,
+      link: `/visits-history`
+    });
+
+    return res.status(200).json({ success: true, message: "Перенос приёма успешно подтвержден.", appointment: updatedApp });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /api/organization-structure/appointments/:id/transfer/decline
+router.post("/appointments/:id/transfer/decline", async (req, res) => {
+  try {
+    const ctx = checkAuth(req, res, ["patient", "support"]);
+    if (!ctx) return;
+    const appointmentId = req.params.id;
+
+    // 1. Get the pending transfer proposal
+    const { data: transfer, error: transErr } = await supabase
+      .from("appointment_transfers")
+      .select("*")
+      .eq("appointment_id", appointmentId)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (transErr || !transfer) {
+      return res.status(404).json({ success: false, message: "Предложение о переносе не найдено или уже обработано." });
+    }
+
+    // 2. Update transfer status to declined
+    await supabase
+      .from("appointment_transfers")
+      .update({ status: "declined" })
+      .eq("id", transfer.id);
+
+    // 3. Cancel the main appointment (original doctor/date/time remain unchanged)
+    const { data: updatedApp, error: updateErr } = await supabase
+      .from("organization_appointments")
+      .update({
+        status: "cancelled",
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", appointmentId)
+      .select("*")
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    // 4. Send notification
+    await supabase.from("notifications").insert({
+      user_id: updatedApp.patient_iin,
+      title: "Перенос приёма отклонен",
+      message: `Вы отклонили перенос приёма. Запись отменена. Вы можете записаться на другое время.`,
+      link: `/visits-history`
+    });
+
+    return res.status(200).json({ success: true, message: "Перенос приёма успешно отклонен. Запись отменена.", appointment: updatedApp });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -2467,8 +2670,17 @@ router.post("/appointments/:id/start", async (req, res) => {
       return res.status(403).json({ success: false, message: "Доступ запрещен." });
     }
 
-    if (app.status === "cancelled" || app.status === "completed") {
-      return res.status(400).json({ success: false, message: "Нельзя начать отмененную или завершенную запись." });
+    const todayStr = new Date().toISOString().split("T")[0];
+    if (app.date !== todayStr) {
+      return res.status(400).json({ success: false, message: "Начать приём можно только в запланированный день приёма." });
+    }
+
+    if (app.actual_start_time) {
+      return res.status(400).json({ success: false, message: "Код уже был использован, приём по этой записи уже начат." });
+    }
+
+    if (!["scheduled", "confirmed", "transfer_pending"].includes(app.status)) {
+      return res.status(400).json({ success: false, message: "Статус записи не позволяет начать приём." });
     }
 
     const expected = String(app.start_code || app.verification_code || "").trim();
@@ -2604,7 +2816,7 @@ router.post("/appointments/:id/request-finish", async (req, res) => {
       link: `/visits-history`
     });
 
-    return res.status(200).json({ success: true, message: "Код подтверждения отправлен пациенту.", otp });
+    return res.status(200).json({ success: true, message: "Код подтверждения отправлен пациенту." });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -2759,7 +2971,31 @@ router.get("/patients/:iin/certificates", async (req, res) => {
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-    return res.status(200).json({ success: true, certificates: data || [] });
+
+    const resolved = [];
+    for (const cert of (data || [])) {
+      let signedUrl = null;
+      if (cert.file_url) {
+        if (cert.file_url.startsWith("http")) {
+          signedUrl = cert.file_url;
+        } else {
+          try {
+            const { data: sData } = await supabase.storage
+              .from(BUCKET_NAME)
+              .createSignedUrl(cert.file_url, 3600);
+            signedUrl = sData ? sData.signedUrl : null;
+          } catch (e) {
+            console.error("Error creating signed URL for cert:", cert.id, e.message);
+          }
+        }
+      }
+      resolved.push({
+        ...cert,
+        file_url: signedUrl || cert.file_url
+      });
+    }
+
+    return res.status(200).json({ success: true, certificates: resolved });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -2896,13 +3132,17 @@ router.post("/support/conversations", async (req, res) => {
     if (error) throw error;
 
     if (messageText || attachmentUrl) {
+      const resolvedSenderType = ctx.role === "support" ? "support" : "org_admin";
+      const resolvedSenderId = ctx.userId;
+      const resolvedSenderName = req.user.full_name || req.user.fullName || req.user.login || "Администратор";
+
       await supabase
         .from("support_messages")
         .insert({
           conversation_id: conv.id,
-          sender_type: "org_admin",
-          sender_id: senderId || organizationId,
-          sender_name: senderName || "Администратор",
+          sender_type: resolvedSenderType,
+          sender_id: resolvedSenderId,
+          sender_name: resolvedSenderName,
           message_text: messageText || description,
           attachment_url: attachmentUrl
         });
@@ -2962,15 +3202,18 @@ router.post("/support/conversations/:id/messages", async (req, res) => {
         return res.status(403).json({ success: false, message: "Доступ запрещен." });
       }
     }
-    const { senderType, senderId, senderName, messageText, attachmentUrl } = req.body;
+    const { messageText, attachmentUrl } = req.body;
+    const resolvedSenderType = ctx.role === "support" ? "support" : "org_admin";
+    const resolvedSenderId = ctx.userId;
+    const resolvedSenderName = req.user.full_name || req.user.fullName || req.user.login || "Администратор";
 
     const { data: msg, error } = await supabase
       .from("support_messages")
       .insert({
         conversation_id: id,
-        sender_type: senderType || "org_admin",
-        sender_id: senderId,
-        sender_name: senderName || "Администратор",
+        sender_type: resolvedSenderType,
+        sender_id: resolvedSenderId,
+        sender_name: resolvedSenderName,
         message_text: messageText,
         attachment_url: attachmentUrl
       })

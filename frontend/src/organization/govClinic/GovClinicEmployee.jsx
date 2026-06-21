@@ -623,12 +623,12 @@ export default function GovClinicEmployee() {
 
   const renderAppointmentCard = (app) => {
     const isToday = app.date === todayStr;
-    const isPast = app.status === "completed" || app.status === "cancelled" || app.status === "rejected" || app.date < todayStr;
+    const isPast = app.status === "completed" || app.status === "cancelled" || app.status === "rejected" || app.status === "no_show" || app.date < todayStr;
     const isFuture = !isToday && !isPast;
 
     let borderLeftColor = '#94a3b8';
     if (app.status === "completed") borderLeftColor = '#10b981';
-    else if (app.status === "cancelled" || app.status === "rejected") borderLeftColor = '#ef4444';
+    else if (app.status === "cancelled" || app.status === "rejected" || app.status === "no_show") borderLeftColor = '#ef4444';
     else if (isToday) borderLeftColor = '#10b981';
     else if (isFuture) borderLeftColor = '#f59e0b';
 
@@ -1144,7 +1144,7 @@ export default function GovClinicEmployee() {
   const getNearestAppointment = () => {
     const todayStr = new Date().toISOString().split("T")[0];
     const todays = appointments
-      .filter(a => a.date === todayStr && (a.status === "pending" || a.status === "arrived"))
+      .filter(a => a.date === todayStr && (a.status === "scheduled" || a.status === "confirmed"))
       .sort((a, b) => a.time.localeCompare(b.time));
     return todays.length > 0 ? todays[0] : null;
   };
@@ -1164,7 +1164,7 @@ export default function GovClinicEmployee() {
 
   // Sort and Filter History visits
   const filteredHistory = appointments.filter(app => {
-    const isPast = app.status === "completed" || app.status === "cancelled";
+    const isPast = app.status === "completed" || app.status === "cancelled" || app.status === "no_show";
     if (!isPast) return false;
 
     if (historySearch) {
@@ -1468,7 +1468,7 @@ export default function GovClinicEmployee() {
                           cellStyle.background = isFinished ? "#e2e8f0" : (isInProgress ? "#d1fae5" : "#e0f2fe");
                           cellStyle.borderLeft = isFinished ? "4px solid #94a3b8" : (isInProgress ? "4px solid #10b981" : "4px solid #3b82f6");
                           
-                          const noShowEnabled = isNoShowButtonEnabled(app.date, app.time) && (app.status === "pending" || app.status === "arrived");
+                          const noShowEnabled = isNoShowButtonEnabled(app.date, app.time) && (app.status === "scheduled" || app.status === "confirmed");
 
                           content = (
                             <div style={{ padding: "8px", fontSize: "13px" }}>
@@ -1482,7 +1482,7 @@ export default function GovClinicEmployee() {
                                 >
                                   {t("open") || "Открыть"}
                                 </button>
-                                {(app.status === "pending" || app.status === "arrived") && (
+                                {(app.status === "scheduled" || app.status === "confirmed") && (
                                   <button 
                                     type="button" 
                                     onClick={() => startAppointment(app)}
@@ -1494,7 +1494,7 @@ export default function GovClinicEmployee() {
                                 {noShowEnabled && (
                                   <button 
                                     type="button" 
-                                    onClick={() => updateAppointmentStatus(app.id, "cancelled")}
+                                    onClick={() => updateAppointmentStatus(app.id, "no_show")}
                                     style={{ padding: "2px 6px", fontSize: "10px", borderRadius: "4px", border: "0", background: "#ef4444", color: "#fff", cursor: "pointer", fontWeight: "bold" }}
                                   >
                                     {t("patientNotArrived") || "Не пришел"}
@@ -1592,6 +1592,7 @@ export default function GovClinicEmployee() {
                 <option value="">{t("allStatuses") || "Все статусы"}</option>
                 <option value="completed">Completed (Завершен)</option>
                 <option value="cancelled">Cancelled (Отменен)</option>
+                <option value="no_show">No show (Не явился)</option>
               </select>
               <input 
                 type="date"
@@ -1637,7 +1638,7 @@ export default function GovClinicEmployee() {
                           </td>
                           <td style={{ padding: "12px" }}>
                             <span className={`status-badge-mini ${item.status}`} style={{ fontSize: "11px" }}>
-                              {item.status === "completed" ? "Завершен" : "Отменен"}
+                              {item.status === "completed" ? "Завершен" : item.status === "no_show" ? "Не явился" : "Отменен"}
                             </span>
                           </td>
                           <td style={{ padding: "12px", fontSize: "13px" }}>
@@ -1819,6 +1820,74 @@ export default function GovClinicEmployee() {
         )}
 
       </div>
+
+      {/* Start Visit Code Modal */}
+      {showStartCodeModal && (
+        <div className="employee-modal" onClick={() => setShowStartCodeModal(false)}>
+          <div className="employee-modal-content" onClick={(e) => e.stopPropagation()} style={{ width: "min(400px, 100%)", padding: "24px" }}>
+            <div className="modal-header-row">
+              <h3>{t("verifyStartCode") || "Ввод кода начала приема"}</h3>
+              <button type="button" className="close-modal-btn" onClick={() => setShowStartCodeModal(false)}>×</button>
+            </div>
+            <form onSubmit={submitStartCode} style={{ marginTop: "16px", display: "grid", gap: "16px" }}>
+              <p style={{ fontSize: "14px", color: "#475569" }}>
+                Введите 4-значный цифровой код или код талона, полученный пациентом при записи.
+              </p>
+              <input
+                type="text"
+                maxLength="6"
+                value={startCodeInput}
+                onChange={(e) => setStartCodeInput(e.target.value)}
+                placeholder="Например: 1234"
+                style={{ padding: "10px", fontSize: "18px", textAlign: "center", letterSpacing: "4px", fontWeight: "bold", borderRadius: "8px", border: "1px solid #cbd5e1" }}
+                required
+              />
+              {startCodeError && <div style={{ color: "#ef4444", fontSize: "13px", fontWeight: "bold" }}>{startCodeError}</div>}
+              <button
+                type="submit"
+                disabled={verifying}
+                style={{ background: "#00b85a", color: "#fff", border: "0", padding: "12px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer" }}
+              >
+                {verifying ? "Проверка..." : "Начать прием"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Finish Visit OTP Modal */}
+      {showFinishOtpModal && (
+        <div className="employee-modal" onClick={() => setShowFinishOtpModal(false)}>
+          <div className="employee-modal-content" onClick={(e) => e.stopPropagation()} style={{ width: "min(400px, 100%)", padding: "24px" }}>
+            <div className="modal-header-row">
+              <h3>{t("verifyFinishOtp") || "Подтверждение завершения приема"}</h3>
+              <button type="button" className="close-modal-btn" onClick={() => setShowFinishOtpModal(false)}>×</button>
+            </div>
+            <form onSubmit={submitFinishOtp} style={{ marginTop: "16px", display: "grid", gap: "16px" }}>
+              <p style={{ fontSize: "14px", color: "#475569" }}>
+                Пациенту отправлено SMS с одноразовым кодом подтверждения. Пожалуйста, введите код для завершения приема.
+              </p>
+              <input
+                type="text"
+                maxLength="4"
+                value={otpInput}
+                onChange={(e) => setOtpInput(e.target.value)}
+                placeholder="4-значный код"
+                style={{ padding: "10px", fontSize: "18px", textAlign: "center", letterSpacing: "4px", fontWeight: "bold", borderRadius: "8px", border: "1px solid #cbd5e1" }}
+                required
+              />
+              {finishError && <div style={{ color: "#ef4444", fontSize: "13px", fontWeight: "bold" }}>{finishError}</div>}
+              <button
+                type="submit"
+                disabled={verifying}
+                style={{ background: "#00b85a", color: "#fff", border: "0", padding: "12px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer" }}
+              >
+                {verifying ? "Проверка..." : "Подтвердить завершение"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

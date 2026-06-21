@@ -1,6 +1,7 @@
 import { verifyAdminToken } from "../services/adminService.js";
+import { supabase } from "../lib/supabaseAdmin.js";
 
-export function requireAdminAuth(req, res, next) {
+export async function requireAdminAuth(req, res, next) {
   try {
     const authHeader = req.headers.authorization || "";
     const token = authHeader.startsWith("Bearer ")
@@ -14,7 +15,28 @@ export function requireAdminAuth(req, res, next) {
       });
     }
 
-    req.admin = verifyAdminToken(token);
+    const decoded = verifyAdminToken(token);
+
+    // Validate role and active status in DB
+    const { data: admin, error } = await supabase
+      .from("site_admins")
+      .select("id, role, is_active, username, full_name")
+      .eq("id", decoded.id)
+      .maybeSingle();
+
+    if (error || !admin || !admin.is_active || admin.role !== "support") {
+      return res.status(403).json({
+        success: false,
+        message: "Доступ запрещен. Недействительный аккаунт поддержки.",
+      });
+    }
+
+    req.admin = {
+      id: admin.id,
+      username: admin.username,
+      fullName: admin.full_name,
+      role: admin.role
+    };
     return next();
   } catch (error) {
     return res.status(401).json({
@@ -25,8 +47,7 @@ export function requireAdminAuth(req, res, next) {
 }
 
 export function requireSuperAdmin(req, res, next) {
-  const allowedRoles = ["super_admin", "site_support", "support_admin"];
-  if (!req.admin || !allowedRoles.includes(req.admin.role)) {
+  if (!req.admin || req.admin.role !== "support") {
     return res.status(403).json({
       success: false,
       message: "Доступ только для администратора техподдержки.",

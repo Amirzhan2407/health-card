@@ -93,7 +93,13 @@ export default function GovClinicLayout() {
                 {t("deptsTab") || "Отделения и кабинеты"}
               </button>
 
-              
+              <button
+                type="button"
+                className={currentTab === "schedules" ? "active" : ""}
+                onClick={() => goAdminTab("schedules")}
+              >
+                {t("schedulesTab") || "Графики"}
+              </button>
 
               <button
                 type="button"
@@ -120,7 +126,7 @@ export default function GovClinicLayout() {
               </button>
             </>
           ) : null}
-
+          
           {isEmployeeRole ? (
             <>
               <button
@@ -150,13 +156,6 @@ export default function GovClinicLayout() {
                 onClick={() => goEmployeeTab("notifications")}
               >
                 {t("notificationsTab") || "Уведомления"}
-              </button>
-              <button
-                type="button"
-                className={currentTab === "profile" ? "active" : ""}
-                onClick={() => goEmployeeTab("profile")}
-              >
-                {t("profileTab") || "Мой профиль"}
               </button>
             </>
           ) : null}

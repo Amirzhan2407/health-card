@@ -1240,10 +1240,14 @@ function copyScheduleToOtherWorkingDays(sourceDayId) {
 
   useEffect(() => {
     if (selectedEmployee) {
-      setActiveSubTab("info");
+      if (tab === "schedules") {
+        setActiveSubTab("schedule");
+      } else {
+        setActiveSubTab("info");
+      }
       loadSelectedEmployeeData(selectedEmployee.id);
     }
-  }, [selectedEmployee]);
+  }, [selectedEmployee, tab]);
 
   async function loadSelectedEmployeeData(empId) {
     try {
@@ -2123,11 +2127,98 @@ style={{ background: '#64748b', color: '#fff', border: 0, padding: '10px 20px', 
         </div>
       )}
 
-      
+      {/* -------------------- TAB: SCHEDULES -------------------- */}
+      {tab === "schedules" && (
+        <section className="gov-card">
+          <div className="employee-top" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+            <div>
+              <h3>Графики работы врачей</h3>
+              <p className="gov-page-subtitle">
+                Выберите врача из списка, чтобы настроить его еженедельный график работы.
+              </p>
+            </div>
+          </div>
 
-      
+          <div className="employee-filters" style={{ display: "flex", gap: "12px", marginBottom: "20px", flexWrap: "wrap" }}>
+            <input
+              value={filters.search}
+              onChange={(e) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  search: e.target.value,
+                }))
+              }
+              placeholder="Поиск по ФИО, должности"
+              style={{ flex: 1, padding: "8px 12px", borderRadius: "10px", border: "1px solid #cbd5e1" }}
+            />
 
-      
+            <select
+              value={filters.departmentId}
+              onChange={(e) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  departmentId: e.target.value,
+                }))
+              }
+              style={{ padding: "8px 12px", borderRadius: "10px", border: "1px solid #cbd5e1" }}
+            >
+              <option value="all">Все отделения</option>
+              {departments.map((department) => (
+                <option key={department.id} value={department.id}>
+                  {department.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="employee-card-list">
+            {filteredEmployees.length ? (
+              filteredEmployees.map((employee) => {
+                const item = normalizeEmployee(employee);
+
+                return (
+                  <div
+                    className="employee-card"
+                    key={item.id}
+                    onClick={() => setSelectedEmployee(item)}
+                    style={{ padding: "16px", borderRadius: "16px", border: "1px solid #e2e8f0", marginBottom: "12px", background: "#ffffff", cursor: "pointer" }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                      <div>
+                        <h4 style={{ margin: 0, fontSize: "16px", color: "#1e293b" }}>{item.fullName}</h4>
+                        <p style={{ margin: "4px 0 0", color: "#00b85a", fontWeight: "bold", fontSize: "14px" }}>
+                          {item.position || "Врач"}
+                        </p>
+                        <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: "13px" }}>
+                          Кабинет: {item.cabinet || "—"} | Отделение: {getDepartmentName(item.departmentId)}
+                        </p>
+                      </div>
+                      <div>
+                        <button
+                          type="button"
+                          style={{
+                            background: "#00b85a",
+                            color: "#ffffff",
+                            border: 0,
+                            borderRadius: "10px",
+                            padding: "8px 16px",
+                            fontWeight: "bold",
+                            cursor: "pointer"
+                          }}
+                        >
+                          Настроить график
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="empty-text">Врачи не найдены.</p>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* -------------------- TAB: TRANSFERS -------------------- */}
       {tab === "transfers" && (
@@ -2581,53 +2672,55 @@ style={{ background: '#64748b', color: '#fff', border: 0, padding: '10px 20px', 
             <p>{selectedEmployee.specialty || selectedEmployee.position}</p>
 
             {/* Modal tabs */}
-            <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '20px' }}>
-              <button
-                type="button"
-                onClick={() => setActiveSubTab("info")}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  border: 0,
-                  background: activeSubTab === 'info' ? '#1e293b' : 'transparent',
-                  color: activeSubTab === 'info' ? '#ffffff' : '#64748b',
-                  fontWeight: 'bold',
-                  cursor: 'pointer'
-                }}
-              >
-                {t("generalInfo") || "Информация"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveSubTab("schedule")}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  border: 0,
-                  background: activeSubTab === 'schedule' ? '#1e293b' : 'transparent',
-                  color: activeSubTab === 'schedule' ? '#ffffff' : '#64748b',
-                  fontWeight: 'bold',
-                  cursor: 'pointer'
-                }}
-              >
-                {t("scheduleConstructorTab") || "График работы"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveSubTab("absences")}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  border: 0,
-                  background: activeSubTab === 'absences' ? '#1e293b' : 'transparent',
-                  color: activeSubTab === 'absences' ? '#ffffff' : '#64748b',
-                  fontWeight: 'bold',
-                  cursor: 'pointer'
-                }}
-              >
-                {t("absencesExceptionsTab") || "Отсутствия и исключения"}
-              </button>
-            </div>
+            {tab !== "schedules" && (
+              <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '20px' }}>
+                <button
+                  type="button"
+                  onClick={() => setActiveSubTab("info")}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: 0,
+                    background: activeSubTab === 'info' ? '#1e293b' : 'transparent',
+                    color: activeSubTab === 'info' ? '#ffffff' : '#64748b',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {t("generalInfo") || "Информация"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveSubTab("schedule")}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: 0,
+                    background: activeSubTab === 'schedule' ? '#1e293b' : 'transparent',
+                    color: activeSubTab === 'schedule' ? '#ffffff' : '#64748b',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {t("scheduleConstructorTab") || "График работы"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveSubTab("absences")}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: 0,
+                    background: activeSubTab === 'absences' ? '#1e293b' : 'transparent',
+                    color: activeSubTab === 'absences' ? '#ffffff' : '#64748b',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {t("absencesExceptionsTab") || "Отсутствия и исключения"}
+                </button>
+              </div>
+            )}
 
             {/* TAB CONTENT: General Info */}
             {activeSubTab === "info" && (
