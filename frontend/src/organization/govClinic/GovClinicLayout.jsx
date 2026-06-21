@@ -1,201 +1,213 @@
 
 import { useEffect } from "react";
 import { Outlet, useNavigate, Navigate, useSearchParams, useLocation } from "react-router-dom";
+import { useLanguage } from "../../i18n/LanguageContext";
+import LanguageSwitcher from "../../components/LanguageSwitcher";
 import "./govClinic.css";
 
 export default function GovClinicLayout() {
-const navigate = useNavigate();
-const location = useLocation();
-const [searchParams] = useSearchParams();
-const currentTab = searchParams.get("tab") || "dashboard";
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const currentTab = searchParams.get("tab") || "dashboard";
+  const { t } = useLanguage();
 
-const user = JSON.parse(
-localStorage.getItem("organizationUser") || "null"
-);
+  const user = JSON.parse(
+    localStorage.getItem("organizationUser") || "null"
+  );
 
-if (!user) {
-return <Navigate to="/organization-login" replace />;
-}
-
-const isEmployeeRole = ["doctor", "nurse", "registrar", "department_head", "deputy_chief_doctor"].includes(user?.role);
-const isAdmin = user?.role === "organization_admin" || user?.role === "admin" || user?.role === "hr" || (user?.role === "employee" && !isEmployeeRole);
-const isChiefDoctor = false;
-const isHr = false;
-
-useEffect(() => {
-  const path = location.pathname;
-  if (isAdmin && !path.includes("system-admin")) {
-    navigate("/organization/gov-clinic/system-admin?tab=dashboard", { replace: true });
-  } else if (isEmployeeRole && !path.includes("employee")) {
-    navigate("/organization/gov-clinic/employee?tab=dashboard", { replace: true });
-  }
-}, [location.pathname, isAdmin, isEmployeeRole]);
-
-
-function logout() {
-  localStorage.removeItem("organizationUser");
-  localStorage.removeItem("organizationData");
-  localStorage.removeItem("organizationToken");
-  navigate("/organization-login");
-}
-
-function goAdminTab(tab) {
-  navigate("/organization/gov-clinic/system-admin?tab=" + tab);
-}
-
-function goEmployeeTab(tab) {
-  navigate("/organization/gov-clinic/employee?tab=" + tab);
-}
-
-const employeeTabs = {
-  doctor: [
-    { id: "dashboard", label: "Главная" },
-    { id: "appointments", label: "Записи" },
-    { id: "patients", label: "Пациенты" },
-    { id: "medical_records", label: "Медицинская карта" },
-    { id: "documents", label: "Документы" },
-    { id: "notifications", label: "Уведомления" }
-  ],
-  nurse: [
-    { id: "dashboard", label: "Главная" },
-    { id: "appointments", label: "Записи" },
-    { id: "patients", label: "Пациенты" },
-    { id: "documents", label: "Документы" },
-    { id: "notifications", label: "Уведомления" }
-  ],
-  registrar: [
-    { id: "dashboard", label: "Главная" },
-    { id: "appointments", label: "Записи" },
-    { id: "patients", label: "Пациенты" },
-    { id: "notifications", label: "Уведомления" }
-  ],
-  department_head: [
-    { id: "dashboard", label: "Главная" },
-    { id: "appointments", label: "Записи" },
-    { id: "patients", label: "Пациенты" },
-    { id: "medical_records", label: "Медицинская карта" },
-    { id: "documents", label: "Документы" },
-    { id: "notifications", label: "Уведомления" },
-    { id: "department_staff", label: "Сотрудники отделения" }
-  ],
-  deputy_chief_doctor: [
-    { id: "dashboard", label: "Главная" },
-    { id: "appointments", label: "Записи" },
-    { id: "patients", label: "Пациенты" },
-    { id: "medical_records", label: "Медицинская карта" },
-    { id: "documents", label: "Документы" },
-    { id: "notifications", label: "Уведомления" },
-    { id: "control", label: "Контроль" }
-  ]
-};
-
-function getCabinetTitle() {
-  if (isAdmin) {
-    return "Кабинет администратора организации";
+  if (!user || user.must_change_password) {
+    return <Navigate to="/organization-login" replace />;
   }
 
-  if (isEmployeeRole) {
-    return "Кабинет сотрудника";
+  const isEmployeeRole = user?.role === "doctor";
+  const isAdmin = user?.role === "organization_admin";
+
+  useEffect(() => {
+    const path = location.pathname;
+    if (user?.must_change_password) {
+      navigate("/organization-login", { replace: true });
+      return;
+    }
+    if (isAdmin && !path.includes("system-admin")) {
+      navigate("/organization/gov-clinic/system-admin?tab=dashboard", { replace: true });
+    } else if (isEmployeeRole && !path.includes("employee")) {
+      navigate("/organization/gov-clinic/employee?tab=dashboard", { replace: true });
+    }
+  }, [location.pathname, isAdmin, isEmployeeRole, user?.must_change_password]);
+
+  function logout() {
+    localStorage.removeItem("organizationUser");
+    localStorage.removeItem("organizationData");
+    localStorage.removeItem("organizationToken");
+    navigate("/organization-login");
   }
 
-  return "Кабинет сотрудника организации";
-}
+  function goAdminTab(tab) {
+    navigate("/organization/gov-clinic/system-admin?tab=" + tab);
+  }
 
-return ( <div className="gov-clinic-shell"> <aside className="gov-clinic-sidebar"> <div className="gov-clinic-logo"> <h2>Clinic OS</h2> <p>{getCabinetTitle()}</p> </div>
+  function goEmployeeTab(tab) {
+    navigate("/organization/gov-clinic/employee?tab=" + tab);
+  }
 
+  function getCabinetTitle() {
+    if (isAdmin) {
+      return t("cabinetTitleAdmin") || "Кабинет администратора";
+    }
+    return t("cabinetTitleDoctor") || "Кабинет врача";
+  }
 
-    <nav className="gov-clinic-nav">
-      {isAdmin ? (
-        <>
-          <button
-            type="button"
-            className={currentTab === "dashboard" ? "active" : ""}
-            onClick={() => goAdminTab("dashboard")}
-          >
-            Организация
-          </button>
+  return (
+    <div className="gov-clinic-shell">
+      <aside className="gov-clinic-sidebar">
+        <div className="gov-clinic-logo">
+          <h2>Clinic OS</h2>
+          <p>{getCabinetTitle()}</p>
+        </div>
 
-          <button
-            type="button"
-            className={currentTab === "departments" ? "active" : ""}
-            onClick={() => goAdminTab("departments")}
-          >
-            Отделения
-          </button>
+        <nav className="gov-clinic-nav">
+          {isAdmin ? (
+            <>
+              <button
+                type="button"
+                className={currentTab === "dashboard" ? "active" : ""}
+                onClick={() => goAdminTab("dashboard")}
+              >
+                {t("orgTab") || "Главная"}
+              </button>
 
-          <button
-            type="button"
-            className={currentTab === "employees" || currentTab === "add" ? "active" : ""}
-            onClick={() => goAdminTab("employees")}
-          >
-            Сотрудники
-          </button>
+              <button
+                type="button"
+                className={currentTab === "employees" ? "active" : ""}
+                onClick={() => goAdminTab("employees")}
+              >
+                {t("doctorsTab") || "Врачи"}
+              </button>
 
-          <button
-            type="button"
-            className={currentTab === "documents" ? "active" : ""}
-            onClick={() => goAdminTab("documents")}
-          >
-            Документы
-          </button>
+              <button
+                type="button"
+                className={currentTab === "departments" ? "active" : ""}
+                onClick={() => goAdminTab("departments")}
+              >
+                {t("deptsTab") || "Отделения и кабинеты"}
+              </button>
 
-          <button
-            type="button"
-            className={currentTab === "support" ? "active" : ""}
-            onClick={() => goAdminTab("support")}
-          >
-            Поддержка
-          </button>
-        </>
-      ) : null}
+              <button
+                type="button"
+                className={currentTab === "schedules" ? "active" : ""}
+                onClick={() => goAdminTab("schedules")}
+              >
+                {t("schedulesTab") || "Графики врачей"}
+              </button>
 
-      {isEmployeeRole ? (
-        <>
-          {(employeeTabs[user?.role] || []).map((tab) => (
+              <button
+                type="button"
+                className={currentTab === "absences" ? "active" : ""}
+                onClick={() => goAdminTab("absences")}
+              >
+                {t("absencesTab") || "Отсутствия и блокировки"}
+              </button>
+
+              <button
+                type="button"
+                className={currentTab === "transfers" ? "active" : ""}
+                onClick={() => goAdminTab("transfers")}
+              >
+                {t("transfersTab") || "Перенос записей"}
+              </button>
+
+              <button
+                type="button"
+                className={currentTab === "notifications" ? "active" : ""}
+                onClick={() => goAdminTab("notifications")}
+              >
+                {t("notificationsTab") || "Уведомления"}
+              </button>
+
+              <button
+                type="button"
+                className={currentTab === "support" ? "active" : ""}
+                onClick={() => goAdminTab("support")}
+              >
+                {t("supportTab") || "Чат с технической поддержкой"}
+              </button>
+            </>
+          ) : null}
+
+          {isEmployeeRole ? (
+            <>
+              <button
+                type="button"
+                className={currentTab === "dashboard" ? "active" : ""}
+                onClick={() => goEmployeeTab("dashboard")}
+              >
+                {t("dashboardTab") || "Главная"}
+              </button>
+              <button
+                type="button"
+                className={currentTab === "appointments" ? "active" : ""}
+                onClick={() => goEmployeeTab("appointments")}
+              >
+                {t("appointmentsTab") || "Записи"}
+              </button>
+              <button
+                type="button"
+                className={currentTab === "history" ? "active" : ""}
+                onClick={() => goEmployeeTab("history")}
+              >
+                {t("historyTab") || "История посещений"}
+              </button>
+              <button
+                type="button"
+                className={currentTab === "notifications" ? "active" : ""}
+                onClick={() => goEmployeeTab("notifications")}
+              >
+                {t("notificationsTab") || "Уведомления"}
+              </button>
+              <button
+                type="button"
+                className={currentTab === "profile" ? "active" : ""}
+                onClick={() => goEmployeeTab("profile")}
+              >
+                {t("profileTab") || "Мой профиль"}
+              </button>
+            </>
+          ) : null}
+        </nav>
+
+        <button
+          type="button"
+          className="gov-clinic-logout-mobile"
+          onClick={logout}
+        >
+          {t("logoutButton") || "Выйти"}
+        </button>
+      </aside>
+
+      <main className="gov-clinic-main">
+        <header className="gov-clinic-header">
+          <div>
+            <h1>{getCabinetTitle()}</h1>
+            <p>{user.full_name || "Пользователь организации"}</p>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <LanguageSwitcher />
             <button
-              key={tab.id}
               type="button"
-              className={currentTab === tab.id ? "active" : ""}
-              onClick={() => goEmployeeTab(tab.id)}
+              className="gov-clinic-login-link"
+              onClick={logout}
             >
-              {tab.label}
+              {t("logoutButton") || "Выйти"}
             </button>
-          ))}
-        </>
-      ) : null}
-    </nav>
+          </div>
+        </header>
 
-    <button
-      type="button"
-      className="gov-clinic-logout-mobile"
-      onClick={logout}
-    >
-      Выйти
-    </button>
-  </aside>
-
-  <main className="gov-clinic-main">
-    <header className="gov-clinic-header">
-      <div>
-        <h1>{getCabinetTitle()}</h1>
-        <p>{user.full_name || "Пользователь организации"}</p>
-      </div>
-
-      <button
-        type="button"
-        className="gov-clinic-login-link"
-        onClick={logout}
-      >
-        Выйти
-      </button>
-    </header>
-
-    <section className="gov-clinic-content">
-      <Outlet />
-    </section>
-  </main>
-</div>
-
-
-);
+        <section className="gov-clinic-content">
+          <Outlet />
+        </section>
+      </main>
+    </div>
+  );
 }

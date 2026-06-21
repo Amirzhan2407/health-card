@@ -108,17 +108,63 @@ function safeFileName(name) {
 }
 
 function getRoleByPosition(position) {
-const value = String(position || "").toLowerCase();
+  const value = String(position || "").toLowerCase();
+  if (value.includes("врач") || value.includes("doctor")) return "doctor";
+  if (value.includes("администратор") || value.includes("admin")) return "organization_admin";
+  return "doctor"; // Врач по умолчанию
+}
 
-if (value.includes("отдел кадров")) return "hr";
-if (value.includes("заместитель")) return "deputy_chief_doctor";
-if (value.includes("завед")) return "department_head";
-if (value.includes("регистратор")) return "registrar";
-if (value.includes("медсестр")) return "nurse";
-if (value.includes("врач")) return "doctor";
-if (value.includes("администратор")) return "organization_admin";
+async function checkCabinetOverlap(employeeId, cabinet, organizationId, workStart, workEnd, workDays) {
+  if (!cabinet) return false;
 
-return "employee";
+  // 1. Fetch other active employees in the same cabinet
+  let query = supabase
+    .from("organization_employees")
+    .select("id, full_name")
+    .eq("organization_id", organizationId)
+    .eq("cabinet", cabinet)
+    .eq("status", "active");
+
+  if (employeeId) {
+    query = query.neq("id", employeeId);
+  }
+
+  const { data: others } = await query;
+  if (!others || others.length === 0) return false;
+
+  const otherIds = others.map(o => o.id);
+
+  // 2. Fetch their schedules
+  const { data: schedules } = await supabase
+    .from("doctor_schedules")
+    .select("*")
+    .in("employee_id", otherIds);
+
+  const fallbackShifts = loadFallbackShifts();
+
+  // 3. Check overlaps
+  for (const other of others) {
+    let sched = (schedules || []).find(s => s.employee_id === other.id);
+    if (!sched) {
+      const fb = fallbackShifts[other.id] || { work_start: "08:00", work_end: "17:00" };
+      sched = {
+        work_days: [1, 2, 3, 4, 5],
+        work_start: fb.work_start,
+        work_end: fb.work_end
+      };
+    }
+
+    // Check if working days intersect
+    const daysIntersect = workDays.some(d => sched.work_days.includes(d));
+    if (daysIntersect) {
+      // Check if times intersect: (start1 < end2) and (end1 > start2)
+      if (workStart < sched.work_end && workEnd > sched.work_start) {
+        return `Кабинет ${cabinet} уже занят врачом ${other.full_name} в это время (${sched.work_start}–${sched.work_end}, дни: ${sched.work_days.join(",")})`;
+      }
+    }
+  }
+
+  return false;
 }
 
 router.get("/departments", async (req, res) => {
@@ -336,14 +382,26 @@ if (!organizationId) {
   });
 }
 
-if (!fullName || !position || !departmentId) {
-  return res.status(400).json({
-    success: false,
-    message: "ФИО, должность и отделение обязательны.",
-  });
-}
+    if (!fullName || !position || !departmentId) {
+      return res.status(400).json({
+        success: false,
+        message: "ФИО, должность и отделение обязательны.",
+      });
+    }
 
-const { data: employee, error } = await supabase
+    const workStart = req.body.work_start || req.body.workStart || "08:00";
+    const workEnd = req.body.work_end || req.body.workEnd || "17:00";
+    const workDays = req.body.work_days || [1, 2, 3, 4, 5];
+
+    const overlapError = await checkCabinetOverlap(null, cabinet, organizationId, workStart, workEnd, workDays);
+    if (overlapError) {
+      return res.status(400).json({
+        success: false,
+        message: overlapError
+      });
+    }
+
+    const { data: employee, error } = await supabase
   .from("organization_employees")
   .insert({
     organization_id: organizationId,
@@ -444,6 +502,42 @@ const { data: currentEmployee } = await supabase
   .select("*")
   .eq("id", employeeId)
   .maybeSingle();
+
+if (currentEmployee && payload.cabinet !== undefined && payload.cabinet !== currentEmployee.cabinet) {
+  let sched = null;
+  const { data: dbSched } = await supabase
+    .from("doctor_schedules")
+    .select("*")
+    .eq("employee_id", employeeId)
+    .maybeSingle();
+
+  if (dbSched) {
+    sched = dbSched;
+  } else {
+    const fb = loadFallbackShifts()[employeeId] || { work_start: "08:00", work_end: "17:00" };
+    sched = {
+      work_days: [1, 2, 3, 4, 5],
+      work_start: fb.work_start,
+      work_end: fb.work_end
+    };
+  }
+
+  const overlapError = await checkCabinetOverlap(
+    employeeId,
+    payload.cabinet,
+    currentEmployee.organization_id,
+    sched.work_start,
+    sched.work_end,
+    sched.work_days
+  );
+
+  if (overlapError) {
+    return res.status(400).json({
+      success: false,
+      message: overlapError
+    });
+  }
+}
 
 const { data: updatedEmployee, error } = await supabase
   .from("organization_employees")
@@ -1186,22 +1280,28 @@ router.get("/public/organizations", async (req, res) => {
 router.get("/appointments", async (req, res) => {
   try {
     const employeeId = req.query.employee_id || req.query.employeeId;
+    const organizationId = req.query.organization_id || req.query.organizationId;
     const date = req.query.date;
     const startDate = req.query.startDate;
     const endDate = req.query.endDate;
 
-    if (!employeeId) {
+    if (!employeeId && !organizationId) {
       return res.status(400).json({
         success: false,
-        message: "employee_id обязателен.",
+        message: "employee_id или organization_id обязателен.",
       });
     }
 
     try {
       let query = supabase
         .from("organization_appointments")
-        .select("*")
-        .eq("employee_id", employeeId);
+        .select("*");
+
+      if (employeeId) {
+        query = query.eq("employee_id", employeeId);
+      } else {
+        query = query.eq("organization_id", organizationId);
+      }
 
       if (date) {
         query = query.eq("date", date);
@@ -1222,7 +1322,13 @@ router.get("/appointments", async (req, res) => {
     } catch (dbErr) {
       console.warn("DB appointments query failed, fallback to memory:", dbErr.message);
       const list = loadFallbackAppointments();
-      let filtered = list.filter((app) => app.employee_id === employeeId);
+      let filtered = list;
+
+      if (employeeId) {
+        filtered = filtered.filter((app) => app.employee_id === employeeId);
+      } else {
+        filtered = filtered.filter((app) => app.organization_id === organizationId);
+      }
 
       if (date) {
         filtered = filtered.filter((app) => app.date === date);
@@ -1319,11 +1425,23 @@ router.get("/appointments/patient/:iin", async (req, res) => {
     const orgMap = Object.fromEntries(organizations.map(o => [o.id, o]));
     const empMap = Object.fromEntries(employees.map(e => [e.id, e]));
 
+    let ratedAppIds = [];
+    try {
+      const { data: ratings } = await supabase
+        .from("doctor_ratings")
+        .select("appointment_id")
+        .eq("patient_id", iin);
+      if (ratings) {
+        ratedAppIds = ratings.map(r => r.appointment_id);
+      }
+    } catch (e) {}
+
     const formatted = appointments.map(app => {
       const org = orgMap[app.organization_id];
       const emp = empMap[app.employee_id];
       return {
         ...app,
+        rated: ratedAppIds.includes(app.id),
         organization_name: org ? org.organization_name : "Медицинская организация",
         doctor_name: emp ? emp.full_name : "Врач",
         doctor_position: emp ? emp.position : "",
@@ -1721,6 +1839,986 @@ router.post("/support-upload", upload.any(), async (req, res) => {
       success: false,
       message: error.message || "Ошибка загрузки документа.",
     });
+  }
+});
+
+});
+
+// POST /api/organization-structure/employees/:id/schedule
+router.post("/employees/:id/schedule", async (req, res) => {
+  try {
+    const employeeId = req.params.id;
+    const { work_days, work_start, work_end, lunch_start, lunch_end, slot_duration, start_date, end_date, daily_schedules } = req.body;
+
+    const schedule = {
+      employee_id: employeeId,
+      work_days: work_days || [1, 2, 3, 4, 5],
+      work_start: work_start || "09:00",
+      work_end: work_end || "18:00",
+      lunch_start: lunch_start || "13:00",
+      lunch_end: lunch_end || "14:00",
+      slot_duration: slot_duration || 30,
+      start_date: start_date || new Date().toISOString().split('T')[0],
+      end_date: end_date || null,
+      daily_schedules: daily_schedules || null
+    };
+
+    saveFallbackShift(employeeId, { work_start: schedule.work_start, work_end: schedule.work_end });
+
+    const { data, error } = await supabase
+      .from("doctor_schedules")
+      .upsert(schedule, { onConflict: "employee_id" })
+      .select("*")
+      .single();
+
+    if (error) {
+      console.warn("doctor_schedules table failed, saving fallback:", error.message);
+      return res.status(200).json({ success: true, message: "График сохранен (fallback).", schedule });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Рабочий график успешно сохранен.",
+      schedule: data
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/organization-structure/employees/:id/schedule
+router.get("/employees/:id/schedule", async (req, res) => {
+  try {
+    const employeeId = req.params.id;
+    const { data, error } = await supabase
+      .from("doctor_schedules")
+      .select("*")
+      .eq("employee_id", employeeId)
+      .maybeSingle();
+
+    if (error || !data) {
+      const shift = loadFallbackShifts()[employeeId] || { work_start: "08:00", work_end: "17:00" };
+      return res.status(200).json({
+        success: true,
+        schedule: {
+          employee_id: employeeId,
+          work_days: [1, 2, 3, 4, 5],
+          work_start: shift.work_start,
+          work_end: shift.work_end,
+          lunch_start: "13:00",
+          lunch_end: "14:00",
+          slot_duration: 30
+        }
+      });
+    }
+
+    return res.status(200).json({ success: true, schedule: data });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/organization-structure/employees/:id/slots
+router.get("/employees/:id/slots", async (req, res) => {
+  try {
+    const employeeId = req.params.id;
+    const dateStr = req.query.date;
+    if (!dateStr) {
+      return res.status(400).json({ success: false, message: "date обязателен." });
+    }
+
+    let schedule = {
+      work_days: [1, 2, 3, 4, 5],
+      work_start: "09:00",
+      work_end: "18:00",
+      lunch_start: "13:00",
+      lunch_end: "14:00",
+      slot_duration: 30
+    };
+
+    try {
+      const { data: dbSched } = await supabase
+        .from("doctor_schedules")
+        .select("*")
+        .eq("employee_id", employeeId)
+        .maybeSingle();
+      if (dbSched) schedule = dbSched;
+      else {
+        const fallbackShift = loadFallbackShifts()[employeeId];
+        if (fallbackShift) {
+          schedule.work_start = fallbackShift.work_start;
+          schedule.work_end = fallbackShift.work_end;
+        }
+      }
+    } catch (e) {}
+
+    const targetDate = new Date(dateStr + "T00:00:00");
+    const dayOfWeek = targetDate.getDay();
+    const mappedDay = dayOfWeek === 0 ? 7 : dayOfWeek;
+
+    if (schedule.start_date && dateStr < schedule.start_date) {
+      return res.status(200).json({ success: true, slots: [] });
+    }
+    if (schedule.end_date && dateStr > schedule.end_date) {
+      return res.status(200).json({ success: true, slots: [] });
+    }
+
+    // 1. Check schedule_exceptions table
+    let exception = null;
+    try {
+      const { data: dbEx } = await supabase
+        .from("schedule_exceptions")
+        .select("*")
+        .eq("employee_id", employeeId)
+        .eq("exception_date", dateStr)
+        .maybeSingle();
+      if (dbEx) exception = dbEx;
+    } catch (e) {}
+
+    let workStart = schedule.work_start;
+    let workEnd = schedule.work_end;
+    let lunchStart = schedule.lunch_start;
+    let lunchEnd = schedule.lunch_end;
+    let slotDuration = schedule.slot_duration;
+    let isWorking = schedule.work_days.includes(mappedDay);
+
+    if (exception) {
+      if (!exception.is_working) {
+        return res.status(200).json({ success: true, slots: [] });
+      }
+      if (exception.work_start) workStart = exception.work_start;
+      if (exception.work_end) workEnd = exception.work_end;
+      if (exception.lunch_start) lunchStart = exception.lunch_start;
+      if (exception.lunch_end) lunchEnd = exception.lunch_end;
+      if (exception.slot_duration) slotDuration = exception.slot_duration;
+      isWorking = true;
+    } else {
+      // Look up daily_schedules
+      if (schedule.daily_schedules && schedule.daily_schedules[String(mappedDay)]) {
+        const daily = schedule.daily_schedules[String(mappedDay)];
+        if (daily.work_start) workStart = daily.work_start;
+        if (daily.work_end) workEnd = daily.work_end;
+        if (daily.lunch_start) lunchStart = daily.lunch_start;
+        if (daily.lunch_end) lunchEnd = daily.lunch_end;
+        if (daily.slot_duration) slotDuration = daily.slot_duration;
+      }
+    }
+
+    if (!isWorking) {
+      return res.status(200).json({ success: true, slots: [] });
+    }
+
+    try {
+      const { data: absences } = await supabase
+        .from("doctor_absences")
+        .select("*")
+        .eq("employee_id", employeeId)
+        .lte("start_date", dateStr)
+        .gte("end_date", dateStr);
+
+      if (absences && absences.length > 0) {
+        return res.status(200).json({ success: true, slots: [] });
+      }
+    } catch (e) {}
+
+    let bookedTimes = [];
+    try {
+      const { data: appointments } = await supabase
+        .from("organization_appointments")
+        .select("time")
+        .eq("employee_id", employeeId)
+        .eq("date", dateStr)
+        .not("status", "in", '("cancelled","rejected")');
+      if (appointments) {
+        bookedTimes = appointments.map(a => a.time);
+      }
+    } catch (e) {
+      const list = loadFallbackAppointments();
+      bookedTimes = list
+        .filter(a => a.employee_id === employeeId && a.date === dateStr && a.status !== "cancelled" && a.status !== "rejected")
+        .map(a => a.time);
+    }
+
+    const slots = [];
+    const [startH, startM] = workStart.split(":").map(Number);
+    const [endH, endM] = workEnd.split(":").map(Number);
+    const [lunchStartH, lunchStartM] = lunchStart.split(":").map(Number);
+    const [lunchEndH, lunchEndM] = lunchEnd.split(":").map(Number);
+
+    let currentMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+    const lunchStartMinutes = lunchStartH * 60 + lunchStartM;
+    const lunchEndMinutes = lunchEndH * 60 + lunchEndM;
+    const duration = Number(slotDuration);
+
+
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+
+    while (currentMinutes + duration <= endMinutes) {
+      const isLunch = currentMinutes >= lunchStartMinutes && currentMinutes < lunchEndMinutes;
+      if (!isLunch) {
+        const slotHour = Math.floor(currentMinutes / 60);
+        const slotMin = currentMinutes % 60;
+        const timeLabel = `${String(slotHour).padStart(2, "0")}:${String(slotMin).padStart(2, "0")}`;
+
+        let isPast = false;
+        if (dateStr === todayStr) {
+          const [nowH, nowM] = [now.getHours(), now.getMinutes()];
+          if (slotHour < nowH || (slotHour === nowH && slotMin <= nowM)) {
+            isPast = true;
+          }
+        } else if (dateStr < todayStr) {
+          isPast = true;
+        }
+
+        const isBooked = bookedTimes.includes(timeLabel);
+
+        slots.push({
+          time: timeLabel,
+          available: !isBooked && !isPast,
+          reason: isBooked ? "occupied" : (isPast ? "past" : "available")
+        });
+      }
+      currentMinutes += duration;
+    }
+
+    return res.status(200).json({ success: true, slots });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /api/organization-structure/employees/:id/absence
+router.post("/employees/:id/absence", async (req, res) => {
+  try {
+    const employeeId = req.params.id;
+    const { absence_type, reason, start_date, end_date, comment } = req.body;
+
+    if (!absence_type || !start_date || !end_date) {
+      return res.status(400).json({ success: false, message: "Тип отсутствия, дата начала и окончания обязательны." });
+    }
+
+    const { data: absence, error } = await supabase
+      .from("doctor_absences")
+      .insert({
+        employee_id: employeeId,
+        absence_type,
+        reason,
+        start_date,
+        end_date,
+        comment
+      })
+      .select("*")
+      .single();
+
+    if (error) throw error;
+
+    if (absence_type === "emergency") {
+      await supabase
+        .from("organization_employees")
+        .update({ absence_status: "emergency_sick" })
+        .eq("id", employeeId);
+    } else {
+      await supabase
+        .from("organization_employees")
+        .update({ absence_status: "planned_vacation" })
+        .eq("id", employeeId);
+    }
+
+    let affectedAppointments = [];
+    try {
+      const { data: apps } = await supabase
+        .from("organization_appointments")
+        .select("*")
+        .eq("employee_id", employeeId)
+        .gte("date", start_date)
+        .lte("date", end_date)
+        .not("status", "in", '("cancelled","completed","no_show","rejected")');
+      affectedAppointments = apps || [];
+    } catch (e) {}
+
+    return res.status(200).json({
+      success: true,
+      message: "Отсутствие успешно зарегистрировано.",
+      absence,
+      affectedAppointmentsCount: affectedAppointments.length,
+      affectedAppointments
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/organization-structure/employees/:id/absence
+router.get("/employees/:id/absence", async (req, res) => {
+  try {
+    const employeeId = req.params.id;
+    const { data, error } = await supabase
+      .from("doctor_absences")
+      .select("*")
+      .eq("employee_id", employeeId)
+      .order("start_date", { ascending: false });
+
+    if (error) throw error;
+    return res.status(200).json({ success: true, absences: data || [] });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// DELETE /api/organization-structure/employees/:id/absence/:absenceId
+router.delete("/employees/:id/absence/:absenceId", async (req, res) => {
+  try {
+    const { id, absenceId } = req.params;
+    const { error } = await supabase.from("doctor_absences").delete().eq("id", absenceId);
+    if (error) throw error;
+
+    await supabase.from("organization_employees").update({ absence_status: "active" }).eq("id", id);
+
+    return res.status(200).json({ success: true, message: "Отсутствие снято. Врач снова работает." });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /api/organization-structure/employees/:id/exceptions
+router.post("/employees/:id/exceptions", async (req, res) => {
+  try {
+    const employeeId = req.params.id;
+    const { exception_date, is_working, work_start, work_end, lunch_start, lunch_end, slot_duration } = req.body;
+
+    if (!exception_date) {
+      return res.status(400).json({ success: false, message: "Дата исключения обязательна." });
+    }
+
+    const { data: exception, error } = await supabase
+      .from("schedule_exceptions")
+      .insert({
+        employee_id: employeeId,
+        exception_date,
+        is_working: is_working !== undefined ? is_working : true,
+        work_start,
+        work_end,
+        lunch_start,
+        lunch_end,
+        slot_duration
+      })
+      .select("*")
+      .single();
+
+    if (error) throw error;
+
+    return res.status(200).json({
+      success: true,
+      message: "Исключение из графика успешно зарегистрировано.",
+      exception
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/organization-structure/employees/:id/exceptions
+router.get("/employees/:id/exceptions", async (req, res) => {
+  try {
+    const employeeId = req.params.id;
+    const { data, error } = await supabase
+      .from("schedule_exceptions")
+      .select("*")
+      .eq("employee_id", employeeId)
+      .order("exception_date", { ascending: false });
+
+    if (error) throw error;
+    return res.status(200).json({ success: true, exceptions: data || [] });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// DELETE /api/organization-structure/employees/:id/exceptions/:exceptionId
+router.delete("/employees/:id/exceptions/:exceptionId", async (req, res) => {
+  try {
+    const { exceptionId } = req.params;
+    const { error } = await supabase.from("schedule_exceptions").delete().eq("id", exceptionId);
+    if (error) throw error;
+
+    return res.status(200).json({ success: true, message: "Исключение удалено." });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /api/organization-structure/appointments/:id/transfer
+router.post("/appointments/:id/transfer", async (req, res) => {
+  try {
+    const appointmentId = req.params.id;
+    const { new_doctor_id, new_date, new_time, transfer_reason } = req.body;
+
+    if (!new_doctor_id || !new_date || !new_time) {
+      return res.status(400).json({ success: false, message: "Врач, дата и время переноса обязательны." });
+    }
+
+    const { data: currentApp, error: fetchErr } = await supabase
+      .from("organization_appointments")
+      .select("*")
+      .eq("id", appointmentId)
+      .single();
+
+    if (fetchErr || !currentApp) {
+      return res.status(404).json({ success: false, message: "Запись не найдена." });
+    }
+
+    await supabase
+      .from("appointment_transfers")
+      .insert({
+        appointment_id: appointmentId,
+        previous_doctor_id: currentApp.employee_id,
+        new_doctor_id,
+        previous_date: currentApp.date,
+        previous_time: currentApp.time,
+        new_date,
+        new_time,
+        transfer_reason,
+        status: "pending"
+      });
+
+    const { data: updatedApp, error: updateErr } = await supabase
+      .from("organization_appointments")
+      .update({
+        status: "transfer_pending",
+        employee_id: new_doctor_id,
+        date: new_date,
+        time: new_time,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", appointmentId)
+      .select("*")
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    const { data: newDoc } = await supabase.from("organization_employees").select("full_name").eq("id", new_doctor_id).maybeSingle();
+    const { data: oldDoc } = await supabase.from("organization_employees").select("full_name").eq("id", currentApp.employee_id).maybeSingle();
+
+    await supabase.from("notifications").insert({
+      user_id: currentApp.patient_iin,
+      title: "Предложен перенос записи",
+      message: `Ваша запись перенесена от врача ${oldDoc?.full_name || "прежнего"} к врачу ${newDoc?.full_name || "новому"} на ${new_date} в ${new_time}. Причина: ${transfer_reason || "экстренное отсутствие врача"}. Подтвердите или отмените перенос.`,
+      link: `/visits-history`
+    });
+
+    return res.status(200).json({ success: true, message: "Предложение о переносе успешно отправлено.", appointment: updatedApp });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /api/organization-structure/appointments/:id/start
+router.post("/appointments/:id/start", async (req, res) => {
+  try {
+    const appointmentId = req.params.id;
+    const { code } = req.body;
+
+    if (!code) {
+      return res.status(400).json({ success: false, message: "Код обязателен." });
+    }
+
+    const { data: app, error } = await supabase
+      .from("organization_appointments")
+      .select("*")
+      .eq("id", appointmentId)
+      .single();
+
+    if (error || !app) {
+      return res.status(404).json({ success: false, message: "Запись не найдена." });
+    }
+
+    if (app.status === "cancelled" || app.status === "completed") {
+      return res.status(400).json({ success: false, message: "Нельзя начать отмененную или завершенную запись." });
+    }
+
+    const expected = String(app.start_code || app.verification_code || "").trim();
+    if (expected !== String(code).trim()) {
+      return res.status(400).json({ success: false, message: "Неверный код талона/QR-кода." });
+    }
+
+    const now = new Date().toISOString();
+    const { data: updated, error: updateErr } = await supabase
+      .from("organization_appointments")
+      .update({
+        status: "in_progress",
+        actual_start_time: now,
+        updated_at: now
+      })
+      .eq("id", appointmentId)
+      .select("*")
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    return res.status(200).json({ success: true, message: "Приём успешно начат.", appointment: updated });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /api/organization-structure/appointments/:id/draft
+router.post("/appointments/:id/draft", async (req, res) => {
+  try {
+    const appointmentId = req.params.id;
+    const { draft } = req.body;
+
+    const { error } = await supabase
+      .from("organization_appointments")
+      .update({ consultation_draft: draft })
+      .eq("id", appointmentId);
+
+    if (error) throw error;
+
+    return res.status(200).json({ success: true, message: "Черновик сохранен." });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/organization-structure/appointments/:id/draft
+router.get("/appointments/:id/draft", async (req, res) => {
+  try {
+    const appointmentId = req.params.id;
+    const { data, error } = await supabase
+      .from("organization_appointments")
+      .select("consultation_draft")
+      .eq("id", appointmentId)
+      .single();
+
+    if (error) throw error;
+
+    return res.status(200).json({ success: true, draft: data?.consultation_draft || null });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /api/organization-structure/appointments/:id/request-finish
+router.post("/appointments/:id/request-finish", async (req, res) => {
+  try {
+    const appointmentId = req.params.id;
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+
+    const { error } = await supabase
+      .from("organization_appointments")
+      .update({ finish_code: otp, status: "waiting_finish_confirmation" })
+      .eq("id", appointmentId);
+
+    if (error) throw error;
+
+    const { data: app } = await supabase.from("organization_appointments").select("*").eq("id", appointmentId).single();
+
+    await supabase.from("notifications").insert({
+      user_id: app.patient_iin,
+      title: "Код завершения приёма",
+      message: `Код подтверждения завершения приёма у врача: ${otp}. Передайте его врачу для подтверждения. Код действует 5 минут.`,
+      link: `/visits-history`
+    });
+
+    return res.status(200).json({ success: true, message: "Код подтверждения отправлен пациенту.", otp });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /api/organization-structure/appointments/:id/finish
+router.post("/appointments/:id/finish", async (req, res) => {
+  try {
+    const appointmentId = req.params.id;
+    const { otp, complaints, symptoms, diagnosis, treatment, recommendations, comment, files } = req.body;
+
+    if (!otp) {
+      return res.status(400).json({ success: false, message: "Код подтверждения обязателен." });
+    }
+
+    const { data: app, error } = await supabase
+      .from("organization_appointments")
+      .select("*")
+      .eq("id", appointmentId)
+      .single();
+
+    if (error || !app) {
+      return res.status(404).json({ success: false, message: "Запись не найдена." });
+    }
+
+    if (String(app.finish_code).trim() !== String(otp).trim()) {
+      return res.status(400).json({ success: false, message: "Неверный код завершения приёма." });
+    }
+
+    const now = new Date().toISOString();
+
+    const visitRecord = {
+      appointment_id: appointmentId,
+      patient_iin: app.patient_iin,
+      doctor_id: app.employee_id,
+      organization_id: app.organization_id,
+      complaints,
+      symptoms,
+      diagnosis,
+      treatment,
+      recommendations,
+      comment,
+      files: files || [],
+      actual_start_time: app.actual_start_time,
+      actual_end_time: now,
+      created_at: now
+    };
+
+    const { error: visitErr } = await supabase
+      .from("visit_records")
+      .upsert(visitRecord, { onConflict: "appointment_id" });
+
+    const { data: updatedApp, error: updateErr } = await supabase
+      .from("organization_appointments")
+      .update({
+        status: "completed",
+        actual_end_time: now,
+        updated_at: now
+      })
+      .eq("id", appointmentId)
+      .select("*")
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    await supabase.from("notifications").insert({
+      user_id: app.patient_iin,
+      title: "Приём завершён",
+      message: "Ваш приём успешно завершён. Пожалуйста, оцените работу врача в истории посещений.",
+      link: `/visits-history`
+    });
+
+    return res.status(200).json({ success: true, message: "Приём успешно завершён.", appointment: updatedApp });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /api/organization-structure/appointments/:id/rate
+router.post("/appointments/:id/rate", async (req, res) => {
+  try {
+    const appointmentId = req.params.id;
+    const { rating_value, comment } = req.body;
+
+    if (!rating_value || rating_value < 1 || rating_value > 10) {
+      return res.status(400).json({ success: false, message: "Оценка должна быть целым числом от 1 до 10." });
+    }
+
+    const { data: app, error } = await supabase
+      .from("organization_appointments")
+      .select("*")
+      .eq("id", appointmentId)
+      .single();
+
+    if (error || !app) {
+      return res.status(404).json({ success: false, message: "Запись не найдена." });
+    }
+
+    if (app.status !== "completed") {
+      return res.status(400).json({ success: false, message: "Оценить можно только завершённый приём." });
+    }
+
+    const { error: ratingErr } = await supabase
+      .from("doctor_ratings")
+      .insert({
+        appointment_id: appointmentId,
+        patient_id: app.patient_iin,
+        doctor_id: app.employee_id,
+        organization_id: app.organization_id,
+        rating_value: Number(rating_value),
+        comment
+      });
+
+    if (ratingErr) {
+      if (ratingErr.code === "23505") {
+        return res.status(400).json({ success: false, message: "Вы уже оставили отзыв для этого приёма." });
+      }
+      throw ratingErr;
+    }
+
+    const { data: ratings } = await supabase
+      .from("doctor_ratings")
+      .select("rating_value")
+      .eq("doctor_id", app.employee_id);
+
+    const countReal = ratings ? ratings.length : 0;
+    const sumReal = ratings ? ratings.reduce((sum, r) => sum + r.rating_value, 0) : 0;
+
+    const avgRating = Number((((8.0 * 5) + sumReal) / (5 + countReal)).toFixed(1));
+
+    await supabase
+      .from("organization_employees")
+      .update({
+        average_rating: avgRating,
+        rating_count: countReal,
+        rating_sum: sumReal + 40
+      })
+      .eq("id", app.employee_id);
+
+    return res.status(200).json({ success: true, message: "Спасибо! Ваш отзыв успешно сохранён.", average_rating: avgRating });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/organization-structure/employees/:id/reviews
+router.get("/employees/:id/reviews", async (req, res) => {
+  try {
+    const doctorId = req.params.id;
+    const { data, error } = await supabase
+      .from("doctor_ratings")
+      .select("id, rating_value, comment, created_at")
+      .eq("doctor_id", doctorId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    const formattedReviews = (data || []).map(item => {
+      const date = new Date(item.created_at);
+      const months = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+      const label = `Пациент, ${months[date.getMonth()]} ${date.getFullYear()}`;
+      return {
+        id: item.id,
+        rating: item.rating_value,
+        comment: item.comment || "Без комментария",
+        dateLabel: label
+      };
+    });
+
+    return res.status(200).json({ success: true, reviews: formattedReviews });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /api/organization-structure/appointments/:id/certificate
+router.post("/appointments/:id/certificate", async (req, res) => {
+  try {
+    const appointmentId = req.params.id;
+    const { title, certificate_type, file_url, valid_until } = req.body;
+
+    if (!title || !certificate_type || !file_url) {
+      return res.status(400).json({ success: false, message: "Название, тип справки и ссылка на файл обязательны." });
+    }
+
+    const { data: app } = await supabase
+      .from("organization_appointments")
+      .select("*")
+      .eq("id", appointmentId)
+      .single();
+
+    if (!app) {
+      return res.status(404).json({ success: false, message: "Запись не найдена." });
+    }
+
+    const { data: cert, error } = await supabase
+      .from("medical_certificates")
+      .insert({
+        patient_id: app.patient_iin,
+        doctor_id: app.employee_id,
+        organization_id: app.organization_id,
+        title,
+        certificate_type,
+        file_url,
+        valid_until
+      })
+      .select("*")
+      .single();
+
+    if (error) throw error;
+
+    return res.status(201).json({ success: true, message: "Справка выписана.", certificate: cert });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/organization-structure/patients/:iin/certificates
+router.get("/patients/:iin/certificates", async (req, res) => {
+  try {
+    const { iin } = req.params;
+    const { data, error } = await supabase
+      .from("medical_certificates")
+      .select("*, organization:organizations(organization_name), doctor:organization_employees(full_name)")
+      .eq("patient_id", iin)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return res.status(200).json({ success: true, certificates: data || [] });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/organization-structure/notifications/:userId
+router.get("/notifications/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    return res.status(200).json({ success: true, notifications: data || [] });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// PATCH /api/organization-structure/notifications/:id/read
+router.patch("/notifications/:id/read", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { error } = await supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("id", id);
+
+    if (error) throw error;
+    return res.status(200).json({ success: true, message: "Уведомление прочитано." });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// PATCH /api/organization-structure/notifications/read-all/:userId
+router.patch("/notifications/read-all/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { error } = await supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("user_id", userId);
+
+    if (error) throw error;
+    return res.status(200).json({ success: true, message: "Все уведомления прочитаны." });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/organization-structure/support/conversations
+router.get("/support/conversations", async (req, res) => {
+  try {
+    const organizationId = getOrganizationId(req);
+    if (!organizationId) {
+      return res.status(400).json({ success: false, message: "organization_id обязателен." });
+    }
+
+    const { data, error } = await supabase
+      .from("support_conversations")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .order("updated_at", { ascending: false });
+
+    if (error) throw error;
+
+    return res.status(200).json({ success: true, conversations: data || [] });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /api/organization-structure/support/conversations
+router.post("/support/conversations", async (req, res) => {
+  try {
+    const organizationId = getOrganizationId(req);
+    const { subject, description, senderName, senderId, messageText, attachmentUrl } = req.body;
+
+    if (!organizationId || !subject || !description) {
+      return res.status(400).json({ success: false, message: "Тема и описание проблемы обязательны." });
+    }
+
+    const { data: conv, error } = await supabase
+      .from("support_conversations")
+      .insert({
+        organization_id: organizationId,
+        subject,
+        description,
+        status: "open"
+      })
+      .select("*")
+      .single();
+
+    if (error) throw error;
+
+    if (messageText || attachmentUrl) {
+      await supabase
+        .from("support_messages")
+        .insert({
+          conversation_id: conv.id,
+          sender_type: "org_admin",
+          sender_id: senderId || organizationId,
+          sender_name: senderName || "Администратор",
+          message_text: messageText || description,
+          attachment_url: attachmentUrl
+        });
+    }
+
+    return res.status(201).json({ success: true, message: "Обращение создано.", conversation: conv });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/organization-structure/support/conversations/:id/messages
+router.get("/support/conversations/:id/messages", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data, error } = await supabase
+      .from("support_messages")
+      .select("*")
+      .eq("conversation_id", id)
+      .order("created_at", { ascending: true });
+
+    if (error) throw error;
+
+    return res.status(200).json({ success: true, messages: data || [] });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /api/organization-structure/support/conversations/:id/messages
+router.post("/support/conversations/:id/messages", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { senderType, senderId, senderName, messageText, attachmentUrl } = req.body;
+
+    const { data: msg, error } = await supabase
+      .from("support_messages")
+      .insert({
+        conversation_id: id,
+        sender_type: senderType || "org_admin",
+        sender_id: senderId,
+        sender_name: senderName || "Администратор",
+        message_text: messageText,
+        attachment_url: attachmentUrl
+      })
+      .select("*")
+      .single();
+
+    if (error) throw error;
+
+    // Update conversation updated_at and reopen if closed
+    await supabase
+      .from("support_conversations")
+      .update({ updated_at: new Date().toISOString(), status: "open" })
+      .eq("id", id);
+
+    return res.status(201).json({ success: true, message: msg });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
   }
 });
 

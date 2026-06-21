@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useLanguage } from "../i18n/LanguageContext";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 import "../styles/organizationLogin.css";
 
 const API_URL = "https://health-card.onrender.com";
 
 export default function OrganizationLogin() {
 const navigate = useNavigate();
+const { t } = useLanguage();
 
 const [theme, setTheme] = useState(localStorage.getItem("orgTheme") || "light");
 const [mode, setMode] = useState("login");
@@ -91,6 +94,9 @@ try {
 
   localStorage.setItem("organizationUser", JSON.stringify(result.user));
   localStorage.setItem("organizationData", JSON.stringify(result.organization));
+  if (result.user && result.user.preferred_language) {
+    localStorage.setItem("clinic_os_language", result.user.preferred_language);
+  }
 
   const path = result.redirectPath || "/organization/gov-clinic";
 
@@ -118,70 +124,81 @@ try {
 }
 
 async function changePassword(event) {
-event.preventDefault();
-setError("");
+  event.preventDefault();
+  setError("");
 
-
-if (!loggedUser) {
-  setError("Пользователь не найден. Войдите заново.");
-  return;
-}
-
-if (passwordForm.newPassword !== passwordForm.repeatPassword) {
-  setError("Новые пароли не совпадают.");
-  return;
-}
-
-if (passwordForm.newPassword.length < 6) {
-  setError("Новый пароль должен быть минимум 6 символов.");
-  return;
-}
-
-setLoading(true);
-
-try {
-  const response = await fetch(API_URL + "/api/organizations/change-password", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      userId: loggedUser.id,
-      currentPassword: passwordForm.currentPassword,
-      newPassword: passwordForm.newPassword,
-    }),
-  });
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result.message || "Ошибка смены пароля.");
+  if (!loggedUser) {
+    setError("Пользователь не найден. Войдите заново.");
+    return;
   }
 
-  if (result.user) {
-    localStorage.setItem("organizationUser", JSON.stringify(result.user));
+  if (passwordForm.newPassword !== passwordForm.repeatPassword) {
+    setError("Новые пароли не совпадают.");
+    return;
   }
 
-  navigate(result.redirectPath || redirectPath || "/organization/gov-clinic");
-} catch (err) {
-  setError(err.message || "Не удалось сменить пароль.");
-} finally {
-  setLoading(false);
-}
+  if (passwordForm.newPassword.length < 6) {
+    setError("Новый пароль должен быть минимум 6 символов.");
+    return;
+  }
 
+  if (passwordForm.newPassword === form.password) {
+    setError("Новый пароль не должен совпадать с временным паролем.");
+    return;
+  }
 
+  if (!/^(?=.*[A-Za-z])(?=.*\d).{6,}$/.test(passwordForm.newPassword)) {
+    setError("Пароль должен содержать как буквы, так и цифры.");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const response = await fetch(API_URL + "/api/organizations/change-password", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        userId: loggedUser.id,
+        currentPassword: "",
+        newPassword: passwordForm.newPassword,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || "Ошибка смены пароля.");
+    }
+
+    if (result.user) {
+      localStorage.setItem("organizationUser", JSON.stringify(result.user));
+    }
+
+    navigate(result.redirectPath || redirectPath || "/organization/gov-clinic");
+  } catch (err) {
+    setError(err.message || "Не удалось сменить пароль.");
+  } finally {
+    setLoading(false);
+  }
 }
 
 return (
 <main className={"org-login-page " + theme}>
-<button
-type="button"
-className="org-theme-btn"
-onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
->
-{theme === "dark" ? "☀️ Светлая" : "🌙 Тёмная"} </button>
+<div style={{ position: "absolute", top: "20px", right: "20px", display: "flex", gap: "12px", alignItems: "center", zIndex: 10 }}>
+  <LanguageSwitcher />
+  <button
+    type="button"
+    className="org-theme-btn"
+    onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+    style={{ position: "static" }}
+  >
+    {theme === "dark" ? "☀️" : "🌙"}
+  </button>
+</div>
 
-  
   <section className="org-login-card">
     <div className="org-login-left">
       <img
@@ -191,28 +208,28 @@ onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
       />
 
       <h1>Clinic OS</h1>
-      <p>Вход в кабинет медицинской организации</p>
+      <p>{t("orgLoginTitle")}</p>
 
       <div className="org-login-info">
-        <h2>Для авторизации укажите данные</h2>
+        <h2>{t("orgLoginInstructions")}</h2>
         <ul>
-          <li>Город нахождения организации</li>
-          <li>БИН медицинской организации</li>
-          <li>Логин, выданный технической поддержкой</li>
-          <li>Одноразовый или постоянный пароль</li>
+          <li>{t("orgLoginCityHint")}</li>
+          <li>{t("orgLoginBinHint")}</li>
+          <li>{t("orgLoginLoginHint")}</li>
+          <li>{t("orgLoginPasswordHint")}</li>
         </ul>
       </div>
     </div>
 
     {mode === "login" ? (
       <form className="org-login-right" onSubmit={handleSubmit}>
-        <h2>Вход для организации</h2>
+        <h2>{t("orgLoginHeading")}</h2>
         <p className="org-login-subtitle">
-          Вход для главного врача, администратора и отдела кадров.
+          {t("orgLoginSubheading")}
         </p>
 
         <label>
-          Город
+          {t("orgCityLabel")}
           <input
             name="city"
             value={form.city}
@@ -223,7 +240,7 @@ onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         </label>
 
         <label>
-          БИН организации
+          {t("orgBinLabel")}
           <input
             name="bin"
             value={form.bin}
@@ -235,7 +252,7 @@ onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         </label>
 
         <label>
-          Логин
+          {t("orgLoginLabel")}
           <input
             name="login"
             value={form.login}
@@ -246,7 +263,7 @@ onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         </label>
 
         <label>
-          Пароль
+          {t("orgPasswordLabel")}
           <input
             type="password"
             name="password"
@@ -260,29 +277,18 @@ onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         {error ? <div className="org-login-error">{error}</div> : null}
 
         <button type="submit" disabled={loading}>
-          {loading ? "Проверка..." : "Войти"}
+          {loading ? t("orgChecking") : t("orgLoginBtn")}
         </button>
       </form>
     ) : (
       <form className="org-login-right" onSubmit={changePassword}>
-        <h2>Смена пароля</h2>
+        <h2>{t("orgChangePasswordHeading")}</h2>
         <p className="org-login-subtitle">
-          Это первый вход. Создайте постоянный пароль.
+          {t("orgFirstLoginSubheading")}
         </p>
 
         <label>
-          Текущий одноразовый пароль
-          <input
-            type="password"
-            name="currentPassword"
-            value={passwordForm.currentPassword}
-            onChange={updatePasswordField}
-            required
-          />
-        </label>
-
-        <label>
-          Новый пароль
+          {t("orgNewPasswordLabel")}
           <input
             type="password"
             name="newPassword"
@@ -293,7 +299,7 @@ onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         </label>
 
         <label>
-          Повторите новый пароль
+          {t("orgRepeatPasswordLabel")}
           <input
             type="password"
             name="repeatPassword"
@@ -306,17 +312,20 @@ onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         {error ? <div className="org-login-error">{error}</div> : null}
 
         <button type="submit" disabled={loading}>
-          {loading ? "Сохранение..." : "Сменить пароль и войти"}
+          {loading ? t("orgSaving") : t("orgChangePasswordBtn")}
         </button>
 
-        <button type="button" onClick={() => setMode("login")}>
-          Назад
+        <button type="button" onClick={() => {
+          localStorage.removeItem("organizationUser");
+          localStorage.removeItem("organizationData");
+          setLoggedUser(null);
+          setMode("login");
+        }}>
+          {t("orgBackBtn")}
         </button>
       </form>
     )}
   </section>
 </main>
-
-
 );
 }

@@ -31,37 +31,15 @@ return hash === checkHash;
 
 function getRoleByPosition(position) {
   const value = String(position || "").toLowerCase();
-  if (value.includes("отдел кадров")) return "hr";
-  if (value.includes("заместитель")) return "deputy_chief_doctor";
-  if (value.includes("завед")) return "department_head";
-  if (value.includes("регистратор")) return "registrar";
-  if (value.includes("медсестр")) return "nurse";
-  if (value.includes("врач")) return "doctor";
-  if (value.includes("администратор")) return "organization_admin";
-  return "employee";
+  if (value.includes("врач") || value.includes("doctor")) return "doctor";
+  if (value.includes("администратор") || value.includes("admin")) return "organization_admin";
+  return "doctor"; // Врач по умолчанию
 }
 
 function getRedirectPath(role) {
-  if (role === "chief_doctor" || role === "chief") {
-    return "/organization/gov-clinic/chief-doctor";
-  }
-
   if (role === "organization_admin" || role === "admin") {
     return "/organization/gov-clinic/system-admin";
   }
-
-  if (role === "hr") {
-    return "/organization/gov-clinic/hr";
-  }
-
-  if (["doctor", "nurse", "registrar", "department_head", "deputy_chief_doctor"].includes(role)) {
-    return "/organization/gov-clinic/employee";
-  }
-
-  if (role === "employee") {
-    return "/organization/gov-clinic/hr";
-  }
-
   return "/organization/gov-clinic/employee";
 }
 
@@ -184,104 +162,141 @@ message: error.message || "Ошибка входа.",
 });
 
 router.post("/change-password", async (req, res) => {
-try {
-const userId = req.body.userId;
-const currentPassword = String(req.body.currentPassword || "");
-const newPassword = String(req.body.newPassword || "");
+  try {
+    const userId = req.body.userId;
+    const currentPassword = String(req.body.currentPassword || "");
+    const newPassword = String(req.body.newPassword || "");
 
+    if (!userId || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Новый пароль обязателен.",
+      });
+    }
 
-if (!userId || !currentPassword || !newPassword) {
-  return res.status(400).json({
-    success: false,
-    message: "Заполните все поля.",
-  });
-}
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Новый пароль должен быть минимум 6 символов.",
+      });
+    }
 
-if (newPassword.length < 6) {
-  return res.status(400).json({
-    success: false,
-    message: "Новый пароль должен быть минимум 6 символов.",
-  });
-}
-
-const { data: user, error } = await supabase
-  .from("organization_users")
-  .select("*")
-  .eq("id", userId)
-  .single();
-
-if (error || !user) {
-  return res.status(404).json({
-    success: false,
-    message: "Пользователь не найден.",
-  });
-}
-
-if (!verifyPassword(currentPassword, user.password_hash)) {
-  return res.status(401).json({
-    success: false,
-    message: "Текущий пароль неверный.",
-  });
-}
-
-const { error: updateError } = await supabase
-  .from("organization_users")
-  .update({
-    password_hash: hashPassword(newPassword),
-    must_change_password: false,
-    updated_at: new Date().toISOString(),
-  })
-  .eq("id", userId);
-
-if (updateError) {
-  return res.status(500).json({
-    success: false,
-    message: updateError.message,
-  });
-}
-
-  let resolvedRole = user.role;
-  if (resolvedRole === "employee") {
-    const { data: emp } = await supabase
-      .from("organization_employees")
+    let isEmployee = false;
+    let { data: user, error } = await supabase
+      .from("organization_users")
       .select("*")
-      .eq("login", user.login)
-      .eq("organization_id", user.organization_id)
+      .eq("id", userId)
       .maybeSingle();
 
-    if (emp) {
-      const parsedRole = getRoleByPosition(emp.position);
-      if (parsedRole && parsedRole !== "employee") {
-        resolvedRole = parsedRole;
+    if (!user || error) {
+      const { data: emp, error: empError } = await supabase
+        .from("organization_employees")
+        .select("*")
+        .eq("id", userId)
+        .maybeSingle();
+      if (emp && !empError) {
+        user = emp;
+        isEmployee = true;
       }
     }
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Пользователь не найден.",
+      });
+    }
+
+    const mustChange = user.must_change_password;
+    if (!mustChange) {
+      if (!currentPassword) {
+        return res.status(400).json({
+          success: false,
+          message: "Укажите текущий пароль.",
+        });
+      }
+      if (!verifyPassword(currentPassword, user.password_hash)) {
+        return res.status(401).json({
+          success: false,
+          message: "Текущий пароль неверный.",
+        });
+      }
+    }
+
+    const newHash = hashPassword(newPassword);
+
+    if (isEmployee) {
+      const { error: updateError } = await supabase
+        .from("organization_employees")
+        .update({
+          password_hash: newHash,
+          must_change_password: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", userId);
+
+      if (updateError) {
+        return res.status(500).json({
+          success: false,
+          message: updateError.message,
+        });
+      }
+
+      const resolvedRole = getRoleByPosition(user.position) || "doctor";
+      return res.status(200).json({
+        success: true,
+        message: "Пароль успешно изменён.",
+        mustChangePassword: false,
+        redirectPath: getRedirectPath(resolvedRole),
+        user: {
+          id: user.id,
+          organization_id: user.organization_id,
+          full_name: user.full_name,
+          email: user.email,
+          role: resolvedRole,
+          login: user.login,
+          must_change_password: false,
+        },
+      });
+    } else {
+      const { error: updateError } = await supabase
+        .from("organization_users")
+        .update({
+          password_hash: newHash,
+          must_change_password: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", userId);
+
+      if (updateError) {
+        return res.status(500).json({
+          success: false,
+          message: updateError.message,
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "Пароль успешно изменён.",
+        mustChangePassword: false,
+        redirectPath: getRedirectPath(user.role),
+        user: {
+          id: user.id,
+          organization_id: user.organization_id,
+          full_name: user.full_name,
+          email: user.email,
+          role: user.role,
+          login: user.login,
+          must_change_password: false,
+        },
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Ошибка смены пароля.",
+    });
   }
-
-  return res.status(200).json({
-    success: true,
-    message: "Пароль успешно изменён.",
-    mustChangePassword: false,
-    redirectPath: getRedirectPath(resolvedRole),
-    user: {
-      id: user.id,
-      organization_id: user.organization_id,
-      full_name: user.full_name,
-      email: user.email,
-      role: resolvedRole,
-      login: user.login,
-      city: user.city,
-      bin: user.bin,
-      must_change_password: false,
-    },
-  });
-
-
-} catch (error) {
-return res.status(500).json({
-success: false,
-message: error.message || "Ошибка смены пароля.",
-});
-}
 });
 
 router.get("/", requireAdminAuth, async (req, res) => {
@@ -562,4 +577,29 @@ message: error.message || "Ошибка изменения организаци�
 }
 });
 
+router.patch("/profile/language", async (req, res) => {
+  try {
+    const { userId, language, role } = req.body;
+    if (!userId || !language) {
+      return res.status(400).json({ success: false, message: "userId and language are required" });
+    }
+
+    if (role === "doctor" || role === "employee") {
+      await supabase
+        .from("organization_employees")
+        .update({ preferred_language: language })
+        .eq("id", userId);
+    } else {
+      await supabase
+        .from("organization_users")
+        .update({ preferred_language: language })
+        .eq("id", userId);
+    }
+    return res.status(200).json({ success: true, message: "Preferred language saved in profile." });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 export default router;
+

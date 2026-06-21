@@ -21,6 +21,14 @@ export default function LanguageSwitcher() {
       >
         KZ
       </button>
+
+      <button
+        type="button"
+        className={language === "en" ? "active" : ""}
+        onClick={() => setLanguage("en")}
+      >
+        EN
+      </button>
     </div>
   );
 }

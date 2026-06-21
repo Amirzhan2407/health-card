@@ -439,4 +439,98 @@ router.post("/organization/:orgId/messages", requireAdminAuth, async (req, res) 
   }
 });
 
+// GET /api/admin-channels/support/conversations
+router.get("/support/conversations", requireAdminAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("support_conversations")
+      .select("*, organization:organizations(organization_name)")
+      .order("updated_at", { ascending: false });
+
+    if (error) throw error;
+
+    return res.status(200).json({ success: true, conversations: data || [] });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/admin-channels/support/conversations/:id/messages
+router.get("/support/conversations/:id/messages", requireAdminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data, error } = await supabase
+      .from("support_messages")
+      .select("*")
+      .eq("conversation_id", id)
+      .order("created_at", { ascending: true });
+
+    if (error) throw error;
+
+    return res.status(200).json({ success: true, messages: data || [] });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /api/admin-channels/support/conversations/:id/messages
+router.post("/support/conversations/:id/messages", requireAdminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { messageText, attachmentUrl } = req.body;
+
+    const username = getLogin(req.admin);
+    const fullName = getFullName(req.admin);
+
+    const { data: msg, error } = await supabase
+      .from("support_messages")
+      .insert({
+        conversation_id: id,
+        sender_type: "support",
+        sender_id: req.admin.id,
+        sender_name: `${fullName} (${username})`,
+        message_text: messageText,
+        attachment_url: attachmentUrl
+      })
+      .select("*")
+      .single();
+
+    if (error) throw error;
+
+    await supabase
+      .from("support_conversations")
+      .update({ updated_at: new Date().toISOString(), status: "in_work" })
+      .eq("id", id);
+
+    return res.status(201).json({ success: true, message: msg });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// PATCH /api/admin-channels/support/conversations/:id/status
+router.patch("/support/conversations/:id/status", requireAdminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!["open", "in_work", "resolved", "closed"].includes(status)) {
+      return res.status(400).json({ success: false, message: "Некорректный статус." });
+    }
+
+    const { data, error } = await supabase
+      .from("support_conversations")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("*")
+      .single();
+
+    if (error) throw error;
+
+    return res.status(200).json({ success: true, conversation: data });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 export default router;

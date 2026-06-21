@@ -5,15 +5,30 @@ const LanguageContext = createContext(null);
 
 export function LanguageProvider({ children }) {
   const [language, setLanguage] = useState(() => {
-    return localStorage.getItem("clinic_os_language") || "ru";
+    const stored = localStorage.getItem("clinic_os_language") || "ru";
+    return stored === "kk" ? "kz" : stored;
   });
 
   useEffect(() => {
     localStorage.setItem("clinic_os_language", language);
+    // Sync language selection to database if authenticated
+    const orgUser = JSON.parse(localStorage.getItem("organizationUser") || "null");
+    if (orgUser && orgUser.id) {
+      fetch("https://health-card.onrender.com/api/organizations/profile/language", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: orgUser.id,
+          language: language,
+          role: orgUser.role
+        })
+      }).catch(err => console.warn("Failed to sync language to DB:", err));
+    }
   }, [language]);
 
   const t = (key) => {
-    return translations[language]?.[key] || translations.ru[key] || key;
+    const activeLang = language === "kk" ? "kz" : language;
+    return translations[activeLang]?.[key] || translations.ru[key] || key;
   };
 
   const value = useMemo(() => {

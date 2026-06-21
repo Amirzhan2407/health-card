@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useLanguage } from "../../i18n/LanguageContext";
 
 const API_URL = "https://health-card.onrender.com";
 
@@ -178,6 +179,7 @@ const getGenderFromIin = (iin) => {
 export default function GovClinicEmployee() {
   const [searchParams, setSearchParams] = useSearchParams();
   const currentTab = searchParams.get("tab") || "dashboard";
+  const { t } = useLanguage();
 
   // Auth local storage data
   const user = JSON.parse(localStorage.getItem("organizationUser") || "null");
@@ -203,6 +205,57 @@ export default function GovClinicEmployee() {
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // New Dynamic States
+  const [reviews, setReviews] = useState([]);
+  const [schedule, setSchedule] = useState(null);
+  const [finishingAppId, setFinishingAppId] = useState(null);
+  const [calendarView, setCalendarView] = useState("week"); // day | week
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(new Date().toISOString().split("T")[0]);
+
+  // History Filter States
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyMonth, setHistoryMonth] = useState("");
+  const [historyYear, setHistoryYear] = useState("");
+  const [historyStatus, setHistoryStatus] = useState("");
+  const [historyDate, setHistoryDate] = useState("");
+  const [historySort, setHistorySort] = useState("date_desc"); // date_desc, date_asc, name_asc
+
+  // Voluntary Change Password Form
+  const [changePwdForm, setChangePwdForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  });
+
+
+  // Start/Finish & Consultation States
+  const [activeAppointment, setActiveAppointment] = useState(null);
+  const [showStartCodeModal, setShowStartCodeModal] = useState(false);
+  const [startCodeInput, setStartCodeInput] = useState("");
+  const [startCodeAppId, setStartCodeAppId] = useState(null);
+  const [startCodeError, setStartCodeError] = useState("");
+  
+  const [activeConsultation, setActiveConsultation] = useState({
+    complaints: "",
+    symptoms: "",
+    diagnosis: "",
+    treatment: "",
+    recommendations: "",
+    comment: "",
+    files: []
+  });
+
+  const [certForm, setCertForm] = useState({
+    title: "",
+    type: "sick_leave",
+    valid_until: ""
+  });
+  const [issuingCert, setIssuingCert] = useState(false);
+
+  const [showFinishOtpModal, setShowFinishOtpModal] = useState(false);
+  const [otpInput, setOtpInput] = useState("");
+  const [finishError, setFinishError] = useState("");
   
   // New Medical Record Form
   const [medicalRecordForm, setMedicalRecordForm] = useState({
@@ -312,6 +365,46 @@ export default function GovClinicEmployee() {
               });
               return unique;
             });
+
+            // Restore active in-progress appointment
+            const inProgress = loadedApps.find(a => a.status === "in_progress" || a.status === "waiting_finish_confirmation");
+            if (inProgress) {
+              setActiveAppointment(inProgress);
+              try {
+                const draftRes = await fetch(`${API_URL}/api/organization-structure/appointments/${inProgress.id}/draft`);
+                const draftData = await draftRes.json();
+                if (draftRes.ok && draftData && draftData.draft) {
+                  setActiveConsultation(draftData.draft);
+                } else {
+                  setActiveConsultation({
+                    complaints: "",
+                    symptoms: "",
+                    diagnosis: inProgress.reason || "",
+                    treatment: "",
+                    recommendations: "",
+                    comment: "",
+                    files: []
+                  });
+                }
+              } catch (de) {
+                console.warn("Could not load draft:", de);
+              }
+
+              const pat = {
+                id: inProgress.patient_id || inProgress.patient_iin,
+                iin: inProgress.patient_iin,
+                full_name: inProgress.patient_name || "Пациент",
+                phone: inProgress.patient_phone || "—",
+                email: inProgress.patient_email || "—",
+                birth_date: getBirthDateFromIin(inProgress.patient_iin),
+                gender: getGenderFromIin(inProgress.patient_iin),
+                blood_type: "Не указана",
+                allergies: "Нет",
+                chronic_conditions: "Нет",
+                records: []
+              };
+              setSelectedPatient(pat);
+            }
           }
         } else {
           setAppointments([]);
@@ -320,10 +413,51 @@ export default function GovClinicEmployee() {
         console.warn("Appointments API fetch error:", err);
         setAppointments([]);
       }
+
+      // Fetch Reviews
+      try {
+        const revRes = await fetch(`${API_URL}/api/organization-structure/employees/${empId}/reviews`);
+        if (revRes.ok) {
+          const revData = await revRes.json();
+          setReviews(revData.reviews || []);
+        }
+      } catch (err) {
+        console.warn("Failed to load reviews:", err);
+      }
+
+      // Fetch Schedule
+      try {
+        const schedRes = await fetch(`${API_URL}/api/organization-structure/employees/${empId}/schedule`);
+        if (schedRes.ok) {
+          const schedData = await schedRes.json();
+          setSchedule(schedData.schedule || null);
+        }
+      } catch (err) {
+        console.warn("Failed to load schedule:", err);
+      }
     }
 
     loadAllData();
   }, [user, startDate, endDate]);
+
+  // Debounced autosave of active consultation draft
+  useEffect(() => {
+    if (!activeAppointment || !activeAppointment.id) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        await fetch(`${API_URL}/api/organization-structure/appointments/${activeAppointment.id}/draft`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ draft: activeConsultation })
+        });
+      } catch (err) {
+        console.warn("Autosave draft failed:", err);
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [activeConsultation, activeAppointment]);
 
   // Handle Tab changes
   function changeTab(tabId) {
@@ -549,37 +683,426 @@ export default function GovClinicEmployee() {
   }
 
   function startAppointment(appointment) {
-    const pat = patients.find(p => p.id === appointment.patient_id || p.iin === appointment.patient_iin);
-    if (pat) {
-      setSelectedPatient(pat);
-      setSelectedAppointment(null);
-      // Switch status to arrived if it was pending
-      if (appointment.status === "pending") {
-        updateAppointmentStatus(appointment.id, "arrived");
+    setStartCodeAppId(appointment.id);
+    setStartCodeInput("");
+    setStartCodeError("");
+    setShowStartCodeModal(true);
+  }
+
+  async function submitStartCode(e) {
+    e.preventDefault();
+    if (!startCodeInput) return;
+    setVerifying(true);
+    setStartCodeError("");
+    try {
+      const res = await fetch(`${API_URL}/api/organization-structure/appointments/${startCodeAppId}/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: startCodeInput })
+      });
+      const data = await res.json();
+      if (res.ok && data && data.success) {
+        setShowStartCodeModal(false);
+        const activeApp = data.appointment || appointments.find(a => a.id === startCodeAppId);
+        setActiveAppointment(activeApp);
+        
+        // Find or create patient
+        let pat = patients.find(p => p.id === activeApp.patient_id || p.iin === activeApp.patient_iin);
+        if (!pat) {
+          pat = {
+            id: activeApp.patient_id || activeApp.patient_iin,
+            iin: activeApp.patient_iin,
+            full_name: activeApp.patient_name || "Пациент",
+            phone: activeApp.patient_phone || "—",
+            email: activeApp.patient_email || "—",
+            birth_date: getBirthDateFromIin(activeApp.patient_iin),
+            gender: getGenderFromIin(activeApp.patient_iin),
+            blood_type: "Не указана",
+            allergies: "Нет",
+            chronic_conditions: "Нет",
+            records: []
+          };
+          setPatients(prev => [...prev, pat]);
+        }
+        setSelectedPatient(pat);
+        
+        // Reset active consultation values
+        setActiveConsultation({
+          complaints: "",
+          symptoms: "",
+          diagnosis: activeApp.reason || "",
+          treatment: "",
+          recommendations: "",
+          comment: "",
+          files: []
+        });
+        setSelectedAppointment(null);
+        changeTab("medical_records");
+        alert("Прием успешно начат!");
+      } else {
+        setStartCodeError(data?.message || "Неверный код талона / QR-кода.");
       }
-      changeTab("medical_records");
-    } else {
-      const newPat = {
-        id: appointment.patient_id || appointment.patient_iin,
-        iin: appointment.patient_iin,
-        full_name: appointment.patient_name,
-        phone: appointment.patient_phone || "—",
-        email: appointment.patient_email || "—",
-        birth_date: getBirthDateFromIin(appointment.patient_iin),
-        gender: getGenderFromIin(appointment.patient_iin),
-        blood_type: "Не указана",
-        allergies: "Нет",
-        chronic_conditions: "Нет",
-        records: []
-      };
-      setPatients(prev => [...prev, newPat]);
-      setSelectedPatient(newPat);
-      setSelectedAppointment(null);
-      if (appointment.status === "pending") {
-        updateAppointmentStatus(appointment.id, "arrived");
-      }
-      changeTab("medical_records");
+    } catch (err) {
+      setStartCodeError("Сетевая ошибка при начале приема.");
+    } finally {
+      setVerifying(false);
     }
+  }
+
+  async function requestFinishAppointment() {
+    if (!activeAppointment) return;
+    setLoading(true);
+    setFinishError("");
+    try {
+      const res = await fetch(`${API_URL}/api/organization-structure/appointments/${activeAppointment.id}/request-finish`, {
+        method: "POST"
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setFinishingAppId(activeAppointment.id);
+        setOtpInput("");
+        setShowFinishOtpModal(true);
+      } else {
+        alert(data.message || "Ошибка при генерации кода завершения.");
+      }
+    } catch (err) {
+      alert("Сетевая ошибка.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitFinishOtp(e) {
+    e.preventDefault();
+    if (!otpInput || otpInput.length !== 4) {
+      setFinishError("Код должен содержать 4 цифры.");
+      return;
+    }
+    setVerifying(true);
+    setFinishError("");
+    try {
+      const res = await fetch(`${API_URL}/api/organization-structure/appointments/${activeAppointment.id}/finish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          otp: otpInput,
+          complaints: activeConsultation.complaints,
+          symptoms: activeConsultation.symptoms,
+          diagnosis: activeConsultation.diagnosis,
+          treatment: activeConsultation.treatment,
+          recommendations: activeConsultation.recommendations,
+          comment: activeConsultation.comment,
+          files: activeConsultation.files
+        })
+      });
+      const result = await res.json();
+      if (res.ok) {
+        alert("Прием успешно завершен!");
+        setShowFinishOtpModal(false);
+        setActiveAppointment(null);
+        // Refresh appointments list
+        setAppointments(prev => prev.map(a => a.id === activeAppointment.id ? { ...a, status: "completed" } : a));
+        setSelectedPatient(null);
+        changeTab("dashboard");
+      } else {
+        setFinishError(result.message || "Неверный код завершения.");
+      }
+    } catch (err) {
+      setFinishError("Ошибка сети при подтверждении кода.");
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  async function generateAndUploadCertificate(e) {
+    e.preventDefault();
+    if (!activeAppointment || !selectedPatient) return;
+    if (!certForm.title || !certForm.valid_until) {
+      alert("Заполните название справки и срок действия.");
+      return;
+    }
+    setIssuingCert(true);
+    try {
+      // 1. Generate PDF locally using jsPDF
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF();
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(20);
+      doc.text("MEDICAL CERTIFICATE / МЕДИЦИНСКАЯ СПРАВКА", 20, 30);
+      
+      doc.setFontSize(12);
+      doc.text(`Organization / Организация: ${organization?.organization_name || "Clinic OS Partner"}`, 20, 50);
+      doc.text(`Patient Name / ФИО: ${selectedPatient.full_name}`, 20, 60);
+      doc.text(`Patient IIN / ИИН: ${selectedPatient.iin}`, 20, 70);
+      doc.text(`Doctor / Врач: ${user?.full_name || "Doctor"}`, 20, 80);
+      doc.text(`Certificate Title / Название справки: ${certForm.title}`, 20, 90);
+      doc.text(`Type / Тип: ${certForm.type === "sick_leave" ? "Больничный лист" : "Медицинская справка"}`, 20, 100);
+      doc.text(`Valid Until / Действителен до: ${certForm.valid_until}`, 20, 110);
+      doc.text(`Issued Date / Дата выдачи: ${new Date().toLocaleDateString("ru-RU")}`, 20, 120);
+
+      doc.text("Signature & Stamp / Подпись и печать: ______________________", 20, 150);
+
+      const pdfBlob = doc.output("blob");
+      const fileName = `Certificate_${selectedPatient.iin}_${Date.now()}.pdf`;
+
+      // 2. Upload PDF to storage via support-upload
+      const formData = new FormData();
+      formData.append("file", pdfBlob, fileName);
+
+      const uploadRes = await fetch(`${API_URL}/api/organization-structure/support-upload`, {
+        method: "POST",
+        headers: { "x-organization-id": activeAppointment.organization_id },
+        body: formData
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok || !uploadData.file_url) {
+        throw new Error(uploadData.message || "Ошибка загрузки файла справки");
+      }
+
+      // 3. Issue certificate in database
+      const certRes = await fetch(`${API_URL}/api/organization-structure/appointments/${activeAppointment.id}/certificate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: certForm.title,
+          certificate_type: certForm.type,
+          file_url: uploadData.file_url,
+          valid_until: certForm.valid_until
+        })
+      });
+      const certData = await certRes.json();
+      if (certRes.ok) {
+        alert("Медицинская справка успешно выписана и загружена в медкарту пациента.");
+        setCertForm({ title: "", type: "sick_leave", valid_until: "" });
+      } else {
+        alert(certData.message || "Ошибка выписки справки.");
+      }
+    } catch (err) {
+      alert("Ошибка при генерации/загрузке справки: " + err.message);
+    } finally {
+      setIssuingCert(false);
+    }
+  }
+
+  const isNoShowButtonEnabled = (appDate, appTime) => {
+    const todayStr = new Date().toISOString().split("T")[0];
+    if (appDate < todayStr) return true;
+    if (appDate > todayStr) return false;
+    const [h, m] = appTime.split(":").map(Number);
+    const appTimeMs = new Date().setHours(h, m + 10, 0, 0);
+    return Date.now() >= appTimeMs;
+  };
+
+  const getWeekDays = (baseDateStr) => {
+    const days = [];
+    const base = new Date(baseDateStr + "T00:00:00");
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(base);
+      d.setDate(base.getDate() + i);
+      const dateStr = d.toISOString().split("T")[0];
+      days.push({
+        dateStr,
+        dayName: d.toLocaleDateString(language === "kz" ? "kk-KZ" : (language === "en" ? "en-US" : "ru-RU"), { weekday: "short" }),
+        dateNum: d.getDate(),
+        monthName: d.toLocaleDateString(language === "kz" ? "kk-KZ" : (language === "en" ? "en-US" : "ru-RU"), { month: "short" })
+      });
+    }
+    return days;
+  };
+
+  function renderActiveVisit() {
+    if (!activeAppointment || !selectedPatient) return null;
+    return (
+      <div className="gov-employee-cabinet active-visit-mode" style={{ padding: "24px", background: "#f0fdf4", minHeight: "100vh" }}>
+        {/* Banner Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#ffffff", padding: "20px 24px", borderRadius: "20px", boxShadow: "0 10px 30px rgba(15,23,42,0.05)", marginBottom: "24px", border: "1px solid rgba(0, 184, 90, 0.2)" }}>
+          <div>
+            <h2 style={{ margin: 0, color: "#0f172a", display: "flex", alignItems: "center", gap: "10px", fontSize: "22px", fontWeight: "900" }}>
+              <span style={{ display: "inline-block", width: "12px", height: "12px", borderRadius: "50%", background: "#10b981", animation: "pulse 1.5s infinite" }}></span>
+              {t("conductingVisit") || "🩺 Проводится приём пациента"}
+            </h2>
+            <p style={{ margin: "6px 0 0", color: "#475569", fontWeight: "600", fontSize: "15px" }}>
+              {selectedPatient.full_name} • {t("iin") || "ИИН"}: {selectedPatient.iin} • {t("phone") || "Телефон"}: {selectedPatient.phone}
+            </p>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => {
+              if (confirm("Вы действительно хотите свернуть окно приема? Черновик сохранен на сервере, вы сможете продолжить прием в любое время из календаря.")) {
+                setActiveAppointment(null);
+                setSelectedPatient(null);
+                changeTab("appointments");
+              }
+            }}
+            style={{ background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", padding: "10px 18px", borderRadius: "12px", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
+          >
+            {t("minimizeVisit") || "◀ Вернуться к списку записей"}
+          </button>
+        </div>
+
+        {/* Form Split Grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: "24px" }}>
+          
+          {/* Left Column: Patient Anketa & History */}
+          <div className="gov-card" style={{ background: "#ffffff", display: "flex", flexDirection: "column", gap: "24px" }}>
+            <div>
+              <h3 style={{ borderBottom: "2px solid #f1f5f9", paddingBottom: "12px", margin: "0 0 16px 0", color: "#0f172a" }}>👤 {t("patientAnketa") || "Анкета пациента"}</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", fontSize: "14px", color: "#334155" }}>
+                <p><b>{t("birthDate") || "Дата рождения"}:</b> {selectedPatient.birth_date}</p>
+                <p><b>{t("gender") || "Пол"}:</b> {selectedPatient.gender === "Мужской" ? t("male") : t("female")}</p>
+                <p><b>{t("bloodType") || "Группа крови"}:</b> {selectedPatient.blood_type || "Не указана"}</p>
+                <p style={{ color: "#dc2626" }}><b>{t("allergies") || "Аллергии"}:</b> {selectedPatient.allergies || "Нет"}</p>
+                <p><b>{t("chronicConditions") || "Хронические болезни"}:</b> {selectedPatient.chronic_conditions || "Нет"}</p>
+              </div>
+            </div>
+
+            <div>
+              <h3 style={{ borderBottom: "2px solid #f1f5f9", paddingBottom: "12px", margin: "0 0 16px 0", color: "#0f172a" }}>📜 {t("historyTab") || "История посещений"} ({selectedPatient.records?.length || 0})</h3>
+              <div style={{ maxHeight: "450px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px", paddingRight: "6px" }}>
+                {selectedPatient.records && selectedPatient.records.length > 0 ? (
+                  selectedPatient.records.map((rec) => (
+                    <div key={rec.id} style={{ background: "#f8fafc", padding: "14px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#64748b", marginBottom: "8px" }}>
+                        <b>{rec.date}</b>
+                        <span>{rec.doctor_name}</span>
+                      </div>
+                      <p style={{ margin: "4px 0", fontSize: "13px", color: "#334155" }}><b>{t("complaints") || "Жалобы"}:</b> {rec.complaints}</p>
+                      <p style={{ margin: "4px 0", fontSize: "13px", color: "#334155" }}><b>{t("diagnosisLabel") || "Диагноз"}:</b> <span style={{ color: "#00b85a", fontWeight: "bold" }}>{rec.diagnosis}</span></p>
+                      <p style={{ margin: "4px 0", fontSize: "13px", color: "#334155" }}><b>{t("treatmentLabel") || "Лечение"}:</b> {rec.prescriptions || rec.treatment}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p style={{ color: "#64748b", fontStyle: "italic", textAlign: "center", margin: "32px 0" }}>{t("noVisitHistory") || "История посещений пуста"}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Active Consultation Form */}
+          <div className="gov-card" style={{ background: "#ffffff", border: "2px solid #00b85a", display: "flex", flexDirection: "column", gap: "20px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ margin: 0, color: "#00b85a" }}>✏️ {t("visitForm") || "Заполнение протокола приема"}</h3>
+              <span style={{ fontSize: "12px", background: "#d1fae5", color: "#065f46", padding: "4px 10px", borderRadius: "8px", fontWeight: "bold" }}>
+                💾 {t("draftAutosaved") || "Черновик автосохраняется"}
+              </span>
+            </div>
+
+            <div className="org-admin-form" style={{ gap: "14px" }}>
+              <label>
+                {t("complaints") || "Жалобы пациента"} *
+                <textarea 
+                  rows="2" 
+                  value={activeConsultation.complaints} 
+                  onChange={(e) => setActiveConsultation(prev => ({ ...prev, complaints: e.target.value }))}
+                  placeholder="Например, острая боль, кашель..."
+                  required
+                />
+              </label>
+
+              <label>
+                {t("symptomsLabel") || "Симптомы / Объективные данные"}
+                <textarea 
+                  rows="2" 
+                  value={activeConsultation.symptoms} 
+                  onChange={(e) => setActiveConsultation(prev => ({ ...prev, symptoms: e.target.value }))}
+                  placeholder="Температура, давление, зев..."
+                />
+              </label>
+
+              <label>
+                {t("diagnosisLabel") || "Диагноз"} *
+                <input 
+                  type="text" 
+                  value={activeConsultation.diagnosis} 
+                  onChange={(e) => setActiveConsultation(prev => ({ ...prev, diagnosis: e.target.value }))}
+                  placeholder="Например: ОРВИ J06.9"
+                  required
+                />
+              </label>
+
+              <label>
+                {t("treatmentLabel") || "Лечение / Назначения"}
+                <textarea 
+                  rows="2" 
+                  value={activeConsultation.treatment} 
+                  onChange={(e) => setActiveConsultation(prev => ({ ...prev, treatment: e.target.value }))}
+                  placeholder="Схема лечения, рецепты..."
+                />
+              </label>
+
+              <label>
+                {t("recommendationsLabel") || "Рекомендации"}
+                <textarea 
+                  rows="2" 
+                  value={activeConsultation.recommendations} 
+                  onChange={(e) => setActiveConsultation(prev => ({ ...prev, recommendations: e.target.value }))}
+                  placeholder="Диета, режим, гигиена..."
+                />
+              </label>
+
+              <label>
+                {t("commentLabel") || "Комментарий"}
+                <input 
+                  type="text" 
+                  value={activeConsultation.comment} 
+                  onChange={(e) => setActiveConsultation(prev => ({ ...prev, comment: e.target.value }))}
+                  placeholder="Примечания..."
+                />
+              </label>
+
+              {/* Issue Official Certificate */}
+              <div style={{ border: "1px dashed #cbd5e1", borderRadius: "12px", padding: "14px", background: "#f8fafc" }}>
+                <h5 style={{ margin: "0 0 8px 0", fontSize: "14px", color: "#334155" }}>📋 {t("issueCert") || "Выписать справку"}</h5>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <input
+                    type="text"
+                    placeholder="Название справки (например, Справка 095/у)"
+                    value={certForm.title}
+                    onChange={(e) => setCertForm(prev => ({ ...prev, title: e.target.value }))}
+                    style={{ padding: "8px", fontSize: "13px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "#fff" }}
+                  />
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <select
+                      value={certForm.type}
+                      onChange={(e) => setCertForm(prev => ({ ...prev, type: e.target.value }))}
+                      style={{ padding: "8px", fontSize: "13px", flex: 1, borderRadius: "8px", border: "1px solid #cbd5e1", background: "#fff" }}
+                    >
+                      <option value="sick_leave">Больничный лист</option>
+                      <option value="general_health">Общая справка о здоровье</option>
+                    </select>
+                    <input
+                      type="date"
+                      value={certForm.valid_until}
+                      onChange={(e) => setCertForm(prev => ({ ...prev, valid_until: e.target.value }))}
+                      style={{ padding: "8px", fontSize: "13px", width: "130px", borderRadius: "8px", border: "1px solid #cbd5e1" }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={generateAndUploadCertificate}
+                    disabled={issuingCert}
+                    style={{ background: "#3b82f6", color: "#fff", border: "0", padding: "10px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "13px" }}
+                  >
+                    {issuingCert ? "Выписка справки..." : "Выписать и загрузить справку"}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={requestFinishAppointment}
+                className="save-record-submit-btn"
+                style={{ background: "#00b85a", color: "#fff", border: "0", padding: "14px", borderRadius: "14px", fontWeight: "bold", cursor: "pointer", fontSize: "15px", marginTop: "10px", width: "100%" }}
+              >
+                🏁 {t("finishVisitBtn") || "Завершить приём (Запросить OTP)"}
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
   }
 
   // Filtered patients for search
@@ -589,58 +1112,162 @@ export default function GovClinicEmployee() {
     return p.full_name.toLowerCase().includes(query) || p.iin.includes(query);
   });
 
-  // Time slots template
-  const timeSlots = [
-    "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", 
-    "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", 
-    "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00"
-  ];
-
   if (!user) {
     return <div style={{ padding: 20 }}>Ошибка: Пользователь не авторизован.</div>;
   }
 
+  if (activeAppointment) {
+    return renderActiveVisit();
+  }
+
   const role = user.role;
-  const showMedicalCardTab = ["doctor", "department_head", "deputy_chief_doctor"].includes(role);
-  const canAddMedicalRecords = role === "doctor" || role === "department_head";
-  const isDepartmentHead = role === "department_head";
-  const isDeputyChief = role === "deputy_chief_doctor";
+
+  // Active schedule values helper
+  const activeSchedule = schedule || {
+    work_start: "09:00",
+    work_end: "18:00",
+    lunch_start: "13:00",
+    lunch_end: "14:00",
+    slot_duration: 30,
+    work_days: [1, 2, 3, 4, 5]
+  };
+
+  const getDayHoursRange = () => {
+    return `${activeSchedule.work_start} – ${activeSchedule.work_end}`;
+  };
+
+  const getLunchBreakRange = () => {
+    return `${activeSchedule.lunch_start} – ${activeSchedule.lunch_end}`;
+  };
+
+  // Find nearest pending appointment
+  const getNearestAppointment = () => {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const todays = appointments
+      .filter(a => a.date === todayStr && (a.status === "pending" || a.status === "arrived"))
+      .sort((a, b) => a.time.localeCompare(b.time));
+    return todays.length > 0 ? todays[0] : null;
+  };
+
+  const nearestApp = getNearestAppointment();
+
+  // Ratings calculation helper
+  const ratingDistribution = Array(10).fill(0);
+  reviews.forEach(r => {
+    const val = Math.round(r.rating || r.rating_value || 8);
+    if (val >= 1 && val <= 10) {
+      ratingDistribution[val - 1]++;
+    }
+  });
+
+  const totalReviewsCount = reviews.length;
+
+  // Sort and Filter History visits
+  const filteredHistory = appointments.filter(app => {
+    const isPast = app.status === "completed" || app.status === "cancelled";
+    if (!isPast) return false;
+
+    if (historySearch) {
+      const q = historySearch.toLowerCase().trim();
+      if (!app.patient_name?.toLowerCase().includes(q) && !app.patient_iin?.includes(q)) {
+        return false;
+      }
+    }
+    if (historyDate && app.date !== historyDate) return false;
+
+    if (app.date) {
+      const [year, month] = app.date.split("-");
+      if (historyYear && year !== historyYear) return false;
+      if (historyMonth && month !== historyMonth.padStart(2, "0")) return false;
+    }
+
+    if (historyStatus && app.status !== historyStatus) return false;
+
+    return true;
+  });
+
+  const sortedHistory = [...filteredHistory].sort((a, b) => {
+    if (historySort === "date_desc") {
+      return `${b.date}T${b.time}`.localeCompare(`${a.date}T${a.time}`);
+    } else if (historySort === "date_asc") {
+      return `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`);
+    } else if (historySort === "name_asc") {
+      return (a.patient_name || "").localeCompare(b.patient_name || "");
+    }
+    return 0;
+  });
+
+  // Handle password change form submit
+  const handleVoluntaryPasswordChange = async (e) => {
+    e.preventDefault();
+    if (!changePwdForm.currentPassword || !changePwdForm.newPassword || !changePwdForm.confirmPassword) {
+      alert("Заполните все поля.");
+      return;
+    }
+    if (changePwdForm.newPassword !== changePwdForm.confirmPassword) {
+      alert("Новые пароли не совпадают.");
+      return;
+    }
+    if (changePwdForm.newPassword.length < 6) {
+      alert("Пароль должен быть не менее 6 символов.");
+      return;
+    }
+    if (!/^(?=.*[A-Za-z])(?=.*\d).{6,}$/.test(changePwdForm.newPassword)) {
+      alert("Пароль должен содержать как буквы, так и цифры.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/api/organizations/change-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          currentPassword: changePwdForm.currentPassword,
+          newPassword: changePwdForm.newPassword
+        })
+      });
+      const result = await response.json();
+      if (response.ok) {
+        alert("Пароль успешно изменен!");
+        setChangePwdForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      } else {
+        alert(result.message || "Ошибка смены пароля.");
+      }
+    } catch (err) {
+      alert("Ошибка сети.");
+    }
+  };
+
+  // Generate calendar grid structure
+  const calendarDays = calendarView === "week" ? getWeekDays(selectedCalendarDate) : [{
+    dateStr: selectedCalendarDate,
+    dayName: new Date(selectedCalendarDate + "T00:00:00").toLocaleDateString(language === "kz" ? "kk-KZ" : (language === "en" ? "en-US" : "ru-RU"), { weekday: "short" }),
+    dateNum: new Date(selectedCalendarDate + "T00:00:00").getDate(),
+    monthName: new Date(selectedCalendarDate + "T00:00:00").toLocaleDateString(language === "kz" ? "kk-KZ" : (language === "en" ? "en-US" : "ru-RU"), { month: "short" })
+  }];
+
+  const startHourNum = Number(activeSchedule.work_start.split(":")[0]);
+  const endHourNum = Number(activeSchedule.work_end.split(":")[0]);
+  const stepMin = activeSchedule.slot_duration;
+
+  const getCalendarTimeSlots = () => {
+    const slots = [];
+    let curMin = startHourNum * 60;
+    const endMin = endHourNum * 60;
+    while (curMin + stepMin <= endMin) {
+      const h = Math.floor(curMin / 60);
+      const m = curMin % 60;
+      slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+      curMin += stepMin;
+    }
+    return slots;
+  };
+
+  const calendarTimeSlots = getCalendarTimeSlots();
 
   return (
     <div className="gov-employee-cabinet">
-      {/* Header Info Panel */}
-      <div className="gov-employee-profile-banner">
-        <div className="profile-banner-left">
-          <div className="profile-banner-avatar">
-            {employeeProfile?.full_name?.split(" ").slice(0,2).map(n=>n[0]).join("") || "С"}
-          </div>
-          <div className="profile-banner-details">
-            <h2>{employeeProfile?.full_name || user.full_name}</h2>
-            <div className="profile-badge-row">
-              <span className="profile-role-badge">{ROLE_LABELS[role] || "Сотрудник"}</span>
-              <span className={`profile-status-badge ${employeeProfile?.status === "active" ? "active" : ""}`}>
-                {employeeProfile?.status === "active" ? "Активен" : "Отключен"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="profile-banner-meta">
-          <div className="meta-item">
-            <span className="meta-label">Организация:</span>
-            <span className="meta-value">{organization?.organization_name || "Clinic OS"}</span>
-          </div>
-          <div className="meta-item">
-            <span className="meta-label">Отделение:</span>
-            <span className="meta-value">{employeeProfile?.department || "Не указано"}</span>
-          </div>
-          <div className="meta-item">
-            <span className="meta-label">Кабинет:</span>
-            <span className="meta-value">№{employeeProfile?.cabinet || "—"}</span>
-          </div>
-        </div>
-      </div>
-
       {/* Messages */}
       {message && <div className="gov-success">{message}</div>}
       {error && <div className="gov-error">{error}</div>}
@@ -651,628 +1278,402 @@ export default function GovClinicEmployee() {
         {/* TABS 1: ГЛАВНАЯ (DASHBOARD) */}
         {currentTab === "dashboard" && (
           <div className="gov-employee-dashboard">
-            <h3 className="gov-section-title">Панель управления сотрудника</h3>
+            <h3 className="gov-section-title">{t("employeeDashboardTitle") || "Панель управления сотрудника"}</h3>
             
             <div className="employee-dashboard-grid">
               
               <div className="employee-stat-card cursor-pointer" onClick={() => changeTab("appointments")}>
-                <span className="stat-card-title">Записи на сегодня</span>
-                <span className="stat-card-number">{appointments.filter(a => a.status !== "cancelled").length}</span>
-                <span className="stat-card-desc">Всего активных записей</span>
+                <span className="stat-card-title">{t("todayAppointments") || "Записи на сегодня"}</span>
+                <span className="stat-card-number">{appointments.filter(a => a.date === new Date().toISOString().split("T")[0] && a.status !== "cancelled").length}</span>
+                <span className="stat-card-desc">{t("todayAppointmentsDesc") || "Всего активных записей на сегодня"}</span>
               </div>
 
               <div className="employee-stat-card highlight-card">
-                <span className="stat-card-title">Следующий пациент</span>
-                {appointments.find(a => a.status === "pending" || a.status === "arrived") ? (
+                <span className="stat-card-title">{t("nextPatient") || "Ближайший пациент"}</span>
+                {nearestApp ? (
                   <>
-                    <span className="stat-card-name">
-                      {appointments.find(a => a.status === "pending" || a.status === "arrived").patient_name}
-                    </span>
-                    <span className="stat-card-time">
-                      Время: {appointments.find(a => a.status === "pending" || a.status === "arrived").time}
-                    </span>
+                    <span className="stat-card-name">{nearestApp.patient_name}</span>
+                    <span className="stat-card-time">{t("time") || "Время"}: {nearestApp.time}</span>
                     <button 
                       type="button" 
                       className="dashboard-action-btn"
-                      onClick={() => startAppointment(appointments.find(a => a.status === "pending" || a.status === "arrived"))}
+                      onClick={() => startAppointment(nearestApp)}
                     >
-                      Начать прием
+                      {t("startVisit") || "Начать прием"}
                     </button>
                   </>
                 ) : (
-                  <span className="stat-card-desc">Записей нет</span>
+                  <span className="stat-card-desc">{t("noMoreAppointmentsToday") || "На сегодня записей больше нет"}</span>
                 )}
               </div>
 
               <div className="employee-stat-card">
-                <span className="stat-card-title">Кабинет</span>
-                <span className="stat-card-number">№{employeeProfile?.cabinet || "—"}</span>
-                <span className="stat-card-desc">Ваше текущее рабочее место</span>
+                <span className="stat-card-title">{t("todaySchedule") || "Сегодняшний график"}</span>
+                <span className="stat-card-value" style={{ display: "block", marginTop: "10px", fontSize: "20px", fontWeight: "bold", color: "#0f172a" }}>
+                  {getDayHoursRange()}
+                </span>
+                <span className="stat-card-desc">{t("lunchBreak") || "Обед"}: {getLunchBreakRange()}</span>
               </div>
 
-              <div className="employee-stat-card">
-                <span className="stat-card-title">Отделение</span>
-                <span className="stat-card-value">{employeeProfile?.department || "—"}</span>
-                <span className="stat-card-desc">Прикрепленное отделение</span>
-              </div>
-
-              {showMedicalCardTab && (
-                <div className="employee-stat-card cursor-pointer" onClick={() => changeTab("patients")}>
-                  <span className="stat-card-title">Пациенты</span>
-                  <span className="stat-card-number">{patients.length}</span>
-                  <span className="stat-card-desc">Карточки в системе</span>
-                </div>
-              )}
-
-              <div className="employee-stat-card cursor-pointer" onClick={() => changeTab("notifications")}>
-                <span className="stat-card-title">Уведомления</span>
-                <span className="stat-card-number">{notifications.length}</span>
-                <span className="stat-card-desc">События и сообщения</span>
+              <div className="employee-stat-card cursor-pointer" onClick={() => changeTab("profile")}>
+                <span className="stat-card-title">{t("rating") || "Текущий рейтинг"}</span>
+                <span className="stat-card-number" style={{ color: "#f59e0b" }}>★ {employeeProfile?.average_rating || "8.0"}</span>
+                <span className="stat-card-desc">{t("basedOnReviews") || "На основе"} {employeeProfile?.rating_count || 0} {t("reviews") || "оценок"}</span>
               </div>
 
             </div>
 
-            {/* Quick Actions Panel */}
-            <div className="quick-actions-panel gov-card">
-              <h3>Быстрый поиск пациента</h3>
+            {/* Quick search input panel */}
+            <div className="quick-actions-panel gov-card" style={{ marginTop: "24px" }}>
+              <h3>{t("quickPatientHistorySearch") || "Быстрый поиск визитов пациента"}</h3>
               <div className="search-bar-inline">
                 <input 
                   type="text" 
                   placeholder="Введите ФИО или ИИН пациента..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
                 />
                 <button 
                   type="button"
                   className="quick-search-btn"
-                  onClick={() => changeTab("patients")}
+                  onClick={() => changeTab("history")}
                 >
-                  Искать
+                  {t("search") || "Искать"}
                 </button>
               </div>
             </div>
+
+            {/* Banner details profile */}
+            <div className="gov-card" style={{ marginTop: "24px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+              <div>
+                <h4>ℹ️ {t("workplaceDetails") || "Детали рабочего места"}</h4>
+                <div style={{ display: "grid", gap: "8px", marginTop: "12px", fontSize: "14px" }}>
+                  <p><b>{t("cabinet") || "Кабинет"}:</b> №{employeeProfile?.cabinet || "—"}</p>
+                  <p><b>{t("specialty") || "Специальность"}:</b> {employeeProfile?.specialty || "Врач"}</p>
+                  <p><b>{t("department") || "Отделение"}:</b> {employeeProfile?.department || "Не назначено"}</p>
+                  <p><b>{t("slotDurationLabel") || "Длительность приема"}:</b> {activeSchedule.slot_duration} {t("minutes") || "минут"}</p>
+                </div>
+              </div>
+              <div>
+                <h4>🔔 {t("latestNotifications") || "Последние уведомления"}</h4>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px" }}>
+                  {notifications.slice(0, 3).map(not => (
+                    <div key={not.id} style={{ fontSize: "13px", padding: "8px", background: "#f8fafc", borderRadius: "8px", borderLeft: "4px solid #3b82f6" }}>
+                      <b>{not.title}</b>: {not.message}
+                    </div>
+                  ))}
+                  {notifications.length === 0 && <p style={{ fontStyle: "italic", fontSize: "13px", color: "#64748b" }}>Нет уведомлений</p>}
+                </div>
+              </div>
+            </div>
+
           </div>
         )}
 
-        {/* TABS 2: ЗАПИСИ (APPOINTMENTS) */}
+        {/* TABS 2: ЗАПИСИ (APPOINTMENTS) - CALENDAR GRID */}
         {currentTab === "appointments" && (
           <div className="gov-employee-appointments">
-            <h3 className="gov-section-title">Расписание приемов</h3>
-            
-            <div className="appointments-filter-row gov-card" style={{ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', padding: '20px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontWeight: 'bold', fontSize: '14px', color: '#475569' }}>Период с:</label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '15px' }}
-                />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontWeight: 'bold', fontSize: '14px', color: '#475569' }}>По:</label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '15px' }}
-                />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <h3 className="gov-section-title" style={{ margin: 0 }}>{t("appointmentsTab") || "Календарь приемов"}</h3>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button 
+                  type="button" 
+                  onClick={() => setCalendarView("day")} 
+                  style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid #cbd5e1", background: calendarView === "day" ? "#00b85a" : "#fff", color: calendarView === "day" ? "#fff" : "#0f172a", fontWeight: "bold", cursor: "pointer" }}
+                >
+                  {t("dayView") || "День"}
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setCalendarView("week")} 
+                  style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid #cbd5e1", background: calendarView === "week" ? "#00b85a" : "#fff", color: calendarView === "week" ? "#fff" : "#0f172a", fontWeight: "bold", cursor: "pointer" }}
+                >
+                  {t("weekView") || "Неделя"}
+                </button>
               </div>
             </div>
 
-            {(() => {
-              const { todayList, futureList, pastList } = getCategorizedAppointments();
-              return (
-                <div className="appointments-categorized-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', marginBottom: '32px' }}>
-                  {/* Today Section */}
-                  <div className="appointment-category-col" style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                    <h4 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', color: '#0f172a', fontWeight: 'bold', fontSize: '16px' }}>
-                      <span>🟢 Сегодня</span>
-                      <span style={{ background: '#10b981', color: '#fff', borderRadius: '20px', padding: '2px 8px', fontSize: '12px' }}>{todayList.length}</span>
-                    </h4>
-                    <div className="category-cards-list">
-                      {todayList.length > 0 ? (
-                        todayList.map(renderAppointmentCard)
-                      ) : (
-                        <p style={{ color: '#64748b', fontStyle: 'italic', textAlign: 'center', margin: '24px 0' }}>На сегодня записей нет</p>
-                      )}
-                    </div>
-                  </div>
+            {/* Date Navigator */}
+            <div className="gov-card" style={{ display: "flex", gap: "15px", alignItems: "center", marginBottom: "20px", padding: "12px 20px" }}>
+              <button 
+                type="button" 
+                onClick={() => {
+                  const d = new Date(selectedCalendarDate + "T00:00:00");
+                  d.setDate(d.getDate() - (calendarView === "week" ? 7 : 1));
+                  setSelectedCalendarDate(d.toISOString().split("T")[0]);
+                }}
+                style={{ background: "#f1f5f9", border: "0", padding: "8px 12px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}
+              >
+                ◀ {t("back") || "Назад"}
+              </button>
+              <input 
+                type="date"
+                value={selectedCalendarDate}
+                onChange={(e) => setSelectedCalendarDate(e.target.value)}
+                style={{ padding: "8px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "bold" }}
+              />
+              <button 
+                type="button" 
+                onClick={() => {
+                  const d = new Date(selectedCalendarDate + "T00:00:00");
+                  d.setDate(d.getDate() + (calendarView === "week" ? 7 : 1));
+                  setSelectedCalendarDate(d.toISOString().split("T")[0]);
+                }}
+                style={{ background: "#f1f5f9", border: "0", padding: "8px 12px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}
+              >
+                {t("forward") || "Вперед"} ▶
+              </button>
+              <button 
+                type="button" 
+                onClick={() => setSelectedCalendarDate(new Date().toISOString().split("T")[0])}
+                style={{ marginLeft: "auto", background: "#3b82f6", color: "#fff", border: "0", padding: "8px 14px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}
+              >
+                {t("today") || "Сегодня"}
+              </button>
+            </div>
 
-                  {/* Future Section */}
-                  <div className="appointment-category-col" style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                    <h4 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', color: '#0f172a', fontWeight: 'bold', fontSize: '16px' }}>
-                      <span>🟡 Предстоящие</span>
-                      <span style={{ background: '#f59e0b', color: '#fff', borderRadius: '20px', padding: '2px 8px', fontSize: '12px' }}>{futureList.length}</span>
-                    </h4>
-                    <div className="category-cards-list">
-                      {futureList.length > 0 ? (
-                        futureList.map(renderAppointmentCard)
-                      ) : (
-                        <p style={{ color: '#64748b', fontStyle: 'italic', textAlign: 'center', margin: '24px 0' }}>Предстоящих записей нет</p>
-                      )}
-                    </div>
-                  </div>
+            {/* Grid Container */}
+            <div className="gov-card" style={{ overflowX: "auto", padding: "16px" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: calendarView === "week" ? "800px" : "100%" }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid #e2e8f0" }}>
+                    <th style={{ padding: "12px", width: "80px", textAlign: "center", color: "#64748b" }}>{t("time") || "Время"}</th>
+                    {calendarDays.map((day) => {
+                      const isToday = day.dateStr === new Date().toISOString().split("T")[0];
+                      return (
+                        <th key={day.dateStr} style={{ padding: "12px", textAlign: "center", background: isToday ? "#e0f2fe" : "transparent", borderLeft: "1px solid #e2e8f0" }}>
+                          <span style={{ display: "block", fontSize: "12px", color: isToday ? "#0284c7" : "#64748b", textTransform: "uppercase", fontWeight: "bold" }}>{day.dayName}</span>
+                          <span style={{ fontSize: "18px", fontWeight: "900", color: isToday ? "#0369a1" : "#0f172a" }}>{day.dateNum} {day.monthName}</span>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {calendarTimeSlots.map((slot) => (
+                    <tr key={slot} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                      <td style={{ padding: "10px", textAlign: "center", fontWeight: "bold", color: "#475569", fontSize: "13px" }}>{slot}</td>
+                      {calendarDays.map((day) => {
+                        const isWorkingDay = activeSchedule.work_days.includes(new Date(day.dateStr + "T00:00:00").getDay() === 0 ? 7 : new Date(day.dateStr + "T00:00:00").getDay());
+                        const isLunch = slot >= activeSchedule.lunch_start && slot < activeSchedule.lunch_end;
+                        const app = appointments.find(a => a.date === day.dateStr && a.time === slot && a.status !== "cancelled");
 
-                  {/* Past Section */}
-                  <div className="appointment-category-col" style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                    <h4 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', color: '#0f172a', fontWeight: 'bold', fontSize: '16px' }}>
-                      <span>⚪ Прошедшие и завершенные</span>
-                      <span style={{ background: '#94a3b8', color: '#fff', borderRadius: '20px', padding: '2px 8px', fontSize: '12px' }}>{pastList.length}</span>
-                    </h4>
-                    <div className="category-cards-list" style={{ maxHeight: '600px', overflowY: 'auto' }}>
-                      {pastList.length > 0 ? (
-                        pastList.map(renderAppointmentCard)
-                      ) : (
-                        <p style={{ color: '#64748b', fontStyle: 'italic', textAlign: 'center', margin: '24px 0' }}>История записей пуста</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
+                        let cellStyle = { background: "#fff", position: "relative", borderLeft: "1px solid #e2e8f0", verticalAlign: "middle" };
+                        let content = null;
 
-            {/* Appointment Detail Modal / Sidebar Panel */}
+                        if (app) {
+                          const isFinished = app.status === "completed";
+                          const isInProgress = app.status === "in_progress" || app.status === "waiting_finish_confirmation";
+                          
+                          cellStyle.background = isFinished ? "#e2e8f0" : (isInProgress ? "#d1fae5" : "#e0f2fe");
+                          cellStyle.borderLeft = isFinished ? "4px solid #94a3b8" : (isInProgress ? "4px solid #10b981" : "4px solid #3b82f6");
+                          
+                          const noShowEnabled = isNoShowButtonEnabled(app.date, app.time) && (app.status === "pending" || app.status === "arrived");
+
+                          content = (
+                            <div style={{ padding: "8px", fontSize: "13px" }}>
+                              <div style={{ fontWeight: "bold", color: "#1e293b" }}>{app.patient_name}</div>
+                              <div style={{ fontSize: "11px", color: "#64748b", margin: "2px 0" }}>ИИН: {app.patient_iin}</div>
+                              <div style={{ display: "flex", gap: "6px", marginTop: "4px", flexWrap: "wrap" }}>
+                                <button 
+                                  type="button" 
+                                  onClick={() => setSelectedAppointment(app)}
+                                  style={{ padding: "2px 6px", fontSize: "10px", borderRadius: "4px", border: "1px solid #3b82f6", background: "#fff", color: "#3b82f6", cursor: "pointer", fontWeight: "bold" }}
+                                >
+                                  {t("open") || "Открыть"}
+                                </button>
+                                {(app.status === "pending" || app.status === "arrived") && (
+                                  <button 
+                                    type="button" 
+                                    onClick={() => startAppointment(app)}
+                                    style={{ padding: "2px 6px", fontSize: "10px", borderRadius: "4px", border: "0", background: "#10b981", color: "#fff", cursor: "pointer", fontWeight: "bold" }}
+                                  >
+                                    {t("startVisit") || "Принять"}
+                                  </button>
+                                )}
+                                {noShowEnabled && (
+                                  <button 
+                                    type="button" 
+                                    onClick={() => updateAppointmentStatus(app.id, "cancelled")}
+                                    style={{ padding: "2px 6px", fontSize: "10px", borderRadius: "4px", border: "0", background: "#ef4444", color: "#fff", cursor: "pointer", fontWeight: "bold" }}
+                                  >
+                                    {t("patientNotArrived") || "Не пришел"}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        } else if (isLunch) {
+                          cellStyle.background = "#f1f5f9";
+                          content = <span style={{ color: "#94a3b8", fontSize: "11px", fontStyle: "italic", textAlign: "center", display: "block" }}>{t("lunchBreak") || "Обед"}</span>;
+                        } else if (!isWorkingDay) {
+                          cellStyle.background = "#fef2f2";
+                          content = <span style={{ color: "#f87171", fontSize: "11px", fontStyle: "italic", textAlign: "center", display: "block" }}>{t("weekendDay") || "Выходной"}</span>;
+                        } else {
+                          content = <span style={{ color: "#cbd5e1", fontSize: "11px", fontStyle: "italic", textAlign: "center", display: "block" }}>{t("freeSlot") || "Свободно"}</span>;
+                        }
+
+                        return (
+                          <td key={day.dateStr} style={cellStyle}>
+                            {content}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Appointment Detail Modal */}
             {selectedAppointment && (
               <div className="employee-modal" onClick={() => setSelectedAppointment(null)}>
-                <div className="employee-modal-content" onClick={(e) => e.stopPropagation()}>
+                <div className="employee-modal-content" onClick={(e) => e.stopPropagation()} style={{ width: "min(500px, 100%)", padding: "24px" }}>
                   <div className="modal-header-row">
-                    <h3>Детали записи на прием</h3>
+                    <h3>{t("appointmentDetails") || "Детали записи"}</h3>
                     <button type="button" className="close-modal-btn" onClick={() => setSelectedAppointment(null)}>×</button>
                   </div>
-
-                  <div className="modal-body-content">
-                    <table className="info-table-details">
-                      <tbody>
-                        <tr>
-                          <td>Пациент:</td>
-                          <td><b>{selectedAppointment.patient_name}</b></td>
-                        </tr>
-                        <tr>
-                          <td>ИИН:</td>
-                          <td>{selectedAppointment.patient_iin}</td>
-                        </tr>
-                        <tr>
-                          <td>Телефон:</td>
-                          <td>{selectedAppointment.patient_phone}</td>
-                        </tr>
-                        <tr>
-                          <td>Дата приема:</td>
-                          <td>{selectedAppointment.date}</td>
-                        </tr>
-                        <tr>
-                          <td>Время приема:</td>
-                          <td><b>{selectedAppointment.time}</b></td>
-                        </tr>
-                        <tr>
-                          <td>Причина обращения:</td>
-                          <td>{selectedAppointment.reason}</td>
-                        </tr>
-                        <tr>
-                          <td>Статус записи:</td>
-                          <td>
-                            <span className={`status-badge-mini ${selectedAppointment.status}`}>
-                              {selectedAppointment.status === "pending" && "Ожидается"}
-                              {selectedAppointment.status === "arrived" && "Пациент пришел"}
-                              {selectedAppointment.status === "completed" && "Прием завершен"}
-                              {selectedAppointment.status === "cancelled" && "Отменено"}
-                            </span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>Кабинет:</td>
-                          <td>№{selectedAppointment.cabinet}</td>
-                        </tr>
-                        {selectedAppointment.comment && (
-                          <tr>
-                            <td>Комментарий:</td>
-                            <td><i>{selectedAppointment.comment}</i></td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-
-                    <div className="modal-actions-buttons">
-                      {/* Common Actions */}
-                      <button 
-                        type="button" 
-                        className="modal-btn outline-btn"
-                        onClick={() => openPatientCard(selectedAppointment.patient_id)}
-                      >
-                        Открыть карточку пациента
-                      </button>
-
-                      {/* Doctor/Nurse Actions */}
-                      {role === "doctor" && (selectedAppointment.status === "pending" || selectedAppointment.status === "arrived") && (
-                        <button 
-                          type="button" 
-                          className="modal-btn action-primary-btn"
-                          onClick={() => startAppointment(selectedAppointment)}
-                        >
-                          Начать прием
-                        </button>
-                      )}
-
-                      {/* Status switch buttons */}
-                      {selectedAppointment.status === "pending" && (
-                        <button 
-                          type="button" 
-                          className="modal-btn status-arrived-btn"
-                          onClick={() => updateAppointmentStatus(selectedAppointment.id, "arrived")}
-                        >
-                          Пациент пришел
-                        </button>
-                      )}
-
-                      {selectedAppointment.status === "arrived" && (
-                        <button 
-                          type="button" 
-                          className="modal-btn status-completed-btn"
-                          onClick={() => {
-                            setVerificationAppId(selectedAppointment.id);
-                            setVerificationCodeInput("");
-                            setVerificationError("");
-                            setShowVerificationModal(true);
-                          }}
-                        >
-                          Завершить прием
-                        </button>
-                      )}
-
-                      {/* Cancel Record */}
-                      {role !== "doctor" && selectedAppointment.status !== "completed" && selectedAppointment.status !== "cancelled" && (
-                        <button 
-                          type="button" 
-                          className="modal-btn status-cancel-btn"
-                          onClick={() => updateAppointmentStatus(selectedAppointment.id, "cancelled")}
-                        >
-                          Отменить запись
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* VERIFICATION CODE MODAL */}
-            {showVerificationModal && (
-              <div className="employee-modal" style={{ zIndex: 1100 }} onClick={() => setShowVerificationModal(false)}>
-                <div className="employee-modal-content" style={{ maxWidth: '400px' }} onClick={(e) => e.stopPropagation()}>
-                  <div className="modal-header-row">
-                    <h3>Подтверждение приема</h3>
-                    <button type="button" className="close-modal-btn" onClick={() => setShowVerificationModal(false)}>×</button>
-                  </div>
-                  <form onSubmit={submitVerificationCode} style={{ padding: '16px 0' }}>
-                    <p style={{ fontSize: '14px', color: '#475569', marginBottom: '20px' }}>
-                      Для завершения приема, пожалуйста, введите 4-значный код подтверждения, отправленный пациенту при бронировании (или отображаемый в его личном кабинете).
-                    </p>
-                    
-                    <div style={{ marginBottom: '20px' }}>
-                      <label htmlFor="verCode" style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px' }}>
-                        Код подтверждения (4 цифры)
-                      </label>
-                      <input
-                        id="verCode"
-                        type="text"
-                        maxLength={4}
-                        pattern="\d{4}"
-                        placeholder="0000"
-                        value={verificationCodeInput}
-                        onChange={(e) => setVerificationCodeInput(e.target.value.replace(/\D/g, ""))}
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          fontSize: '24px',
-                          letterSpacing: '8px',
-                          textAlign: 'center',
-                          borderRadius: '8px',
-                          border: '1px solid #cbd5e1'
-                        }}
-                        required
-                      />
-                    </div>
-
-                    {verificationError && (
-                      <div style={{ color: '#ef4444', fontSize: '14px', marginBottom: '16px', fontWeight: 'bold' }}>
-                        ⚠️ {verificationError}
-                      </div>
+                  <div style={{ marginTop: "16px", display: "grid", gap: "12px", fontSize: "14px" }}>
+                    <p><b>{t("fullName") || "Пациент"}:</b> {selectedAppointment.patient_name}</p>
+                    <p><b>{t("iin") || "ИИН"}:</b> {selectedAppointment.patient_iin}</p>
+                    <p><b>{t("phone") || "Телефон"}:</b> {selectedAppointment.patient_phone || "—"}</p>
+                    <p><b>{t("date") || "Дата"}:</b> {selectedAppointment.date}</p>
+                    <p><b>{t("time") || "Время"}:</b> {selectedAppointment.time}</p>
+                    <p><b>{t("reason") || "Причина"}:</b> {selectedAppointment.reason}</p>
+                    <p><b>{t("status") || "Статус"}:</b> <span className={`status-badge-mini ${selectedAppointment.status}`}>{selectedAppointment.status}</span></p>
+                    {selectedAppointment.patient_confirmed !== undefined && (
+                      <p><b>{t("patientConfirmed") || "Подтверждено пациентом"}:</b> {selectedAppointment.patient_confirmed ? "🟢 Да" : "🔴 Нет"}</p>
                     )}
-
-                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                      <button
-                        type="button"
-                        className="modal-btn outline-btn"
-                        onClick={() => setShowVerificationModal(false)}
-                      >
-                        Отмена
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={verifying}
-                        className="modal-btn status-completed-btn"
-                        style={{ background: '#00b85a', color: '#fff', border: 0 }}
-                      >
-                        {verifying ? "Проверка..." : "Подтвердить"}
-                      </button>
-                    </div>
-                  </form>
+                  </div>
                 </div>
               </div>
             )}
           </div>
         )}
 
-        {/* TABS 3: ПАЦИЕНТЫ (PATIENTS) */}
-        {currentTab === "patients" && (
-          <div className="gov-employee-patients">
-            <h3 className="gov-section-title">Список записанных пациентов</h3>
-            
-            <div className="patients-search-row">
+        {/* TABS 3: ИСТОРИЯ ПОСЕЩЕНИЙ (VISIT HISTORY) */}
+        {currentTab === "history" && (
+          <div className="gov-employee-history">
+            <h3 className="gov-section-title">{t("historyTab") || "История посещений"}</h3>
+
+            {/* Filters Bar */}
+            <div className="gov-card" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "20px", padding: "16px" }}>
               <input 
                 type="text" 
-                placeholder="Поиск по ФИО или ИИН..." 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="patient-search-input"
+                placeholder="Поиск по ФИО / ИИН..." 
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                style={{ padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1" }}
               />
+              <select 
+                value={historyMonth} 
+                onChange={(e) => setHistoryMonth(e.target.value)}
+                style={{ padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "#fff" }}
+              >
+                <option value="">{t("allMonths") || "Все месяцы"}</option>
+                {["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"].map((m, idx) => (
+                  <option key={idx} value={idx + 1}>{m}</option>
+                ))}
+              </select>
+              <select 
+                value={historyYear} 
+                onChange={(e) => setHistoryYear(e.target.value)}
+                style={{ padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "#fff" }}
+              >
+                <option value="">{t("allYears") || "Все годы"}</option>
+                <option value="2025">2025</option>
+                <option value="2026">2026</option>
+              </select>
+              <select 
+                value={historyStatus} 
+                onChange={(e) => setHistoryStatus(e.target.value)}
+                style={{ padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "#fff" }}
+              >
+                <option value="">{t("allStatuses") || "Все статусы"}</option>
+                <option value="completed">Completed (Завершен)</option>
+                <option value="cancelled">Cancelled (Отменен)</option>
+              </select>
+              <input 
+                type="date"
+                value={historyDate}
+                onChange={(e) => setHistoryDate(e.target.value)}
+                style={{ padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1" }}
+              />
+              <select 
+                value={historySort} 
+                onChange={(e) => setHistorySort(e.target.value)}
+                style={{ padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "#fff" }}
+              >
+                <option value="date_desc">{t("newestFirst") || "Сначала новые"}</option>
+                <option value="date_asc">{t("oldestFirst") || "Сначала старые"}</option>
+                <option value="name_asc">{t("nameAsc") || "По алфавиту (ФИО)"}</option>
+              </select>
             </div>
 
-            <div className="patients-grid-list">
-              {filteredPatients.length > 0 ? (
-                filteredPatients.map((pat) => (
-                  <div key={pat.id} className="patient-info-card gov-card">
-                    <div className="patient-card-title">
-                      <h4>{pat.full_name}</h4>
-                      <span className="patient-iin-badge">ИИН: {pat.iin}</span>
-                    </div>
-
-                    <div className="patient-card-meta">
-                      <p><b>Телефон:</b> {pat.phone}</p>
-                      <p><b>Дата рождения:</b> {pat.birth_date}</p>
-                      <p><b>Хронические заболевания:</b> {pat.chronic_conditions}</p>
-                    </div>
-
-                    <div className="patient-card-actions">
-                      <button 
-                        type="button" 
-                        className="patient-action-link"
-                        onClick={() => {
-                          setSelectedPatient(pat);
-                          changeTab("medical_records");
-                        }}
-                      >
-                        Медицинская карта
-                      </button>
-                      <button 
-                        type="button" 
-                        className="patient-action-link"
-                        onClick={() => {
-                          setSelectedPatient(pat);
-                          setSelectedAppointment(null);
-                          // Open patient profile modal
-                        }}
-                      >
-                        Посмотреть анкету
-                      </button>
-                    </div>
-                  </div>
-                ))
+            {/* History Table */}
+            <div className="gov-card" style={{ padding: "16px", overflowX: "auto" }}>
+              {sortedHistory.length > 0 ? (
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "2px solid #e2e8f0", textAlign: "left", color: "#64748b" }}>
+                      <th style={{ padding: "12px" }}>{t("date") || "Дата и время"}</th>
+                      <th style={{ padding: "12px" }}>{t("fullName") || "Пациент"}</th>
+                      <th style={{ padding: "12px" }}>{t("status") || "Статус"}</th>
+                      <th style={{ padding: "12px" }}>{t("details") || "Протокол осмотра"}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedHistory.map((item) => {
+                      const isCompleted = item.status === "completed";
+                      return (
+                        <tr key={item.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                          <td style={{ padding: "12px", whiteSpace: "nowrap" }}>
+                            <b>{item.date}</b> <br />
+                            <span style={{ fontSize: "12px", color: "#64748b" }}>{item.time}</span>
+                          </td>
+                          <td style={{ padding: "12px" }}>
+                            <b>{item.patient_name}</b> <br />
+                            <span style={{ fontSize: "12px", color: "#64748b" }}>ИИН: {item.patient_iin}</span>
+                          </td>
+                          <td style={{ padding: "12px" }}>
+                            <span className={`status-badge-mini ${item.status}`} style={{ fontSize: "11px" }}>
+                              {item.status === "completed" ? "Завершен" : "Отменен"}
+                            </span>
+                          </td>
+                          <td style={{ padding: "12px", fontSize: "13px" }}>
+                            {isCompleted ? (
+                              <div style={{ display: "grid", gap: "4px", color: "#334155" }}>
+                                {item.reason && <p style={{ margin: 0 }}><b>Жалобы при записи:</b> {item.reason}</p>}
+                                {item.actual_start_time && (
+                                  <p style={{ margin: 0, fontSize: "11px", color: "#64748b" }}>
+                                    Фактически: {new Date(item.actual_start_time).toLocaleTimeString()} – {item.actual_end_time ? new Date(item.actual_end_time).toLocaleTimeString() : ""}
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <div style={{ color: "#b91c1c" }}>
+                                <p style={{ margin: 0 }}><b>Причина отмены:</b> {item.comment || "Указана администратором"}</p>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               ) : (
-                <div className="no-records-label">Пациенты не найдены.</div>
+                <div style={{ textAlign: "center", padding: "40px", color: "#64748b", fontStyle: "italic" }}>
+                  {t("noRecordsFound") || "История посещений по выбранным фильтрам не найдена."}
+                </div>
               )}
             </div>
           </div>
         )}
 
-        {/* TABS 4: МЕДИЦИНСКАЯ КАРТА (MEDICAL RECORDS) */}
-        {currentTab === "medical_records" && (
-          <div className="gov-employee-medical-records">
-            {!selectedPatient ? (
-              <div className="no-patient-selected-panel gov-card text-center">
-                <h3>Медицинская карта пациента</h3>
-                <p>Пожалуйста, выберите пациента из списка во вкладке "Пациенты" или начните прием из календаря записей.</p>
-                <button type="button" className="btn-link-action" onClick={() => changeTab("patients")}>
-                  Перейти к списку пациентов
-                </button>
-              </div>
-            ) : (
-              <div className="medical-card-layout">
-                {/* Back Link */}
-                <div className="back-link-row">
-                  <button type="button" className="back-link-btn" onClick={() => setSelectedPatient(null)}>
-                    ← Вернуться к выбору пациента
-                  </button>
-                </div>
-
-                {/* Patient Summary Header */}
-                <div className="patient-summary-header gov-card">
-                  <div className="patient-summary-profile">
-                    <h3>{selectedPatient.full_name}</h3>
-                    <p className="summary-iin">ИИН: {selectedPatient.iin} | Дата рождения: {selectedPatient.birth_date}</p>
-                  </div>
-                  <div className="patient-summary-indicators">
-                    <span className="indicator-tag">Группа крови: <b>{selectedPatient.blood_type}</b></span>
-                    <span className="indicator-tag warning-tag">Аллергии: <b>{selectedPatient.allergies}</b></span>
-                    <span className="indicator-tag chronic-tag">Хронические: <b>{selectedPatient.chronic_conditions}</b></span>
-                  </div>
-                </div>
-
-                {/* Main Medical Split Layout */}
-                <div className="medical-split-grid">
-                  
-                  {/* Left Column: History list */}
-                  <div className="medical-history-column gov-card">
-                    <h4>История посещений ({selectedPatient.records?.length || 0})</h4>
-                    
-                    <div className="history-entries-list">
-                      {selectedPatient.records && selectedPatient.records.length > 0 ? (
-                        selectedPatient.records.map((rec) => (
-                          <div key={rec.id} className="history-record-entry">
-                            <div className="entry-head">
-                              <span className="entry-date">{rec.date}</span>
-                              <span className="entry-doctor">Врач: {rec.doctor_name}</span>
-                            </div>
-                            <div className="entry-body">
-                              <p><b>Жалобы:</b> {rec.complaints}</p>
-                              <p><b>Осмотр:</b> {rec.inspection}</p>
-                              <p><b>Диагноз:</b> <span className="text-diagnosis">{rec.diagnosis}</span></p>
-                              <p><b>Рекомендации:</b> {rec.recommendations}</p>
-                              {rec.prescriptions && <p><b>Назначения:</b> <code>{rec.prescriptions}</code></p>}
-                              {rec.comment && <p className="entry-comment"><i>Комментарий: {rec.comment}</i></p>}
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="no-records-label">Нет записей в истории посещений.</div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right Column: Adding new entry */}
-                  {canAddMedicalRecords ? (
-                    <div className="medical-entry-form-column gov-card">
-                      <h4>Добавить новую запись приема</h4>
-                      
-                      <form className="medical-record-add-form" onSubmit={handleAddMedicalRecord}>
-                        <div className="form-group-item">
-                          <label>Жалобы пациента *</label>
-                          <textarea 
-                            rows="2" 
-                            placeholder="Опишите жалобы пациента..."
-                            value={medicalRecordForm.complaints}
-                            onChange={(e) => setMedicalRecordForm(prev => ({ ...prev, complaints: e.target.value }))}
-                            required
-                          />
-                        </div>
-
-                        <div className="form-group-item">
-                          <label>Осмотр (объективные данные)</label>
-                          <textarea 
-                            rows="2" 
-                            placeholder="Данные осмотра (давление, температура, зев и т.д.)..."
-                            value={medicalRecordForm.inspection}
-                            onChange={(e) => setMedicalRecordForm(prev => ({ ...prev, inspection: e.target.value }))}
-                          />
-                        </div>
-
-                        <div className="form-group-item">
-                          <label>Диагноз (или предварительный диагноз) *</label>
-                          <input 
-                            type="text" 
-                            placeholder="Код МКБ-10 или название диагноза..."
-                            value={medicalRecordForm.diagnosis}
-                            onChange={(e) => setMedicalRecordForm(prev => ({ ...prev, diagnosis: e.target.value }))}
-                            required
-                          />
-                        </div>
-
-                        <div className="form-group-item">
-                          <label>Рекомендации</label>
-                          <textarea 
-                            rows="2" 
-                            placeholder="Диета, режим, гигиена..."
-                            value={medicalRecordForm.recommendations}
-                            onChange={(e) => setMedicalRecordForm(prev => ({ ...prev, recommendations: e.target.value }))}
-                          />
-                        </div>
-
-                        <div className="form-group-item">
-                          <label>Назначения (лекарства, процедуры, дозировка)</label>
-                          <textarea 
-                            rows="2" 
-                            placeholder="Название препарата, доза, кратность и длительность приема..."
-                            value={medicalRecordForm.prescriptions}
-                            onChange={(e) => setMedicalRecordForm(prev => ({ ...prev, prescriptions: e.target.value }))}
-                          />
-                        </div>
-
-                        <div className="form-group-item">
-                          <label>Комментарий врача (для внутренних заметок)</label>
-                          <input 
-                            type="text" 
-                            placeholder="Дополнительные примечания..."
-                            value={medicalRecordForm.comment}
-                            onChange={(e) => setMedicalRecordForm(prev => ({ ...prev, comment: e.target.value }))}
-                          />
-                        </div>
-
-                        <div className="form-actions-row">
-                          <button type="submit" className="save-record-submit-btn">
-                            Сохранить и внести в карту
-                          </button>
-                        </div>
-                      </form>
-                    </div>
-                  ) : (
-                    <div className="medical-entry-form-column gov-card disabled-column">
-                      <h4>Новая запись приема</h4>
-                      <p className="no-access-message">Вам недоступно добавление записей в медицинскую карту (необходима роль врача).</p>
-                    </div>
-                  )}
-
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TABS 5: ДОКУМЕНТЫ (DOCUMENTS) */}
-        {currentTab === "documents" && (
-          <div className="gov-employee-documents">
-            <h3 className="gov-section-title">Прикрепленные документы пациента</h3>
-            
-            <div className="gov-card">
-              <table className="documents-list-table">
-                <thead>
-                  <tr>
-                    <th>Тип документа</th>
-                    <th>Файл</th>
-                    <th>Дата добавления</th>
-                    <th>Действие</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td><b>Результаты общего анализа крови</b></td>
-                    <td>BloodTest_Report.pdf</td>
-                    <td>14.06.2026</td>
-                    <td>
-                      <a href="#" className="download-doc-link" onClick={(e) => { e.preventDefault(); alert("Скачивание файла..."); }}>
-                        Скачать
-                      </a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td><b>Справка формы 075/у</b></td>
-                    <td>MedicalCertificate_075.pdf</td>
-                    <td>10.06.2026</td>
-                    <td>
-                      <a href="#" className="download-doc-link" onClick={(e) => { e.preventDefault(); alert("Скачивание файла..."); }}>
-                        Скачать
-                      </a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td><b>Выписка из стационара</b></td>
-                    <td>HospitalReleaseSummary.pdf</td>
-                    <td>25.05.2026</td>
-                    <td>
-                      <a href="#" className="download-doc-link" onClick={(e) => { e.preventDefault(); alert("Скачивание файла..."); }}>
-                        Скачать
-                      </a>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* TABS 6: УВЕДОМЛЕНИЯ (NOTIFICATIONS) */}
+        {/* TABS 4: УВЕДОМЛЕНИЯ (NOTIFICATIONS) */}
         {currentTab === "notifications" && (
           <div className="gov-employee-notifications">
-            <h3 className="gov-section-title">Уведомления и оповещения</h3>
+            <h3 className="gov-section-title">{t("notificationsTab") || "Уведомления и оповещения"}</h3>
             
             <div className="notifications-list-block">
               {notifications.map((not) => (
@@ -1290,100 +1691,127 @@ export default function GovClinicEmployee() {
                   </div>
                 </div>
               ))}
+              {notifications.length === 0 && (
+                <p style={{ fontStyle: "italic", textAlign: "center", padding: "40px", color: "#64748b" }}>
+                  {t("noNotifications") || "Уведомлений пока нет."}
+                </p>
+              )}
             </div>
           </div>
         )}
 
-        {/* TABS 7: СОТРДНИКИ ОТДЕЛЕНИЯ (DEPARTMENT STAFF - for department_head) */}
-        {isDepartmentHead && currentTab === "department_staff" && (
-          <div className="gov-department-staff">
-            <h3 className="gov-section-title">Сотрудники вашего отделения</h3>
-            
-            <div className="department-staff-dashboard gov-card">
-              <p>Вы вошли как Заведующий отделением. Здесь показаны ваши коллеги, прикрепленные к этому же отделению.</p>
+        {/* TABS 5: МОЙ ПРОФИЛЬ (PROFILE & RATING) */}
+        {currentTab === "profile" && (
+          <div className="gov-employee-profile">
+            <h3 className="gov-section-title">{t("profileTab") || "Мой профиль"}</h3>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
               
-              <table className="staff-info-table">
-                <thead>
-                  <tr>
-                    <th>ФИО</th>
-                    <th>Должность</th>
-                    <th>Кабинет</th>
-                    <th>Статус</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td><b>Касенов Мурат Серикович</b></td>
-                    <td>Врач-терапевт</td>
-                    <td>Каб. 305</td>
-                    <td><span className="staff-active-tag">В сети</span></td>
-                  </tr>
-                  <tr>
-                    <td><b>Садвакасова Динара Аскаровна</b></td>
-                    <td>Старшая медсестра</td>
-                    <td>Каб. 301</td>
-                    <td><span className="staff-active-tag">В сети</span></td>
-                  </tr>
-                  <tr>
-                    <td><b>Омаров Бауржан Канатович</b></td>
-                    <td>Медбрат</td>
-                    <td>Каб. 301</td>
-                    <td><span className="staff-offline-tag">Не в сети</span></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* TABS 8: КОНТРОЛЬ (CONTROL - for deputy_chief_doctor) */}
-        {isDeputyChief && currentTab === "control" && (
-          <div className="gov-deputy-control">
-            <h3 className="gov-section-title">Контроль деятельности организации</h3>
-            
-            <div className="control-stats-dashboard">
-              
-              <div className="stats-row-grid">
-                <div className="control-indicator-card gov-card">
-                  <h4>Всего приемов сегодня</h4>
-                  <span className="big-stat-number">48</span>
-                  <p>Включая все отделения организации</p>
+              {/* Left Column: Personal info & Password Reset */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+                
+                {/* Doctor details card */}
+                <div className="gov-card">
+                  <h4 style={{ borderBottom: "2px solid #f1f5f9", paddingBottom: "12px", margin: "0 0 16px 0" }}>👤 {t("doctorProfileDetails") || "Личные данные"}</h4>
+                  <div style={{ display: "grid", gap: "10px", fontSize: "14px" }}>
+                    <p><b>{t("fullName") || "ФИО"}:</b> {employeeProfile?.full_name || user.full_name}</p>
+                    <p><b>{t("email") || "Электронная почта"}:</b> {employeeProfile?.email || user.email}</p>
+                    <p><b>{t("phone") || "Номер телефона"}:</b> {employeeProfile?.phone || "—"}</p>
+                    <p><b>{t("specialty") || "Специальность"}:</b> {employeeProfile?.specialty || "Врач"}</p>
+                    <p><b>{t("department") || "Отделение"}:</b> {employeeProfile?.department || "Не указано"}</p>
+                    <p><b>{t("cabinet") || "Кабинет"}:</b> №{employeeProfile?.cabinet || "—"}</p>
+                  </div>
                 </div>
 
-                <div className="control-indicator-card gov-card">
-                  <h4>Среднее время ожидания</h4>
-                  <span className="big-stat-number text-yellow">12 мин</span>
-                  <p>Соответствует нормативам Минздрава</p>
+                {/* Voluntary Change Password Form */}
+                <div className="gov-card">
+                  <h4 style={{ borderBottom: "2px solid #f1f5f9", paddingBottom: "12px", margin: "0 0 16px 0" }}>🔒 {t("changePasswordSecurity") || "Безопасность и смена пароля"}</h4>
+                  <form onSubmit={handleVoluntaryPasswordChange} className="org-admin-form" style={{ gap: "12px" }}>
+                    <label>
+                      {t("currentPassword") || "Текущий пароль"}
+                      <input 
+                        type="password"
+                        value={changePwdForm.currentPassword}
+                        onChange={(e) => setChangePwdForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+                        required
+                      />
+                    </label>
+                    <label>
+                      {t("newPassword") || "Новый пароль"}
+                      <input 
+                        type="password"
+                        value={changePwdForm.newPassword}
+                        onChange={(e) => setChangePwdForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                        required
+                      />
+                    </label>
+                    <label>
+                      {t("repeatPassword") || "Подтверждение нового пароля"}
+                      <input 
+                        type="password"
+                        value={changePwdForm.confirmPassword}
+                        onChange={(e) => setChangePwdForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                        required
+                      />
+                    </label>
+                    <button type="submit" style={{ background: "#00b85a", color: "#fff", border: "0", padding: "12px", borderRadius: "10px", cursor: "pointer", fontWeight: "bold" }}>
+                      {t("updatePasswordBtn") || "Сменить пароль"}
+                    </button>
+                  </form>
                 </div>
 
-                <div className="control-indicator-card gov-card">
-                  <h4>Заполняемость медкарт</h4>
-                  <span className="big-stat-number text-green">94%</span>
-                  <p>Высокая своевременность ввода записей</p>
-                </div>
               </div>
 
-              {/* Department loads */}
-              <div className="department-occupancy-chart gov-card">
-                <h4>Нагрузка по отделениям</h4>
-                <div className="chart-bar-row">
-                  <span className="chart-label">Терапевтическое отделение</span>
-                  <div className="chart-bar-container">
-                    <div className="chart-bar-fill" style={{ width: "85%", background: "#00b85a" }}>85%</div>
+              {/* Right Column: Reviews & Star distribution */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+                
+                {/* Ratings Dashboard */}
+                <div className="gov-card">
+                  <h4 style={{ borderBottom: "2px solid #f1f5f9", paddingBottom: "12px", margin: "0 0 16px 0" }}>★ {t("ratingDist") || "Рейтинг и оценки"}</h4>
+                  <div style={{ display: "flex", alignItems: "center", gap: "30px", marginBottom: "20px" }}>
+                    <div style={{ textAlign: "center" }}>
+                      <span style={{ fontSize: "48px", fontWeight: "950", color: "#f59e0b" }}>{employeeProfile?.average_rating || "8.0"}</span>
+                      <span style={{ display: "block", fontSize: "13px", color: "#64748b" }}>{t("basedOnReviews") || "Всего"} {totalReviewsCount} {t("reviews") || "отзывов"}</span>
+                    </div>
+                    {/* Star bars */}
+                    <div style={{ flex: 1, display: "grid", gap: "4px" }}>
+                      {ratingDistribution.map((count, index) => {
+                        const score = index + 1;
+                        const percent = totalReviewsCount > 0 ? (count / totalReviewsCount) * 100 : 0;
+                        return (
+                          <div key={score} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px" }}>
+                            <span style={{ width: "20px", textAlign: "right" }}>{score} ★</span>
+                            <div style={{ flex: 1, height: "6px", background: "#f1f5f9", borderRadius: "3px", overflow: "hidden" }}>
+                              <div style={{ width: `${percent}%`, height: "100%", background: "#f59e0b" }}></div>
+                            </div>
+                            <span style={{ width: "25px", color: "#64748b" }}>{count}</span>
+                          </div>
+                        );
+                      }).reverse()}
+                    </div>
                   </div>
                 </div>
-                <div className="chart-bar-row">
-                  <span className="chart-label">Педиатрическое отделение</span>
-                  <div className="chart-bar-container">
-                    <div className="chart-bar-fill" style={{ width: "65%", background: "#00a344" }}>65%</div>
+
+                {/* Anonymous Comments List */}
+                <div className="gov-card">
+                  <h4 style={{ borderBottom: "2px solid #f1f5f9", paddingBottom: "12px", margin: "0 0 16px 0" }}>💬 {t("reviewsList") || "Анонимные отзывы пациентов"}</h4>
+                  <div style={{ maxHeight: "350px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px", paddingRight: "6px" }}>
+                    {reviews.length > 0 ? (
+                      reviews.map((rev) => (
+                        <div key={rev.id} style={{ background: "#f8fafc", padding: "12px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", fontSize: "12px" }}>
+                            <span style={{ color: "#64748b", fontWeight: "bold" }}>{rev.dateLabel}</span>
+                            <span style={{ color: "#f59e0b", fontWeight: "bold" }}>★ {rev.rating} / 10</span>
+                          </div>
+                          <p style={{ margin: 0, fontSize: "13px", color: "#334155" }}>"{rev.comment}"</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p style={{ color: "#64748b", fontStyle: "italic", textAlign: "center", margin: "24px 0" }}>{t("noReviewsYet") || "Отзывов с комментариями пока нет."}</p>
+                    )}
                   </div>
                 </div>
-                <div className="chart-bar-row">
-                  <span className="chart-label">Хирургическое отделение</span>
-                  <div className="chart-bar-container">
-                    <div className="chart-bar-fill" style={{ width: "40%", background: "#008f3b" }}>40%</div>
-                  </div>
-                </div>
+
               </div>
 
             </div>
