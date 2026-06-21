@@ -136,17 +136,17 @@ export default function GovClinicSystemAdmin() {
   const [ticketDescription, setTicketDescription] = useState("");
 
   // Doctor Schedules & Absences
-  const [selectedDocForSched, setSelectedDocForSched] = useState("");
-  
-  
-  const [absenceForm, setAbsenceForm] = useState({
-    absence_type: "planned",
-    reason: "",
-    start_date: "",
-    end_date: "",
-    comment: ""
-  });
-  const [docAbsences, setDocAbsences] = useState([]);
+ const [selectedDocForSched, setSelectedDocForSched] = useState("");
+
+const [absenceForm, setAbsenceForm] = useState({
+  absence_type: "planned",
+  reason: "",
+  start_date: "",
+  end_date: "",
+  comment: ""
+});
+
+const [docAbsences, setDocAbsences] = useState([]);
   const [affectedApps, setAffectedApps] = useState([]);
   
   // Manual transfer modal/state
@@ -349,10 +349,7 @@ export default function GovClinicSystemAdmin() {
   }
 
   // Load absences for the selected doctor
-  useEffect(() => {
-  if (!selectedDocForSched) return;
-  loadDocAbsences(selectedDocForSched);
-}, [selectedDocForSched]);
+ 
 
   
 
@@ -360,19 +357,7 @@ export default function GovClinicSystemAdmin() {
 
   
 
-  async function loadDocAbsences(docId) {
-    try {
-      const res = await fetch(`${API_URL}/api/organization-structure/employees/${docId}/absence`, {
-        headers: { "x-organization-id": organizationId }
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setDocAbsences(data.absences || []);
-      }
-    } catch (err) {
-      console.warn("Error loading absences:", err);
-    }
-  }
+ 
 
   
 
@@ -380,66 +365,8 @@ export default function GovClinicSystemAdmin() {
 
   
 
-  async function logDocAbsence(e) {
-    e.preventDefault();
-    if (!selectedDocForSched) return;
-    setLoading(true);
-    setAffectedApps([]);
-    try {
-      const res = await fetch(`${API_URL}/api/organization-structure/employees/${selectedDocForSched}/absence`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-organization-id": organizationId
-        },
-        body: JSON.stringify(absenceForm)
-      });
-      const data = await res.json();
-      if (res.ok) {
-        alert("Отсутствие успешно зарегистрировано.");
-        if (data.affectedAppointmentsCount > 0) {
-          setAffectedApps(data.affectedAppointments || []);
-        }
-        loadDocAbsences(selectedDocForSched);
-        setAbsenceForm({
-          absence_type: "planned",
-          reason: "",
-          start_date: "",
-          end_date: "",
-          comment: ""
-        });
-      } else {
-        alert(data.message || "Ошибка регистрации отсутствия.");
-      }
-    } catch (err) {
-      alert("Ошибка сети при регистрации отсутствия.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function removeDocAbsence(absenceId) {
-    if (!selectedDocForSched) return;
-    if (!confirm("Вы уверены, что хотите снять отсутствие врача?")) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/api/organization-structure/employees/${selectedDocForSched}/absence/${absenceId}`, {
-        method: "DELETE",
-        headers: { "x-organization-id": organizationId }
-      });
-      const data = await res.json();
-      if (res.ok) {
-        alert(data.message || "Отсутствие снято.");
-        loadDocAbsences(selectedDocForSched);
-      } else {
-        alert(data.message || "Ошибка удаления.");
-      }
-    } catch (err) {
-      alert("Ошибка сети.");
-    } finally {
-      setLoading(false);
-    }
-  }
+ 
+  
 
   async function createSupportTicket(e) {
     e.preventDefault();
@@ -1600,180 +1527,7 @@ export default function GovClinicSystemAdmin() {
 
       
 
-      {/* -------------------- TAB: ABSENCES -------------------- */}
-      {tab === "absences" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          <div className="gov-card">
-            <h3>Управление отсутствиями врачей</h3>
-            <p className="gov-page-subtitle">
-              Зарегистрируйте отпуск, командировку или больничный. При экстренном отсутствии затронутые записи пациентов будут выведены для переноса.
-            </p>
-            
-            <label style={{ display: "flex", flexDirection: "column", gap: "8px", maxWidth: "400px", marginTop: "16px" }}>
-              Выберите врача:
-              <select
-                value={selectedDocForSched}
-                onChange={(e) => setSelectedDocForSched(e.target.value)}
-                style={{ padding: "10px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "15px" }}
-              >
-                <option value="">-- Выберите врача --</option>
-                {employees
-                  .filter(e => e.role === "doctor" || String(e.position).toLowerCase().includes("врач"))
-                  .map(doc => (
-                    <option key={doc.id} value={doc.id}>
-                      🩺 {doc.full_name} ({doc.position})
-                    </option>
-                  ))
-                }
-              </select>
-            </label>
-          </div>
-
-          {selectedDocForSched && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
-              {/* Log Absence Form */}
-              <form className="gov-card" onSubmit={logDocAbsence}>
-                <h4>📅 Регистрация отсутствия / блокировка</h4>
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "16px" }}>
-                  <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    Тип отсутствия:
-                    <select
-                      value={absenceForm.absence_type}
-                      onChange={(e) => setAbsenceForm(prev => ({ ...prev, absence_type: e.target.value }))}
-                      style={{ padding: "8px", borderRadius: "8px", border: "1px solid #cbd5e1" }}
-                    >
-                      <option value="planned">🌴 Плановое отсутствие (отпуск, командировка, учеба)</option>
-                      <option value="emergency">🚨 Экстренное отсутствие (болезнь, срочный невыход)</option>
-                    </select>
-                  </label>
-
-                  <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    Дата начала:
-                    <input
-                      type="date"
-                      value={absenceForm.start_date}
-                      onChange={(e) => setAbsenceForm(prev => ({ ...prev, start_date: e.target.value }))}
-                      required
-                    />
-                  </label>
-
-                  <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    Дата окончания:
-                    <input
-                      type="date"
-                      value={absenceForm.end_date}
-                      onChange={(e) => setAbsenceForm(prev => ({ ...prev, end_date: e.target.value }))}
-                      required
-                    />
-                  </label>
-
-                  <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    Причина:
-                    <input
-                      type="text"
-                      placeholder="Например, Больничный или Отпуск"
-                      value={absenceForm.reason}
-                      onChange={(e) => setAbsenceForm(prev => ({ ...prev, reason: e.target.value }))}
-                      required
-                    />
-                  </label>
-
-                  <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    Комментарий (необязательно):
-                    <textarea
-                      placeholder="Дополнительные примечания..."
-                      value={absenceForm.comment}
-                      onChange={(e) => setAbsenceForm(prev => ({ ...prev, comment: e.target.value }))}
-                      style={{ padding: "8px", borderRadius: "8px", border: "1px solid #cbd5e1", minHeight: "60px" }}
-                    />
-                  </label>
-
-                  <button type="submit" disabled={loading} className="gov-btn" style={{ marginTop: "12px", background: "#ef4444", color: "#fff", border: "0", padding: "12px", borderRadius: "10px", cursor: "pointer", fontWeight: "bold" }}>
-                    Зарегистрировать отсутствие
-                  </button>
-                </div>
-              </form>
-
-              <div className="gov-card">
-                <h4>📋 Зарегистрированные периоды отсутствия</h4>
-                <div style={{ marginTop: "16px", overflowX: "auto" }}>
-                  {docAbsences.length === 0 ? (
-                    <p style={{ color: "#64748b", fontStyle: "italic", margin: 0 }}>Периодов отсутствия не найдено.</p>
-                  ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-                      <thead>
-                        <tr style={{ borderBottom: "2px solid #cbd5e1" }}>
-                          <th style={{ padding: "8px" }}>Начало</th>
-                          <th style={{ padding: "8px" }}>Конец</th>
-                          <th style={{ padding: "8px" }}>Тип</th>
-                          <th style={{ padding: "8px" }}>Причина</th>
-                          <th style={{ padding: "8px" }}>Действие</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {docAbsences.map(abs => (
-                          <tr key={abs.id} style={{ borderBottom: "1px solid #e2e8f0" }}>
-                            <td style={{ padding: "8px" }}>{abs.start_date}</td>
-                            <td style={{ padding: "8px" }}>{abs.end_date}</td>
-                            <td style={{ padding: "8px" }}>
-                              {abs.absence_type === "emergency" ? (
-                                <span style={{ color: "#ef4444", fontWeight: "bold" }}>🚨 Экстренное</span>
-                              ) : (
-                                <span style={{ color: "#3b82f6", fontWeight: "bold" }}>🌴 Плановое</span>
-                              )}
-                            </td>
-                            <td style={{ padding: "8px" }}>{abs.reason}</td>
-                            <td style={{ padding: "8px" }}>
-                              <button
-                                onClick={() => removeDocAbsence(abs.id)}
-                                style={{ background: "#ef4444", color: "#fff", border: "0", padding: "4px 8px", borderRadius: "6px", cursor: "pointer" }}
-                              >
-                                Удалить
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {selectedDocForSched && affectedApps.length > 0 && (
-            <div className="gov-card" style={{ borderColor: "#f59e0b", background: "#fffbeb" }}>
-              <h4 style={{ color: "#b45309" }}>⚠️ Конфликтующие записи пациентов ({affectedApps.length})</h4>
-              <p style={{ color: "#b45309", fontSize: "14px", margin: "4px 0 16px" }}>
-                На период отсутствия врача обнаружены активные записи пациентов. Пожалуйста, перенесите их к другим специалистам.
-              </p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "12px" }}>
-                {affectedApps.map(app => (
-                  <div key={app.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px", background: "#ffffff", borderRadius: "10px", border: "1px solid #fde68a" }}>
-                    <div>
-                      <strong>📅 {app.date} в {app.time}</strong>
-                      <span style={{ marginLeft: "12px", color: "#64748b" }}>Пациент: {app.patient_iin}</span>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setTransferModalApp(app);
-                        setTransferForm(prev => ({
-                          ...prev,
-                          new_date: app.date,
-                          new_time: ""
-                        }));
-                      }}
-                      style={{ background: "#f59e0b", color: "#fff", border: "0", padding: "8px 16px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer" }}
-                    >
-                      Перенести запись
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      
 
       {/* -------------------- TAB: TRANSFERS -------------------- */}
       {tab === "transfers" && (

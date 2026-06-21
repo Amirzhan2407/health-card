@@ -93,21 +93,7 @@ export default function GovClinicLayout() {
                 {t("deptsTab") || "Отделения и кабинеты"}
               </button>
 
-              <button
-                type="button"
-                className={currentTab === "schedules" ? "active" : ""}
-                onClick={() => goAdminTab("schedules")}
-              >
-                {t("schedulesTab") || "Графики врачей"}
-              </button>
-
-              <button
-                type="button"
-                className={currentTab === "absences" ? "active" : ""}
-                onClick={() => goAdminTab("absences")}
-              >
-                {t("absencesTab") || "Отсутствия и блокировки"}
-              </button>
+              
 
               <button
                 type="button"
