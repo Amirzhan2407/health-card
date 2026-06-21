@@ -75,6 +75,42 @@ function createInitialDoctorSchedule() {
   };
 }
 
+function parseCabinetList(roomsValue) {
+  const cabinets = new Set();
+
+  String(roomsValue || "")
+    .split(/[,;\n]+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .forEach((part) => {
+      const normalizedPart = part.replace(/[–—]/g, "-");
+      const rangeMatch = normalizedPart.match(/^(\d+)\s*-\s*(\d+)$/);
+
+      if (rangeMatch) {
+        const start = Number(rangeMatch[1]);
+        const end = Number(rangeMatch[2]);
+
+        if (start <= end && end - start <= 500) {
+          for (let cabinet = start; cabinet <= end; cabinet += 1) {
+            cabinets.add(String(cabinet));
+          }
+        }
+
+        return;
+      }
+
+      if (/^\d+$/.test(normalizedPart)) {
+        cabinets.add(normalizedPart);
+      }
+    });
+
+  return Array.from(cabinets).sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true })
+  );
+}
+
+
+
 function generatePassword() {
   const a = Math.random().toString(36).slice(2, 6).toUpperCase();
   const b = Math.random().toString(36).slice(2, 6).toUpperCase();
@@ -94,7 +130,7 @@ export default function GovClinicSystemAdmin() {
   const [searchParams] = useSearchParams();
   const tab = searchParams.get("tab") || "dashboard";
  
-  useLanguage();  
+  const { t } = useLanguage();
 
   const organizationUser = JSON.parse(
     localStorage.getItem("organizationUser") || "null"
@@ -139,10 +175,10 @@ export default function GovClinicSystemAdmin() {
   
   const EMPTY_EMPLOYEE_FORM = {
   full_name: "",
-  age: "",
+  birth_date: "",
   phone: "",
   email: "",
-  position: "",
+  specialty: "",
   department: "",
   department_id: "",
   cabinet: "",
@@ -161,6 +197,28 @@ const [schedulePreset, setSchedulePreset] = useState({
   lunch_end: "14:00",
   slot_duration: 30,
 });
+
+  // Doctor Detailed Panel States
+  const [activeSubTab, setActiveSubTab] = useState("info"); // "info", "schedule", "absences"
+  const [employeeAbsences, setEmployeeAbsences] = useState([]);
+  const [employeeExceptions, setEmployeeExceptions] = useState([]);
+  const [absenceForm, setAbsenceForm] = useState({
+    absence_type: "planned",
+    reason: "vacation",
+    start_date: "",
+    end_date: "",
+    comment: ""
+  });
+  const [exceptionForm, setExceptionForm] = useState({
+    exception_date: "",
+    is_working: true,
+    work_start: "09:00",
+    work_end: "17:30",
+    lunch_start: "13:00",
+    lunch_end: "14:00",
+    slot_duration: 30
+  });
+  const [absenceAffectedApps, setAbsenceAffectedApps] = useState([]);
   
 
   // Support Chat States
@@ -562,6 +620,22 @@ const [schedulePreset, setSchedulePreset] = useState({
   function getDepartmentName(id) {
     return departments.find((dep) => String(dep.id) === String(id))?.name || "—";
   }
+  
+const selectedDepartment = useMemo(() => {
+  return (
+    departments.find(
+      (department) =>
+        String(department.id) ===
+        String(employeeForm.department_id)
+    ) || null
+  );
+}, [departments, employeeForm.department_id]);
+
+const availableCabinets = useMemo(() => {
+  return parseCabinetList(selectedDepartment?.rooms);
+}, [selectedDepartment]);
+
+
 
   const filteredEmployees = useMemo(() => {
     return employees.filter((employee) => {
@@ -579,7 +653,12 @@ const [schedulePreset, setSchedulePreset] = useState({
         filters.departmentId === "all" ||
         String(employee.department_id) === String(filters.departmentId);
 
-      const status = employee.login ? employee.status || "active" : "no_access";
+      const status =
+  employee.status === "dismissed"
+    ? "dismissed"
+    : employee.login
+      ? employee.status || "active"
+      : "no_access";
 
       const matchesStatus =
         filters.status === "all" || String(status) === String(filters.status);
@@ -588,9 +667,22 @@ const [schedulePreset, setSchedulePreset] = useState({
     });
   }, [employees, filters]);
 
-  const noAccessCount = employees.filter((e) => !e.login).length;
-  const activeCount = employees.filter((e) => e.login && e.status === "active").length;
-  const blockedCount = employees.filter((e) => e.status === "blocked").length;
+  const currentEmployees = employees.filter(
+  (employee) => employee.status !== "dismissed"
+);
+
+const noAccessCount = currentEmployees.filter(
+  (employee) => !employee.login
+).length;
+
+const activeCount = currentEmployees.filter(
+  (employee) =>
+    employee.login && employee.status === "active"
+).length;
+
+const blockedCount = currentEmployees.filter(
+  (employee) => employee.status === "blocked"
+).length;
 
   function updateDepartmentForm(e) {
     const { name, value } = e.target;
@@ -846,6 +938,12 @@ const [schedulePreset, setSchedulePreset] = useState({
       return;
     }
 
+
+    if (!employeeForm.cabinet) {
+  setMessage("Выберите кабинет.");
+  return;
+}
+
     setSavingEmployee(true);
     setMessage("");
 
@@ -853,10 +951,11 @@ const [schedulePreset, setSchedulePreset] = useState({
       const payload = {
   organization_id: organizationId,
   full_name: employeeForm.full_name.trim(),
-  age: Number(employeeForm.age),
+  birth_date: employeeForm.birth_date,
   phone: employeeForm.phone.trim(),
   email: employeeForm.email.trim(),
-  position: employeeForm.position.trim(),
+  specialty: employeeForm.specialty.trim(),
+  position: employeeForm.specialty.trim(),
   department_id: employeeForm.department_id || null,
   cabinet: employeeForm.cabinet.trim(),
   role: "doctor",
@@ -901,15 +1000,14 @@ const [schedulePreset, setSchedulePreset] = useState({
     setEditingEmployeeId(item.id);
     setEmployeeForm({
       full_name: item.fullName,
-       age: item.age,
+      birth_date: employee.birth_date || "",
       phone: item.phone,
       email: item.email,
-      position: item.position,
+      specialty: employee.specialty || item.position || "",
       department: departments.find(d => String(d.id) === String(item.departmentId))?.name || "",
       department_id: item.departmentId,
       cabinet: item.cabinet,
-       role: "doctor",
-      
+      role: "doctor",
     });
     setShowEmployeeForm(true);
   }
@@ -1140,6 +1238,203 @@ function copyScheduleToOtherWorkingDays(sourceDayId) {
 
   
 
+  useEffect(() => {
+    if (selectedEmployee) {
+      setActiveSubTab("info");
+      loadSelectedEmployeeData(selectedEmployee.id);
+    }
+  }, [selectedEmployee]);
+
+  async function loadSelectedEmployeeData(empId) {
+    try {
+      const res = await fetch(`${API_URL}/api/organization-structure/employees/${empId}/schedule`);
+      const data = await res.json();
+      if (res.ok && data.schedule) {
+        const days = {};
+        const dbDays = data.schedule.daily_schedules || {};
+        WEEK_DAYS.forEach(day => {
+          const dbDay = dbDays[day.id] || {};
+          days[day.id] = {
+            is_working: data.schedule.work_days.includes(day.id),
+            work_start: dbDay.work_start || "09:00",
+            work_end: dbDay.work_end || "17:30",
+            lunch_start: dbDay.lunch_start || "13:00",
+            lunch_end: dbDay.lunch_end || "14:00",
+            slot_duration: dbDay.slot_duration || 30
+          };
+        });
+        setDoctorScheduleForm({
+          valid_from: data.schedule.start_date || "",
+          valid_to: data.schedule.end_date || "",
+          days
+        });
+      } else {
+        setDoctorScheduleForm(createInitialDoctorSchedule());
+      }
+    } catch (e) {
+      console.error("Error loading schedule:", e);
+      setDoctorScheduleForm(createInitialDoctorSchedule());
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/organization-structure/employees/${empId}/absence`);
+      const data = await res.json();
+      if (res.ok) setEmployeeAbsences(data.absences || []);
+    } catch (e) {
+      console.error("Error loading absences:", e);
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/organization-structure/employees/${empId}/exceptions`);
+      const data = await res.json();
+      if (res.ok) setEmployeeExceptions(data.exceptions || []);
+    } catch (e) {
+      console.error("Error loading exceptions:", e);
+    }
+  }
+
+  async function saveWeeklySchedule(e) {
+    e.preventDefault();
+    if (!selectedEmployee) return;
+    setLoading(true);
+    setMessage("");
+    try {
+      const work_days = Object.keys(doctorScheduleForm.days)
+        .filter(dayId => doctorScheduleForm.days[dayId].is_working)
+        .map(Number);
+      
+      const payload = {
+        work_days,
+        work_start: "09:00",
+        work_end: "17:30",
+        lunch_start: "13:00",
+        lunch_end: "14:00",
+        slot_duration: 30,
+        start_date: doctorScheduleForm.valid_from || new Date().toISOString().split('T')[0],
+        end_date: doctorScheduleForm.valid_to || null,
+        daily_schedules: doctorScheduleForm.days
+      };
+
+      const response = await fetch(`${API_URL}/api/organization-structure/employees/${selectedEmployee.id}/schedule`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Не удалось сохранить график");
+      setMessage("График работы врача успешно сохранен.");
+      loadSelectedEmployeeData(selectedEmployee.id);
+    } catch (err) {
+      setMessage(err.message || "Ошибка сохранения графика");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function addAbsence(e) {
+    e.preventDefault();
+    if (!selectedEmployee) return;
+    setLoading(true);
+    setMessage("");
+    setAbsenceAffectedApps([]);
+    try {
+      const response = await fetch(`${API_URL}/api/organization-structure/employees/${selectedEmployee.id}/absence`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(absenceForm)
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Не удалось зарегистрировать отсутствие");
+      
+      setMessage("Отсутствие успешно зарегистрировано.");
+      if (data.affectedAppointments && data.affectedAppointments.length > 0) {
+        setAbsenceAffectedApps(data.affectedAppointments);
+      }
+      setAbsenceForm({
+        absence_type: "planned",
+        reason: "vacation",
+        start_date: "",
+        end_date: "",
+        comment: ""
+      });
+      loadSelectedEmployeeData(selectedEmployee.id);
+      loadAllTransfers();
+    } catch (err) {
+      setMessage(err.message || "Ошибка регистрации отсутствия");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function removeAbsence(absenceId) {
+    if (!selectedEmployee) return;
+    if (!window.confirm("Вы уверены, что хотите снять это отсутствие? Врач вернется к обычному графику.")) return;
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/organization-structure/employees/${selectedEmployee.id}/absence/${absenceId}`, {
+        method: "DELETE"
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Не удалось снять отсутствие");
+      setMessage("Отсутствие успешно снято.");
+      loadSelectedEmployeeData(selectedEmployee.id);
+    } catch (err) {
+      setMessage(err.message || "Ошибка снятия отсутствия");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function addException(e) {
+    e.preventDefault();
+    if (!selectedEmployee) return;
+    setLoading(true);
+    setMessage("");
+    try {
+      const response = await fetch(`${API_URL}/api/organization-structure/employees/${selectedEmployee.id}/exceptions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(exceptionForm)
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Не удалось сохранить исключение");
+      setMessage("Исключение из графика добавлено.");
+      setExceptionForm({
+        exception_date: "",
+        is_working: true,
+        work_start: "09:00",
+        work_end: "17:30",
+        lunch_start: "13:00",
+        lunch_end: "14:00",
+        slot_duration: 30
+      });
+      loadSelectedEmployeeData(selectedEmployee.id);
+    } catch (err) {
+      setMessage(err.message || "Ошибка сохранения исключения");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function removeException(exceptionId) {
+    if (!selectedEmployee) return;
+    if (!window.confirm("Удалить это исключение из графика?")) return;
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/organization-structure/employees/${selectedEmployee.id}/exceptions/${exceptionId}`, {
+        method: "DELETE"
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Не удалось удалить исключение");
+      setMessage("Исключение удалено.");
+      loadSelectedEmployeeData(selectedEmployee.id);
+    } catch (err) {
+      setMessage(err.message || "Ошибка удаления исключения");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="org-admin-page">
       <div className="gov-page-head">
@@ -1194,7 +1489,7 @@ function copyScheduleToOtherWorkingDays(sourceDayId) {
 
             <div className="admin-stat-card">
               <span>Врачей</span>
-              <b>{employees.length}</b>
+              <b>{currentEmployees.length}</b>
             </div>
 
             <div className="admin-stat-card">
@@ -1220,13 +1515,13 @@ function copyScheduleToOtherWorkingDays(sourceDayId) {
 
           <div className="gov-card" style={{ marginTop: "8px" }}>
             <h3>Врачи, ожидающие создания доступа ({noAccessCount})</h3>
-            {employees.filter((emp) => !emp.login).length === 0 ? (
+            {currentEmployees.filter((emp) => !emp.login).length === 0 ? (
               <p className="empty-text" style={{ margin: "10px 0 0" }}>Все врачи имеют доступы.</p>
             ) : (
               <div className="employee-card-list" style={{ marginTop: "16px" }}>
-                {employees
-                  .filter((emp) => !emp.login)
-                  .map((employee) => {
+                {currentEmployees
+  .filter((emp) => !emp.login)
+  .map((employee) => {
                     const item = normalizeEmployee(employee);
                     return (
                       <div className="employee-card" key={item.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1322,9 +1617,10 @@ function copyScheduleToOtherWorkingDays(sourceDayId) {
               {departments.length ? (
                 departments.map((department) => {
                   const people = employees.filter(
-                    (employee) =>
-                      String(employee.department_id) === String(department.id)
-                  );
+  (employee) =>
+    employee.status !== "dismissed" &&
+    String(employee.department_id) === String(department.id)
+);
 
                   return (
                     <div className="department-card" key={department.id}>
@@ -1392,16 +1688,18 @@ function copyScheduleToOtherWorkingDays(sourceDayId) {
                           gap: "6px",
                         }}
                       >
-                        Возраст
+                        {t("birthDateLabel") || "Дата рождения"}
                         <input
-                          type="number"
-                          name="age"
-                          min="18"
-                          max="100"
-                          value={employeeForm.age}
+                          type="date"
+                          name="birth_date"
+                          value={employeeForm.birth_date}
                           onChange={updateEmployeeField}
-                          placeholder="Например: 35"
                           required
+                          style={{
+                            padding: "8px",
+                            borderRadius: "8px",
+                            border: "1px solid #cbd5e1",
+                          }}
                         />
                       </label>
 
@@ -1434,58 +1732,123 @@ function copyScheduleToOtherWorkingDays(sourceDayId) {
                 </h4>
                 <div className="gov-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    Должность
-                    <select
-                      name="position"
-                      value={employeeForm.position}
-                      onChange={handlePositionChange}
-                      required
-                      style={{ padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
-                    >
-                      <option value="">Выберите должность</option>
-                      {POSITIONS.map((pos) => (
-                        <option key={pos} value={pos}>
-                          {pos}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    Отделение
-                    <select
-                      name="department"
-                      value={employeeForm.department}
-                      onChange={function (e) {
-                        const selectedDep = departments.find(d => d.name === e.target.value);
-                        setEmployeeForm(prev => ({
-                          ...prev,
-                          department: e.target.value,
-                          department_id: selectedDep ? selectedDep.id : ""
-                        }));
-                      }}
-                      required
-                      style={{ padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
-                    >
-                      <option value="">Выберите отделение</option>
-                      {departments.map((dep) => (
-                        <option key={dep.id} value={dep.name}>
-                          {dep.name} — {dep.floor || "этаж не указан"}, кабинеты:{" "}
-                            {dep.rooms || "не указаны"}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    Кабинет
+                    {t("specialtyLabel") || "Специальность"}
                     <input
-                      name="cabinet"
-                      value={employeeForm.cabinet}
+                      name="specialty"
+                      value={employeeForm.specialty}
                       onChange={updateEmployeeField}
-                      placeholder="204"
+                      placeholder="Например: Терапевт"
+                      required
+                      style={{ padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
                     />
                   </label>
+
+<label
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+  }}
+>
+  Отделение
+
+  <select
+    name="department_id"
+    value={employeeForm.department_id}
+    onChange={(e) => {
+      const departmentId = e.target.value;
+
+      const selectedDep = departments.find(
+        (department) =>
+          String(department.id) === String(departmentId)
+      );
+
+      setEmployeeForm((prev) => ({
+        ...prev,
+        department_id: departmentId,
+        department: selectedDep?.name || "",
+        cabinet: "",
+      }));
+    }}
+    required
+    style={{
+      padding: "8px",
+      borderRadius: "8px",
+      border: "1px solid #cbd5e1",
+    }}
+  >
+    <option value="">Выберите отделение</option>
+
+    {departments.map((department) => (
+      <option key={department.id} value={department.id}>
+        {department.name} —{" "}
+        {department.floor || "этаж не указан"}, кабинеты:{" "}
+        {department.rooms || "не указаны"}
+      </option>
+    ))}
+  </select>
+</label>
+
+
+
+<label
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+  }}
+>
+  Кабинет
+
+  <select
+    name="cabinet"
+    value={employeeForm.cabinet}
+    onChange={updateEmployeeField}
+    disabled={
+      !employeeForm.department_id ||
+      availableCabinets.length === 0
+    }
+    required
+    style={{
+      padding: "8px",
+      borderRadius: "8px",
+      border: "1px solid #cbd5e1",
+      background:
+        !employeeForm.department_id ||
+        availableCabinets.length === 0
+          ? "#f1f5f9"
+          : "#ffffff",
+      cursor:
+        !employeeForm.department_id ||
+        availableCabinets.length === 0
+          ? "not-allowed"
+          : "pointer",
+    }}
+  >
+    <option value="">
+      {!employeeForm.department_id
+        ? "Сначала выберите отделение"
+        : availableCabinets.length === 0
+          ? "В отделении нет кабинетов"
+          : "Выберите кабинет"}
+    </option>
+
+    {employeeForm.cabinet &&
+      !availableCabinets.includes(employeeForm.cabinet) && (
+        <option value={employeeForm.cabinet}>
+          Кабинет {employeeForm.cabinet}
+        </option>
+      )}
+
+    {availableCabinets.map((cabinet) => (
+      <option key={cabinet} value={cabinet}>
+        Кабинет {cabinet}
+      </option>
+    ))}
+  </select>
+</label>
+
+
 
                   
 
@@ -1495,7 +1858,7 @@ function copyScheduleToOtherWorkingDays(sourceDayId) {
                 </div>
               </div>
 
-              <div className="gov-actions" style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px', marginTop: '24px', display: 'flex', gap: '10px' }}>
+             
                 <button type="submit" disabled={savingEmployee} style={{ background: '#00b85a', color: '#fff', border: 0, padding: '10px 20px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
                   {savingEmployee ? "Сохранение..." : editingEmployeeId ? "Сохранить изменения" : "Добавить врача"}
                 </button>
@@ -1522,7 +1885,7 @@ style={{ background: '#64748b', color: '#fff', border: 0, padding: '10px 20px', 
                 <button type="button" onClick={resetEmployeeForm} style={{ background: '#cbd5e1', color: '#1e293b', border: 0, padding: '10px 20px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
                   Назад к списку
                 </button>
-              </div>
+              
             </form>
           ) : (
             <section className="gov-card">
@@ -1601,6 +1964,7 @@ style={{ background: '#64748b', color: '#fff', border: 0, padding: '10px 20px', 
                   <option value="no_access">Нет доступа</option>
                   <option value="active">Активен</option>
                   <option value="blocked">Заблокирован</option>
+                  <option value="dismissed">В архиве</option>
                 </select>
               </div>
 
@@ -1658,37 +2022,94 @@ style={{ background: '#64748b', color: '#fff', border: 0, padding: '10px 20px', 
 
                           
 
-                          <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
-                            {!item.login ? (
-                              <button type="button" onClick={() => openAccessModal(employee)} style={{ background: "#00b85a", color: "#ffffff", border: 0, borderRadius: "8px", padding: "6px 12px", cursor: "pointer", fontSize: "13px", fontWeight: "bold" }}>
-                                Выдать доступ
-                              </button>
-                            ) : (
-                              <>
-                                <button type="button" onClick={() => resetPassword(employee)} style={{ background: "#f59e0b", color: "#ffffff", border: 0, borderRadius: "8px", padding: "6px 12px", cursor: "pointer", fontSize: "13px" }}>
-                                  Сбросить пароль
-                                </button>
+                          
+{item.status !== "dismissed" && (
+  <div
+    style={{
+      marginLeft: "auto",
+      display: "flex",
+      gap: "8px",
+      flexWrap: "wrap",
+    }}
+  >
+    {!item.login ? (
+      <button
+        type="button"
+        onClick={() => openAccessModal(employee)}
+        style={{
+          background: "#00b85a",
+          color: "#ffffff",
+          border: 0,
+          borderRadius: "8px",
+          padding: "6px 12px",
+          cursor: "pointer",
+          fontSize: "13px",
+          fontWeight: "bold",
+        }}
+      >
+        Выдать доступ
+      </button>
+    ) : (
+      <>
+        <button
+          type="button"
+          onClick={() => resetPassword(employee)}
+          style={{
+            background: "#f59e0b",
+            color: "#ffffff",
+            border: 0,
+            borderRadius: "8px",
+            padding: "6px 12px",
+            cursor: "pointer",
+            fontSize: "13px",
+          }}
+        >
+          Сбросить пароль
+        </button>
 
-                                {item.status === "blocked" ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => changeBlockStatus(employee, "unblock")}
-                                    style={{ background: "#10b981", color: "#ffffff", border: 0, borderRadius: "8px", padding: "6px 12px", cursor: "pointer", fontSize: "13px" }}
-                                  >
-                                    Разблокировать
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => changeBlockStatus(employee, "block")}
-                                    style={{ background: "#ef4444", color: "#ffffff", border: 0, borderRadius: "8px", padding: "6px 12px", cursor: "pointer", fontSize: "13px" }}
-                                  >
-                                    Заблокировать
-                                  </button>
-                                )}
-                              </>
-                            )}
-                          </div>
+        {item.status === "blocked" ? (
+          <button
+            type="button"
+            onClick={() =>
+              changeBlockStatus(employee, "unblock")
+            }
+            style={{
+              background: "#10b981",
+              color: "#ffffff",
+              border: 0,
+              borderRadius: "8px",
+              padding: "6px 12px",
+              cursor: "pointer",
+              fontSize: "13px",
+            }}
+          >
+            Разблокировать
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() =>
+              changeBlockStatus(employee, "block")
+            }
+            style={{
+              background: "#ef4444",
+              color: "#ffffff",
+              border: 0,
+              borderRadius: "8px",
+              padding: "6px 12px",
+              cursor: "pointer",
+              fontSize: "13px",
+            }}
+          >
+            Заблокировать
+          </button>
+        )}
+      </>
+    )}
+  </div>
+)}
+
+
                         </div>
                       </div>
                     );
@@ -2149,59 +2570,381 @@ style={{ background: '#64748b', color: '#fff', border: 0, padding: '10px 20px', 
       {/* -------------------- MODAL: EMPLOYEE DETAILS -------------------- */}
       {selectedEmployee && (
         <div className="employee-modal" onClick={() => setSelectedEmployee(null)}>
-          <div className="employee-modal-card" onClick={(e) => e.stopPropagation()}>
+          <div 
+            className="employee-modal-card" 
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: activeSubTab !== 'info' ? 'min(900px, 95%)' : 'min(760px, 95%)', transition: 'width 0.25s ease' }}
+          >
             <button onClick={() => setSelectedEmployee(null)}>×</button>
 
             <h3>{selectedEmployee.fullName}</h3>
-            <p>{selectedEmployee.position}</p>
+            <p>{selectedEmployee.specialty || selectedEmployee.position}</p>
 
-            <div className="employee-detail-grid">
-              <div>
-                <span>Телефон</span>
-                <b>{selectedEmployee.phone || "—"}</b>
+            {/* Modal tabs */}
+            <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '20px' }}>
+              <button
+                type="button"
+                onClick={() => setActiveSubTab("info")}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: 0,
+                  background: activeSubTab === 'info' ? '#1e293b' : 'transparent',
+                  color: activeSubTab === 'info' ? '#ffffff' : '#64748b',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                {t("generalInfo") || "Информация"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSubTab("schedule")}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: 0,
+                  background: activeSubTab === 'schedule' ? '#1e293b' : 'transparent',
+                  color: activeSubTab === 'schedule' ? '#ffffff' : '#64748b',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                {t("scheduleConstructorTab") || "График работы"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSubTab("absences")}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: 0,
+                  background: activeSubTab === 'absences' ? '#1e293b' : 'transparent',
+                  color: activeSubTab === 'absences' ? '#ffffff' : '#64748b',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                {t("absencesExceptionsTab") || "Отсутствия и исключения"}
+              </button>
+            </div>
+
+            {/* TAB CONTENT: General Info */}
+            {activeSubTab === "info" && (
+              <div className="employee-detail-grid">
+                <div>
+                  <span>{t("phone") || "Телефон"}</span>
+                  <b>{selectedEmployee.phone || "—"}</b>
+                </div>
+
+                <div>
+                  <span>{t("birthDateLabel") || "Дата рождения"}</span>
+                  <b>{selectedEmployee.birth_date || "—"}</b>
+                </div>
+
+                <div>
+                  <span>{t("email") || "Почта"}</span>
+                  <b>{selectedEmployee.email || "—"}</b>
+                </div>
+
+                <div>
+                  <span>{t("specialtyLabel") || "Специальность"}</span>
+                  <b>{selectedEmployee.specialty || selectedEmployee.position || "—"}</b>
+                </div>
+
+                <div>
+                  <span>Отделение</span>
+                  <b>{getDepartmentName(selectedEmployee.departmentId)}</b>
+                </div>
+
+                <div>
+                  <span>{t("cabinet") || "Кабинет"}</span>
+                  <b>{selectedEmployee.cabinet || "—"}</b>
+                </div>
+
+                <div>
+                  <span>Логин</span>
+                  <b>{selectedEmployee.login || "—"}</b>
+                </div>
+
+                <div>
+                  <span>{t("status") || "Статус"}</span>
+                  <b>{getStatusText(selectedEmployee.status)}</b>
+                </div>
               </div>
+            )}
 
+            {/* TAB CONTENT: Weekly Schedule */}
+            {activeSubTab === "schedule" && (
+              <form onSubmit={saveWeeklySchedule} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', background: '#f8fafc', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontWeight: 'bold', width: '100%', fontSize: '13px', color: '#1e293b' }}>
+                    {t("presetLabel") || "Шаблон графика:"}
+                  </div>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px' }}>
+                    Начало работы
+                    <input type="time" value={schedulePreset.work_start} onChange={e => updateSchedulePreset("work_start", e.target.value)} style={{ padding: '4px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px' }}>
+                    Окончание работы
+                    <input type="time" value={schedulePreset.work_end} onChange={e => updateSchedulePreset("work_end", e.target.value)} style={{ padding: '4px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px' }}>
+                    Обед с
+                    <input type="time" value={schedulePreset.lunch_start} onChange={e => updateSchedulePreset("lunch_start", e.target.value)} style={{ padding: '4px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px' }}>
+                    Обед по
+                    <input type="time" value={schedulePreset.lunch_end} onChange={e => updateSchedulePreset("lunch_end", e.target.value)} style={{ padding: '4px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px' }}>
+                    Длительность
+                    <select value={schedulePreset.slot_duration} onChange={e => updateSchedulePreset("slot_duration", e.target.value)} style={{ padding: '4px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                      <option value="15">15 минут</option>
+                      <option value="20">20 минут</option>
+                      <option value="30">30 минут</option>
+                      <option value="45">45 минут</option>
+                      <option value="60">60 минут</option>
+                    </select>
+                  </label>
+                  <button type="button" onClick={applyPresetToWorkingDays} style={{ alignSelf: 'flex-end', background: '#3b82f6', color: '#fff', border: 0, padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', marginTop: '4px' }}>
+                    {t("applyPresetBtn") || "Применить"}
+                  </button>
+                </div>
 
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto', paddingRight: '4px' }}>
+                  {WEEK_DAYS.map(day => {
+                    const daySched = doctorScheduleForm.days[day.id] || {};
+                    return (
+                      <div key={day.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: daySched.is_working ? '#f0fdf4' : '#f8fafc', borderRadius: '10px', border: '1px solid', borderColor: daySched.is_working ? '#bbf7d0' : '#e2e8f0', flexWrap: 'wrap' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', minWidth: '100px', fontSize: '13px', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={daySched.is_working || false} onChange={() => toggleScheduleDay(day.id)} />
+                          {day.name}
+                        </label>
 
-                                  <div>
-                      <span>Возраст</span>
-                      <b>
-                        {selectedEmployee.age
-                          ? `${selectedEmployee.age} лет`
-                          : "—"}
-                      </b>
+                        {daySched.is_working && (
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <label style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              Работа:
+                              <input type="time" value={daySched.work_start} onChange={e => updateScheduleDay(day.id, "work_start", e.target.value)} style={{ padding: '3px', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+                              –
+                              <input type="time" value={daySched.work_end} onChange={e => updateScheduleDay(day.id, "work_end", e.target.value)} style={{ padding: '3px', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+                            </label>
+
+                            <label style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              Обед:
+                              <input type="time" value={daySched.lunch_start} onChange={e => updateScheduleDay(day.id, "lunch_start", e.target.value)} style={{ padding: '3px', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+                              –
+                              <input type="time" value={daySched.lunch_end} onChange={e => updateScheduleDay(day.id, "lunch_end", e.target.value)} style={{ padding: '3px', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+                            </label>
+
+                            <label style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              Слот:
+                              <select value={daySched.slot_duration} onChange={e => updateScheduleDay(day.id, "slot_duration", e.target.value)} style={{ padding: '3px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
+                                <option value="15">15 м</option>
+                                <option value="20">20 м</option>
+                                <option value="30">30 м</option>
+                                <option value="45">45 м</option>
+                                <option value="60">60 м</option>
+                              </select>
+                            </label>
+
+                            <button type="button" onClick={() => copyScheduleToOtherWorkingDays(day.id)} style={{ background: '#e2e8f0', color: '#1e293b', border: 0, padding: '3px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: '10px', fontWeight: 'bold' }}>
+                              {t("copyDayBtn") || "Скопировать"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, fontSize: '12px' }}>
+                    {t("validFrom") || "Действует с"}
+                    <input type="date" value={doctorScheduleForm.valid_from} onChange={e => updateSchedulePeriod("valid_from", e.target.value)} required style={{ padding: '6px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, fontSize: '12px' }}>
+                    {t("validTo") || "Действует по"}
+                    <input type="date" value={doctorScheduleForm.valid_to} onChange={e => updateSchedulePeriod("valid_to", e.target.value)} style={{ padding: '6px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
+                  </label>
+                </div>
+
+                <button type="submit" disabled={loading} style={{ background: '#10b981', color: '#fff', border: 0, padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>
+                  {loading ? "Сохранение..." : (t("saveScheduleBtn") || "Сохранить график")}
+                </button>
+              </form>
+            )}
+
+            {/* TAB CONTENT: Absences & Exceptions */}
+            {activeSubTab === "absences" && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', height: '420px', overflowY: 'auto' }}>
+                {/* Exceptions panel */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <h4 style={{ margin: '0', fontSize: '13px', borderBottom: '2px solid #e2e8f0', paddingBottom: '4px', color: '#1e293b' }}>
+                    {t("exceptionDate") || "Исключения из графика"}
+                  </h4>
+
+                  <form onSubmit={addException} style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px' }}>
+                      Дата исключения
+                      <input type="date" value={exceptionForm.exception_date} onChange={e => setExceptionForm(prev => ({ ...prev, exception_date: e.target.value }))} required style={{ padding: '4px', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+                    </label>
+
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={exceptionForm.is_working} onChange={e => setExceptionForm(prev => ({ ...prev, is_working: e.target.checked }))} />
+                      {t("isWorkingDay") || "Рабочий день"}
+                    </label>
+
+                    {exceptionForm.is_working && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '1px', flex: 1, fontSize: '10px' }}>
+                            Работа с
+                            <input type="time" value={exceptionForm.work_start} onChange={e => setExceptionForm(prev => ({ ...prev, work_start: e.target.value }))} style={{ padding: '3px', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+                          </label>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '1px', flex: 1, fontSize: '10px' }}>
+                            Работа по
+                            <input type="time" value={exceptionForm.work_end} onChange={e => setExceptionForm(prev => ({ ...prev, work_end: e.target.value }))} style={{ padding: '3px', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+                          </label>
+                        </div>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '1px', flex: 1, fontSize: '10px' }}>
+                            Обед с
+                            <input type="time" value={exceptionForm.lunch_start} onChange={e => setExceptionForm(prev => ({ ...prev, lunch_start: e.target.value }))} style={{ padding: '3px', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+                          </label>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '1px', flex: 1, fontSize: '10px' }}>
+                            Обед по
+                            <input type="time" value={exceptionForm.lunch_end} onChange={e => setExceptionForm(prev => ({ ...prev, lunch_end: e.target.value }))} style={{ padding: '3px', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+                          </label>
+                        </div>
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: '1px', fontSize: '10px' }}>
+                          Слот приёма
+                          <select value={exceptionForm.slot_duration} onChange={e => setExceptionForm(prev => ({ ...prev, slot_duration: Number(e.target.value) }))} style={{ padding: '3px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
+                            <option value="15">15 минут</option>
+                            <option value="20">20 минут</option>
+                            <option value="30">30 минут</option>
+                            <option value="45">45 минут</option>
+                            <option value="60">60 минут</option>
+                          </select>
+                        </label>
+                      </div>
+                    )}
+
+                    <button type="submit" disabled={loading} style={{ background: '#3b82f6', color: '#fff', border: 0, padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', marginTop: '2px' }}>
+                      {t("addExceptionBtn") || "Добавить"}
+                    </button>
+                  </form>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
+                    {employeeExceptions.length > 0 ? (
+                      employeeExceptions.map(ex => (
+                        <div key={ex.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: '#f1f5f9', borderRadius: '6px', fontSize: '11px' }}>
+                          <div>
+                            <strong>{ex.exception_date}</strong>: {ex.is_working ? "Работа " + ex.work_start + "–" + ex.work_end : "Выходной"}
+                          </div>
+                          <button type="button" onClick={() => removeException(ex.id)} style={{ border: 0, background: 'transparent', color: '#ef4444', fontSize: '13px', cursor: 'pointer', fontWeight: 'bold' }}>
+                            ×
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>
+                        {t("noExceptions") || "Исключений из графика нет."}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Absences panel */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <h4 style={{ margin: '0', fontSize: '13px', borderBottom: '2px solid #e2e8f0', paddingBottom: '4px', color: '#1e293b' }}>
+                    {t("absencesExceptionsTab") || "Отсутствия врача"}
+                  </h4>
+
+                  <form onSubmit={addAbsence} style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px' }}>
+                      {t("absenceType") || "Тип отсутствия"}
+                      <select value={absenceForm.absence_type} onChange={e => setAbsenceForm(prev => ({ ...prev, absence_type: e.target.value, reason: e.target.value === "emergency" ? "sick" : "vacation" }))} style={{ padding: '4px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
+                        <option value="planned">{t("plannedAbsence") || "Плановое"}</option>
+                        <option value="emergency">{t("emergencyAbsence") || "Экстренное"}</option>
+                      </select>
+                    </label>
+
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px' }}>
+                      {t("absenceReason") || "Причина"}
+                      <select value={absenceForm.reason} onChange={e => setAbsenceForm(prev => ({ ...prev, reason: e.target.value }))} style={{ padding: '4px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
+                        {absenceForm.absence_type === "planned" ? (
+                          <>
+                            <option value="vacation">{t("vacation") || "Отпуск"}</option>
+                            <option value="conference">{t("conference") || "Конференция"}</option>
+                            <option value="training">{t("training") || "Обучение"}</option>
+                            <option value="personal">{t("personal") || "Личные обстоятельства"}</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="sick">{t("sick") || "Больничный"}</option>
+                            <option value="emergency">{t("emergency") || "Экстренный случай"}</option>
+                          </>
+                        )}
+                      </select>
+                    </label>
+
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, fontSize: '11px' }}>
+                        {t("startDate") || "Начало"}
+                        <input type="date" value={absenceForm.start_date} onChange={e => setAbsenceForm(prev => ({ ...prev, start_date: e.target.value }))} required style={{ padding: '4px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '11px' }} />
+                      </label>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, fontSize: '11px' }}>
+                        {t("endDate") || "Окончание"}
+                        <input type="date" value={absenceForm.end_date} onChange={e => setAbsenceForm(prev => ({ ...prev, end_date: e.target.value }))} required style={{ padding: '4px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '11px' }} />
+                      </label>
                     </div>
 
-              <div>
-                <span>Почта</span>
-                <b>{selectedEmployee.email || "—"}</b>
-              </div>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px' }}>
+                      {t("absenceComment") || "Комментарий"}
+                      <textarea value={absenceForm.comment} onChange={e => setAbsenceForm(prev => ({ ...prev, comment: e.target.value }))} placeholder="..." style={{ padding: '4px', borderRadius: '4px', border: '1px solid #cbd5e1', height: '35px', resize: 'none' }} />
+                    </label>
 
-              <div>
-                <span>Должность</span>
-                <b>{selectedEmployee.position || "—"}</b>
-              </div>
+                    <button type="submit" disabled={loading} style={{ background: '#f43f5e', color: '#fff', border: 0, padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px' }}>
+                      {t("registerAbsence") || "Зарегистрировать"}
+                    </button>
+                  </form>
 
-              <div>
-                <span>Отделение</span>
-                <b>{getDepartmentName(selectedEmployee.departmentId)}</b>
-              </div>
+                  {absenceAffectedApps.length > 0 && (
+                    <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '8px', padding: '8px', fontSize: '11px', color: '#9f1239' }}>
+                      <strong>{t("affectedAppointmentsWarning") || "Отсутствие затронет записи:"}</strong>
+                      <div style={{ maxHeight: '80px', overflowY: 'auto', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        {absenceAffectedApps.map(app => (
+                          <div key={app.id} style={{ background: '#ffe4e6', padding: '4px', borderRadius: '4px' }}>
+                            • {app.patient_name} — {app.date} {app.time}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-              <div>
-                <span>Кабинет</span>
-                <b>{selectedEmployee.cabinet || "—"}</b>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
+                    {employeeAbsences.length > 0 ? (
+                      employeeAbsences.map(abs => (
+                        <div key={abs.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: '#ffe4e6', borderRadius: '6px', fontSize: '11px', border: '1px solid #fecdd3' }}>
+                          <div>
+                            <strong>{t(abs.reason) || abs.reason}</strong>: {abs.start_date} – {abs.end_date}
+                          </div>
+                          <button type="button" onClick={() => removeAbsence(abs.id)} style={{ border: 0, background: 'transparent', color: '#e11d48', fontSize: '13px', cursor: 'pointer', fontWeight: 'bold' }}>
+                            ×
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>
+                        {t("noAbsences") || "Отсутствий врача нет."}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
-
-              <div>
-                <span>Логин</span>
-                <b>{selectedEmployee.login || "—"}</b>
-              </div>
-
-              <div>
-                <span>Статус</span>
-                <b>{getStatusText(selectedEmployee.status)}</b>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}

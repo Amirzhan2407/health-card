@@ -94,6 +94,9 @@ try {
 
   localStorage.setItem("organizationUser", JSON.stringify(result.user));
   localStorage.setItem("organizationData", JSON.stringify(result.organization));
+  if (result.token) {
+    localStorage.setItem("organizationToken", result.token);
+  }
   if (result.user && result.user.preferred_language) {
     localStorage.setItem("clinic_os_language", result.user.preferred_language);
   }
@@ -175,6 +178,9 @@ async function changePassword(event) {
 
     if (result.user) {
       localStorage.setItem("organizationUser", JSON.stringify(result.user));
+    }
+    if (result.token) {
+      localStorage.setItem("organizationToken", result.token);
     }
 
     navigate(result.redirectPath || redirectPath || "/organization/gov-clinic");

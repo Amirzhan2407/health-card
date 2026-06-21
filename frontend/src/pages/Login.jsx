@@ -74,6 +74,23 @@ export default function Login() {
     localStorage.setItem("userData", JSON.stringify(userData));
   };
 
+  const obtainPatientToken = async (iin, id) => {
+    try {
+      const API_URL = "https://health-card.onrender.com";
+      const response = await fetch(`${API_URL}/api/organizations/auth/patient-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ iin, id }),
+      });
+      const resData = await response.json();
+      if (response.ok && resData.token) {
+        localStorage.setItem("organizationToken", resData.token);
+      }
+    } catch (e) {
+      console.warn("Could not obtain patient auth token:", e);
+    }
+  };
+
   const onSign = async () => {
     if (status === "reading" || status === "signing") return;
 
@@ -153,6 +170,7 @@ export default function Login() {
           email: existingUser.email || "",
         });
 
+        await obtainPatientToken(existingUser.iin, existingUser.id);
         setStatus("ok");
         navigate("/");
         return;
@@ -222,6 +240,7 @@ export default function Login() {
       email: "",
     });
 
+    await obtainPatientToken(ecpUserData.iin, data.user.id);
     setStatus("ok");
     navigate("/");
   };
@@ -264,6 +283,7 @@ export default function Login() {
       email: data.user.email || "",
     });
 
+    await obtainPatientToken(data.user.iin, data.user.id);
     navigate("/");
   };
 

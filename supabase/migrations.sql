@@ -1,8 +1,7 @@
--- 1. Добавление колонок рейтинга и статуса в таблицу сотрудников (organization_employees)
-ALTER TABLE organization_employees ADD COLUMN IF NOT EXISTS average_rating NUMERIC(3, 1) DEFAULT 8.0;
-ALTER TABLE organization_employees ADD COLUMN IF NOT EXISTS rating_count INTEGER DEFAULT 0;
-ALTER TABLE organization_employees ADD COLUMN IF NOT EXISTS rating_sum INTEGER DEFAULT 40;
+-- 1. Добавление колонок статуса, специальности и даты рождения в таблицу сотрудников (organization_employees)
 ALTER TABLE organization_employees ADD COLUMN IF NOT EXISTS absence_status VARCHAR(50) DEFAULT 'active';
+ALTER TABLE organization_employees ADD COLUMN IF NOT EXISTS specialty TEXT;
+ALTER TABLE organization_employees ADD COLUMN IF NOT EXISTS birth_date DATE;
 
 -- 2. Добавление кодов и времени приёма в таблицу записей (organization_appointments)
 ALTER TABLE organization_appointments ADD COLUMN IF NOT EXISTS start_code VARCHAR(50);
@@ -10,22 +9,9 @@ ALTER TABLE organization_appointments ADD COLUMN IF NOT EXISTS finish_code VARCH
 ALTER TABLE organization_appointments ADD COLUMN IF NOT EXISTS actual_start_time TIMESTAMPTZ;
 ALTER TABLE organization_appointments ADD COLUMN IF NOT EXISTS actual_end_time TIMESTAMPTZ;
 ALTER TABLE organization_appointments ADD COLUMN IF NOT EXISTS consultation_draft JSONB;
+ALTER TABLE organization_appointments ADD COLUMN IF NOT EXISTS patient_confirmed BOOLEAN DEFAULT true;
 
-
--- 3. Создание таблицы оценок врачей (doctor_ratings)
-CREATE TABLE IF NOT EXISTS doctor_ratings (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    appointment_id UUID UNIQUE REFERENCES organization_appointments(id) ON DELETE CASCADE,
-    patient_id UUID REFERENCES app_users(id) ON DELETE CASCADE,
-    doctor_id UUID REFERENCES organization_employees(id) ON DELETE CASCADE,
-    organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
-    rating_value INTEGER CHECK (rating_value >= 1 AND rating_value <= 10),
-    comment TEXT,
-    created_at TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- 4. Создание таблицы отсутствия врачей (doctor_absences)
+-- 3. Создание таблицы отсутствия врачей (doctor_absences)
 CREATE TABLE IF NOT EXISTS doctor_absences (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     employee_id UUID REFERENCES organization_employees(id) ON DELETE CASCADE,
@@ -37,7 +23,7 @@ CREATE TABLE IF NOT EXISTS doctor_absences (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 5. Создание таблицы переноса записей (appointment_transfers)
+-- 4. Создание таблицы переноса записей (appointment_transfers)
 CREATE TABLE IF NOT EXISTS appointment_transfers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     appointment_id UUID REFERENCES organization_appointments(id) ON DELETE CASCADE,
@@ -52,7 +38,7 @@ CREATE TABLE IF NOT EXISTS appointment_transfers (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 6. Создание таблицы медицинских справок (medical_certificates)
+-- 5. Создание таблицы медицинских справок (medical_certificates)
 CREATE TABLE IF NOT EXISTS medical_certificates (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     patient_id UUID REFERENCES app_users(id) ON DELETE CASCADE,
@@ -65,7 +51,7 @@ CREATE TABLE IF NOT EXISTS medical_certificates (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 7. Создание таблицы обращений в техподдержку (support_conversations)
+-- 6. Создание таблицы обращений в техподдержку (support_conversations)
 CREATE TABLE IF NOT EXISTS support_conversations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
@@ -76,7 +62,7 @@ CREATE TABLE IF NOT EXISTS support_conversations (
     updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 8. Создание таблицы сообщений обращений (support_messages)
+-- 7. Создание таблицы сообщений обращений (support_messages)
 CREATE TABLE IF NOT EXISTS support_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     conversation_id UUID REFERENCES support_conversations(id) ON DELETE CASCADE,
@@ -89,7 +75,7 @@ CREATE TABLE IF NOT EXISTS support_messages (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 9. Создание таблицы уведомлений (notifications)
+-- 8. Создание таблицы уведомлений (notifications)
 CREATE TABLE IF NOT EXISTS notifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL, -- Может относиться к app_users, organization_employees или site_admins
@@ -100,7 +86,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 10. Создание таблицы графиков врачей (doctor_schedules)
+-- 9. Создание таблицы графиков врачей (doctor_schedules)
 CREATE TABLE IF NOT EXISTS doctor_schedules (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     employee_id UUID UNIQUE REFERENCES organization_employees(id) ON DELETE CASCADE,
@@ -117,7 +103,7 @@ CREATE TABLE IF NOT EXISTS doctor_schedules (
     updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 11. Создание таблицы исключений из графика (schedule_exceptions)
+-- 10. Создание таблицы исключений из графика (schedule_exceptions)
 CREATE TABLE IF NOT EXISTS schedule_exceptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     employee_id UUID REFERENCES organization_employees(id) ON DELETE CASCADE,
@@ -131,7 +117,7 @@ CREATE TABLE IF NOT EXISTS schedule_exceptions (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 12. Создание таблицы записей визитов (visit_records)
+-- 11. Создание таблицы записей визитов (visit_records)
 CREATE TABLE IF NOT EXISTS visit_records (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     appointment_id UUID UNIQUE REFERENCES organization_appointments(id) ON DELETE CASCADE,
@@ -150,10 +136,13 @@ CREATE TABLE IF NOT EXISTS visit_records (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 13. Добавление признака подтверждения пациентом
-ALTER TABLE organization_appointments ADD COLUMN IF NOT EXISTS patient_confirmed BOOLEAN DEFAULT true;
-
--- 14. Добавление предпочтительного языка в таблицы пользователей
+-- 12. Добавление предпочтительного языка в таблицы пользователей
 ALTER TABLE organization_users ADD COLUMN IF NOT EXISTS preferred_language VARCHAR(5) DEFAULT 'ru';
 ALTER TABLE organization_employees ADD COLUMN IF NOT EXISTS preferred_language VARCHAR(5) DEFAULT 'ru';
 
+-- 13. Ограничение ролей в таблицах пользователей для четырех ролей
+ALTER TABLE organization_users DROP CONSTRAINT IF EXISTS organization_users_role_check;
+ALTER TABLE organization_users ADD CONSTRAINT organization_users_role_check CHECK (role IN ('patient', 'doctor', 'organization_admin', 'support'));
+
+ALTER TABLE organization_employees DROP CONSTRAINT IF EXISTS organization_employees_role_check;
+ALTER TABLE organization_employees ADD CONSTRAINT organization_employees_role_check CHECK (role IN ('patient', 'doctor', 'organization_admin', 'support'));

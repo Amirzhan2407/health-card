@@ -2,6 +2,7 @@
 
 import express from "express";
 import crypto from "crypto";
+import jwt from "jsonwebtoken";
 import { supabase } from "../lib/supabaseAdmin.js";
 import { requireAdminAuth } from "../middleware/requireAdminAuth.js";
 import { createAuditLog } from "../services/adminAuditService.js";
@@ -133,9 +134,21 @@ router.post("/login", async (req, res) => {
       });
     }
 
+    const token = jwt.sign(
+      {
+        id: user.id,
+        login: user.login,
+        role: user.role,
+        organization_id: user.organization_id
+      },
+      process.env.JWT_SECRET || "your_jwt_secret_here",
+      { expiresIn: "24h" }
+    );
+
     return res.status(200).json({
       success: true,
       message: "Вход выполнен.",
+      token,
       mustChangePassword: user.must_change_password,
       redirectPath: getRedirectPath(user.role),
       user: {
@@ -243,9 +256,20 @@ router.post("/change-password", async (req, res) => {
       }
 
       const resolvedRole = getRoleByPosition(user.position) || "doctor";
+      const token = jwt.sign(
+        {
+          id: user.id,
+          login: user.login,
+          role: resolvedRole,
+          organization_id: user.organization_id
+        },
+        process.env.JWT_SECRET || "your_jwt_secret_here",
+        { expiresIn: "24h" }
+      );
       return res.status(200).json({
         success: true,
         message: "Пароль успешно изменён.",
+        token,
         mustChangePassword: false,
         redirectPath: getRedirectPath(resolvedRole),
         user: {
@@ -275,9 +299,20 @@ router.post("/change-password", async (req, res) => {
         });
       }
 
+      const token = jwt.sign(
+        {
+          id: user.id,
+          login: user.login,
+          role: user.role,
+          organization_id: user.organization_id
+        },
+        process.env.JWT_SECRET || "your_jwt_secret_here",
+        { expiresIn: "24h" }
+      );
       return res.status(200).json({
         success: true,
         message: "Пароль успешно изменён.",
+        token,
         mustChangePassword: false,
         redirectPath: getRedirectPath(user.role),
         user: {
@@ -601,5 +636,35 @@ router.patch("/profile/language", async (req, res) => {
   }
 });
 
-export default router;
+router.post("/auth/patient-token", async (req, res) => {
+  try {
+    const { iin, id } = req.body;
+    if (!iin || !id) {
+      return res.status(400).json({ success: false, message: "ИИН и ID обязательны." });
+    }
+    
+    // Check if the user exists in app_users
+    const { data: user, error } = await supabase
+      .from("app_users")
+      .select("*")
+      .eq("iin", iin)
+      .eq("id", id)
+      .maybeSingle();
 
+    if (error || !user) {
+      return res.status(401).json({ success: false, message: "Неверный ИИН или ID." });
+    }
+
+    const token = jwt.sign(
+      { id: user.id, iin: user.iin, role: "patient" },
+      process.env.JWT_SECRET || "your_jwt_secret_here",
+      { expiresIn: "24h" }
+    );
+
+    return res.status(200).json({ success: true, token });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+export default router;

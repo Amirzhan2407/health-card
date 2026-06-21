@@ -3,10 +3,10 @@
 import express from "express";
 import multer from "multer";
 import crypto from "crypto";
-import fs from "fs";
-import path from "path";
+
 import { supabase } from "../lib/supabaseAdmin.js";
 import { sendOrganizationAccessEmail, sendAppointmentBookingEmail } from "../services/emailService.js";
+import { authenticateToken } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -19,31 +19,85 @@ fileSize: 30 * 1024 * 1024,
 
 const BUCKET_NAME = "organization-documents";
 
-const SHIFTS_FILE = path.resolve("employee_shifts_fallback.json");
-
-function loadFallbackShifts() {
+// GET /api/organization-structure/public/organizations (Public Route)
+router.get("/public/organizations", async (req, res) => {
   try {
-    if (fs.existsSync(SHIFTS_FILE)) {
-      const content = fs.readFileSync(SHIFTS_FILE, "utf8");
-      return JSON.parse(content) || {};
+    const { data, error } = await supabase
+      .from("organizations")
+      .select("id, organization_name, bin, city, status")
+      .in("status", ["approved", "waiting_first_login"]);
+
+    if (error) {
+      const { data: rawData, error: rawError } = await supabase
+        .from("organizations")
+        .select("id, organization_name, bin, city");
+      if (rawError) throw rawError;
+      return res.status(200).json({ success: true, organizations: rawData || [] });
     }
-  } catch (err) {
-    console.error("Failed to read employee shifts fallback file:", err);
+
+    return res.status(200).json({ success: true, organizations: data || [] });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Ошибка получения списка организаций.",
+    });
   }
-  return {};
+});
+
+// Protect all subsequent routes with Bearer JWT check
+router.use(authenticateToken);
+
+
+
+
+
+
+
+function calculateAge(birthDateStr) {
+  if (!birthDateStr) return "";
+  try {
+    const birthDate = new Date(birthDateStr);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return String(age);
+  } catch (e) {
+    return "";
+  }
 }
 
-function saveFallbackShift(employeeId, shift) {
-  try {
-    const map = loadFallbackShifts();
-    map[employeeId] = {
-      work_start: shift.work_start || "08:00",
-      work_end: shift.work_end || "17:00"
-    };
-    fs.writeFileSync(SHIFTS_FILE, JSON.stringify(map, null, 2), "utf8");
-  } catch (err) {
-    console.error("Failed to write employee shifts fallback file:", err);
+function checkAuth(req, res, allowedRoles) {
+  if (!req.user) {
+    res.status(401).json({ success: false, message: "Не авторизован." });
+    return null;
   }
+  if (!allowedRoles.includes(req.user.role)) {
+    res.status(403).json({ success: false, message: "Доступ запрещен." });
+    return null;
+  }
+  
+  const ctx = {
+    role: req.user.role,
+    userId: req.user.id
+  };
+  
+  if (req.user.role === "organization_admin") {
+    ctx.organizationId = req.user.organization_id;
+  } else if (req.user.role === "doctor") {
+    ctx.organizationId = req.user.organization_id;
+    ctx.employeeId = req.user.id;
+  } else if (req.user.role === "patient") {
+    ctx.patientIin = req.user.iin;
+  } else if (req.user.role === "support") {
+    ctx.organizationId = req.headers["x-organization-id"] || req.query.organization_id || req.body?.organization_id;
+    ctx.employeeId = req.query.employee_id || req.body?.employee_id;
+    ctx.patientIin = req.query.patient_iin || req.body?.patient_iin;
+  }
+  
+  return ctx;
 }
 
 function hashPassword(password) {
@@ -114,11 +168,32 @@ function getRoleByPosition(position) {
   return "doctor"; // Врач по умолчанию
 }
 
-async function checkCabinetOverlap(employeeId, cabinet, organizationId, workStart, workEnd, workDays) {
-  if (!cabinet) return false;
 
-  // 1. Fetch other active employees in the same cabinet
-  let query = supabase
+async function checkCabinetOverlap(
+  employeeId,
+  cabinet,
+  organizationId,
+  workStart,
+  workEnd,
+  workDays
+) {
+  if (!cabinet || !organizationId) {
+    return false;
+  }
+
+  const normalizedWorkDays = Array.isArray(workDays)
+    ? workDays.map(Number)
+    : [];
+
+  if (
+    !workStart ||
+    !workEnd ||
+    normalizedWorkDays.length === 0
+  ) {
+    return false;
+  }
+
+  let employeesQuery = supabase
     .from("organization_employees")
     .select("id, full_name")
     .eq("organization_id", organizationId)
@@ -126,50 +201,97 @@ async function checkCabinetOverlap(employeeId, cabinet, organizationId, workStar
     .eq("status", "active");
 
   if (employeeId) {
-    query = query.neq("id", employeeId);
+    employeesQuery = employeesQuery.neq("id", employeeId);
   }
 
-  const { data: others } = await query;
-  if (!others || others.length === 0) return false;
+  const {
+    data: otherEmployees,
+    error: employeesError,
+  } = await employeesQuery;
 
-  const otherIds = others.map(o => o.id);
+  if (employeesError) {
+    throw new Error(
+      employeesError.message ||
+        "Не удалось проверить занятость кабинета."
+    );
+  }
 
-  // 2. Fetch their schedules
-  const { data: schedules } = await supabase
+  if (!otherEmployees || otherEmployees.length === 0) {
+    return false;
+  }
+
+  const otherEmployeeIds = otherEmployees.map(
+    (employee) => employee.id
+  );
+
+  const {
+    data: schedules,
+    error: schedulesError,
+  } = await supabase
     .from("doctor_schedules")
-    .select("*")
-    .in("employee_id", otherIds);
+    .select(
+      "employee_id, work_days, work_start, work_end"
+    )
+    .in("employee_id", otherEmployeeIds);
 
-  const fallbackShifts = loadFallbackShifts();
+  if (schedulesError) {
+    throw new Error(
+      schedulesError.message ||
+        "Не удалось загрузить графики врачей."
+    );
+  }
 
-  // 3. Check overlaps
-  for (const other of others) {
-    let sched = (schedules || []).find(s => s.employee_id === other.id);
-    if (!sched) {
-      const fb = fallbackShifts[other.id] || { work_start: "08:00", work_end: "17:00" };
-      sched = {
-        work_days: [1, 2, 3, 4, 5],
-        work_start: fb.work_start,
-        work_end: fb.work_end
-      };
+  for (const otherEmployee of otherEmployees) {
+    const schedule = (schedules || []).find(
+      (item) =>
+        String(item.employee_id) ===
+        String(otherEmployee.id)
+    );
+
+    // Если у врача нет сохранённого графика,
+    // его не учитываем при сравнении времени.
+    if (!schedule) {
+      continue;
     }
 
-    // Check if working days intersect
-    const daysIntersect = workDays.some(d => sched.work_days.includes(d));
-    if (daysIntersect) {
-      // Check if times intersect: (start1 < end2) and (end1 > start2)
-      if (workStart < sched.work_end && workEnd > sched.work_start) {
-        return `Кабинет ${cabinet} уже занят врачом ${other.full_name} в это время (${sched.work_start}–${sched.work_end}, дни: ${sched.work_days.join(",")})`;
-      }
+    const scheduleWorkDays = Array.isArray(
+      schedule.work_days
+    )
+      ? schedule.work_days.map(Number)
+      : [];
+
+    const daysIntersect = normalizedWorkDays.some(
+      (day) => scheduleWorkDays.includes(day)
+    );
+
+    if (!daysIntersect) {
+      continue;
+    }
+
+    const timesIntersect =
+      workStart < schedule.work_end &&
+      workEnd > schedule.work_start;
+
+    if (timesIntersect) {
+      return (
+        `Кабинет ${cabinet} уже занят врачом ` +
+        `${otherEmployee.full_name} в это время ` +
+        `(${schedule.work_start}–${schedule.work_end}, ` +
+        `дни: ${scheduleWorkDays.join(", ")}).`
+      );
     }
   }
 
   return false;
 }
 
+
+
 router.get("/departments", async (req, res) => {
 try {
-const organizationId = getOrganizationId(req);
+const ctx = checkAuth(req, res, ["organization_admin", "doctor", "support", "patient"]);
+if (!ctx) return;
+const organizationId = ctx.organizationId;
 
 
 if (!organizationId) {
@@ -193,32 +315,7 @@ if (error) {
 }
 
 // Auto-initialize standard departments if list is empty
-if (!data || data.length === 0) {
-  const defaultDepartments = [
-    "Терапия", "Педиатрия", "Хирургия", "Травматология", "Неврология",
-    "Кардиология", "Эндокринология", "ЛОР", "Офтальмология", "Гинекология",
-    "Дерматология", "Инфекционный кабинет", "Рентген кабинет", "УЗИ кабинет",
-    "Функциональная диагностика", "Лаборатория", "Регистратура",
-    "Доврачебный кабинет", "Процедурный кабинет", "Прививочный кабинет",
-    "Отдел кадров", "Бухгалтерия", "ИТ отдел"
-  ];
-  
-  const inserts = defaultDepartments.map((name, idx) => ({
-    organization_id: organizationId,
-    name,
-    floor: String(Math.floor(idx / 5) + 1),
-    rooms: `${Math.floor(idx / 5) + 1}0${(idx % 5) + 1}`
-  }));
 
-  const { data: insertedData, error: insertError } = await supabase
-    .from("organization_departments")
-    .insert(inserts)
-    .select("*");
-
-  if (!insertError && insertedData) {
-    data = insertedData;
-  }
-}
 
 return res.status(200).json({
   success: true,
@@ -236,7 +333,9 @@ message: error.message || "Ошибка получения отделений.",
 
 router.post("/departments", async (req, res) => {
 try {
-const organizationId = getOrganizationId(req);
+const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+if (!ctx) return;
+const organizationId = ctx.organizationId;
 const name = safeText(req.body.name);
 const floor = safeText(req.body.floor);
 const rooms = safeText(req.body.rooms);
@@ -283,7 +382,9 @@ message: error.message || "Ошибка добавления отделения.
 
 router.get("/employees", async (req, res) => {
 try {
-const organizationId = getOrganizationId(req);
+const ctx = checkAuth(req, res, ["organization_admin", "doctor", "support", "patient"]);
+if (!ctx) return;
+const organizationId = ctx.organizationId;
 const status = req.query.status ? String(req.query.status) : null;
 
 
@@ -329,21 +430,22 @@ if (employeeIds.length > 0) {
   }
 }
 
-const shifts = loadFallbackShifts();
+
 const employeesWithDocuments = (employees || []).map((employee) => {
-  const employeeDocuments = documents.filter((doc) => {
-    return doc.employee_id === employee.id;
-  });
-  const shift = shifts[employee.id] || { work_start: "08:00", work_end: "17:00" };
+  const employeeDocuments = documents.filter(
+    (document) => document.employee_id === employee.id
+  );
 
   return {
     ...employee,
-    department: employee.organization_departments ? employee.organization_departments.name : (employee.department || "—"),
+    department: employee.organization_departments
+      ? employee.organization_departments.name
+      : employee.department || "—",
     documents: employeeDocuments,
-    work_start: shift.work_start,
-    work_end: shift.work_end
   };
 });
+
+
 
 return res.status(200).json({
   success: true,
@@ -361,19 +463,55 @@ message: error.message || "Ошибка получения сотруднико�
 
 router.post("/employees", async (req, res) => {
 try {
-const organizationId = getOrganizationId(req);
-
+const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+if (!ctx) return;
+const organizationId = ctx.organizationId;
 
 const fullName = safeText(req.body.full_name || req.body.fullName);
-const age = safeText(req.body.age);
+const birthDate = safeText(req.body.birth_date || req.body.birthDate);
+const age = req.body.age ? safeText(req.body.age) : (birthDate ? calculateAge(birthDate) : "");
 const phone = safeText(req.body.phone);
 const email = safeText(req.body.email).toLowerCase();
-const position = safeText(req.body.position);
+const specialty = safeText(req.body.specialty || req.body.position);
+const position = specialty;
 const department = safeText(req.body.department);
 const departmentId = req.body.department_id || req.body.departmentId || null;
 const cabinet = safeText(req.body.cabinet);
-const role = safeText(req.body.role) || getRoleByPosition(position);
 const status = safeText(req.body.status) || "active";
+
+    // Validate email and phone formats
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (email && !emailRegex.test(email)) {
+      return res.status(400).json({ success: false, message: "Неверный формат email." });
+    }
+
+    const phoneRegex = /^\+?[0-9\s()+-]{10,20}$/;
+    if (phone && !phoneRegex.test(phone)) {
+      return res.status(400).json({ success: false, message: "Неверный формат номера телефона." });
+    }
+
+    // Uniqueness checks across the whole database table organization_employees
+    if (email) {
+      const { data: existingEmail } = await supabase
+        .from("organization_employees")
+        .select("id")
+        .eq("email", email)
+        .maybeSingle();
+      if (existingEmail) {
+        return res.status(400).json({ success: false, message: "Сотрудник с такой почтой уже зарегистрирован в системе." });
+      }
+    }
+
+    if (phone) {
+      const { data: existingPhone } = await supabase
+        .from("organization_employees")
+        .select("id")
+        .eq("phone", phone)
+        .maybeSingle();
+      if (existingPhone) {
+        return res.status(400).json({ success: false, message: "Сотрудник с таким номером телефона уже зарегистрирован в системе." });
+      }
+    }
 
 if (!organizationId) {
   return res.status(400).json({
@@ -382,10 +520,10 @@ if (!organizationId) {
   });
 }
 
-    if (!fullName || !position || !departmentId) {
+    if (!fullName || !specialty || !departmentId) {
       return res.status(400).json({
         success: false,
-        message: "ФИО, должность и отделение обязательны.",
+        message: "ФИО, специальность и отделение обязательны.",
       });
     }
 
@@ -408,10 +546,13 @@ if (!organizationId) {
     department_id: departmentId,
     full_name: fullName,
     age,
+    birth_date: birthDate || null,
     phone,
     email,
     position,
+    specialty,
     cabinet,
+    role: "doctor",
     login: null,
     password_hash: null,
     must_change_password: true,
@@ -426,12 +567,6 @@ if (error) {
     success: false,
     message: error.message,
   });
-}
-
-if (employee) {
-  saveFallbackShift(employee.id, { work_start: workStart, work_end: workEnd });
-  employee.work_start = workStart;
-  employee.work_end = workEnd;
 }
 
 return res.status(201).json({
@@ -451,7 +586,20 @@ message: error.message || "Ошибка добавления сотрудник�
 
 router.patch("/employees/:id", async (req, res) => {
 try {
+const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+if (!ctx) return;
 const employeeId = req.params.id;
+
+if (ctx.role === "organization_admin") {
+  const { data: empCheck } = await supabase
+    .from("organization_employees")
+    .select("organization_id")
+    .eq("id", employeeId)
+    .maybeSingle();
+  if (!empCheck || empCheck.organization_id !== ctx.organizationId) {
+    return res.status(403).json({ success: false, message: "Доступ запрещен." });
+  }
+}
 
 
 const payload = {};
@@ -460,17 +608,23 @@ if (req.body.full_name !== undefined || req.body.fullName !== undefined) {
   payload.full_name = safeText(req.body.full_name || req.body.fullName);
 }
 
-if (req.body.age !== undefined) payload.age = safeText(req.body.age);
+if (req.body.birth_date !== undefined || req.body.birthDate !== undefined) {
+  payload.birth_date = safeText(req.body.birth_date || req.body.birthDate);
+  payload.age = calculateAge(payload.birth_date);
+} else if (req.body.age !== undefined) {
+  payload.age = safeText(req.body.age);
+}
+
 if (req.body.phone !== undefined) payload.phone = safeText(req.body.phone);
 
 if (req.body.email !== undefined) {
   payload.email = safeText(req.body.email).toLowerCase();
 }
 
-if (req.body.position !== undefined) {
-  payload.position = safeText(req.body.position);
+if (req.body.specialty !== undefined || req.body.position !== undefined) {
+  payload.specialty = safeText(req.body.specialty || req.body.position);
+  payload.position = payload.specialty;
 }
-
 
 if (req.body.department_id !== undefined || req.body.departmentId !== undefined) {
   payload.department_id = req.body.department_id || req.body.departmentId || null;
@@ -480,14 +634,15 @@ if (req.body.cabinet !== undefined) {
   payload.cabinet = safeText(req.body.cabinet);
 }
 
+
 if (req.body.status === "dismissed") {
-  payload.organization_id = null;
-  payload.department_id = null;
   payload.status = "dismissed";
   payload.dismissed_at = new Date().toISOString();
 } else if (req.body.status !== undefined) {
   payload.status = safeText(req.body.status);
 }
+
+
 
 if (req.body.dismissed_at !== undefined) {
   payload.dismissed_at = req.body.dismissed_at || null;
@@ -495,47 +650,88 @@ if (req.body.dismissed_at !== undefined) {
 
 payload.updated_at = new Date().toISOString();
 
+if (payload.email) {
+  const email = payload.email;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ success: false, message: "Неверный формат email." });
+  }
+  const { data: existingEmail } = await supabase
+    .from("organization_employees")
+    .select("id")
+    .eq("email", email)
+    .neq("id", employeeId)
+    .maybeSingle();
+  if (existingEmail) {
+    return res.status(400).json({ success: false, message: "Сотрудник с такой почтой уже зарегистрирован в системе." });
+  }
+}
+
+if (payload.phone) {
+  const phone = payload.phone;
+  const phoneRegex = /^\+?[0-9\s()+-]{10,20}$/;
+  if (!phoneRegex.test(phone)) {
+    return res.status(400).json({ success: false, message: "Неверный формат номера телефона." });
+  }
+  const { data: existingPhone } = await supabase
+    .from("organization_employees")
+    .select("id")
+    .eq("phone", phone)
+    .neq("id", employeeId)
+    .maybeSingle();
+  if (existingPhone) {
+    return res.status(400).json({ success: false, message: "Сотрудник с таким номером телефона уже зарегистрирован в системе." });
+  }
+}
+
 const { data: currentEmployee } = await supabase
   .from("organization_employees")
   .select("*")
   .eq("id", employeeId)
   .maybeSingle();
 
-if (currentEmployee && payload.cabinet !== undefined && payload.cabinet !== currentEmployee.cabinet) {
-  let sched = null;
-  const { data: dbSched } = await supabase
+
+if (
+  currentEmployee &&
+  payload.cabinet !== undefined &&
+  payload.cabinet !== currentEmployee.cabinet
+) {
+  const { data: doctorSchedule, error: scheduleError } = await supabase
     .from("doctor_schedules")
     .select("*")
     .eq("employee_id", employeeId)
     .maybeSingle();
 
-  if (dbSched) {
-    sched = dbSched;
-  } else {
-    const fb = loadFallbackShifts()[employeeId] || { work_start: "08:00", work_end: "17:00" };
-    sched = {
-      work_days: [1, 2, 3, 4, 5],
-      work_start: fb.work_start,
-      work_end: fb.work_end
-    };
-  }
-
-  const overlapError = await checkCabinetOverlap(
-    employeeId,
-    payload.cabinet,
-    currentEmployee.organization_id,
-    sched.work_start,
-    sched.work_end,
-    sched.work_days
-  );
-
-  if (overlapError) {
-    return res.status(400).json({
+  if (scheduleError) {
+    return res.status(500).json({
       success: false,
-      message: overlapError
+      code: "SCHEDULE_LOAD_FAILED",
+      message:
+        scheduleError.message ||
+        "Не удалось загрузить график врача.",
     });
   }
+
+  if (doctorSchedule) {
+    const overlapError = await checkCabinetOverlap(
+      employeeId,
+      payload.cabinet,
+      currentEmployee.organization_id,
+      doctorSchedule.work_start,
+      doctorSchedule.work_end,
+      doctorSchedule.work_days
+    );
+
+    if (overlapError) {
+      return res.status(400).json({
+        success: false,
+        message: overlapError,
+      });
+    }
+  }
 }
+
+
 
 const { data: updatedEmployee, error } = await supabase
   .from("organization_employees")
@@ -551,17 +747,25 @@ if (error) {
   });
 }
 
-if (currentEmployee && currentEmployee.login && payload.status === "dismissed") {
+
+if (
+  currentEmployee &&
+  currentEmployee.login &&
+  payload.status === "dismissed"
+) {
   await supabase
     .from("organization_users")
     .update({
-      organization_id: null,
       status: "blocked",
       updated_at: new Date().toISOString(),
     })
     .eq("organization_id", currentEmployee.organization_id)
     .eq("login", currentEmployee.login);
-} else if (currentEmployee && currentEmployee.login && payload.status) {
+} else if (
+  currentEmployee &&
+  currentEmployee.login &&
+  payload.status
+) {
   await supabase
     .from("organization_users")
     .update({
@@ -575,21 +779,9 @@ if (currentEmployee && currentEmployee.login && payload.status === "dismissed") 
     .eq("login", currentEmployee.login);
 }
 
-const workStart = req.body.work_start || req.body.workStart;
-const workEnd = req.body.work_end || req.body.workEnd;
-if (updatedEmployee && (workStart !== undefined || workEnd !== undefined)) {
-  const currentShift = loadFallbackShifts()[employeeId] || { work_start: "08:00", work_end: "17:00" };
-  saveFallbackShift(employeeId, {
-    work_start: workStart !== undefined ? workStart : currentShift.work_start,
-    work_end: workEnd !== undefined ? workEnd : currentShift.work_end
-  });
-  updatedEmployee.work_start = workStart !== undefined ? workStart : currentShift.work_start;
-  updatedEmployee.work_end = workEnd !== undefined ? workEnd : currentShift.work_end;
-} else if (updatedEmployee) {
-  const shift = loadFallbackShifts()[employeeId] || { work_start: "08:00", work_end: "17:00" };
-  updatedEmployee.work_start = shift.work_start;
-  updatedEmployee.work_end = shift.work_end;
-}
+
+
+
 
 return res.status(200).json({
   success: true,
@@ -606,67 +798,48 @@ message: error.message || "Ошибка изменения сотрудника.
 }
 });
 
+
 router.delete("/employees/:id", async (req, res) => {
-try {
-const employeeId = req.params.id;
+  const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+  if (!ctx) return;
+  const employeeId = req.params.id;
 
-
-const { data: employee, error: employeeError } = await supabase
-  .from("organization_employees")
-  .select("*")
-  .eq("id", employeeId)
-  .maybeSingle();
-
-if (employeeError || !employee) {
-  return res.status(404).json({
+  if (ctx.role === "organization_admin") {
+    const { data: empCheck } = await supabase
+      .from("organization_employees")
+      .select("organization_id")
+      .eq("id", employeeId)
+      .maybeSingle();
+    if (!empCheck || empCheck.organization_id !== ctx.organizationId) {
+      return res.status(403).json({ success: false, message: "Доступ запрещен." });
+    }
+  }
+  return res.status(405).json({
     success: false,
-    message: "Сотрудник не найден.",
+    code: "PHYSICAL_DELETE_DISABLED",
+    message:
+      "Физическое удаление врача запрещено. Используйте архивирование.",
   });
-}
-
-await supabase
-  .from("organization_employee_documents")
-  .delete()
-  .eq("employee_id", employeeId);
-
-if (employee.login) {
-  await supabase
-    .from("organization_users")
-    .delete()
-    .eq("organization_id", employee.organization_id)
-    .eq("login", employee.login);
-}
-
-const { error } = await supabase
-  .from("organization_employees")
-  .delete()
-  .eq("id", employeeId);
-
-if (error) {
-  return res.status(500).json({
-    success: false,
-    message: error.message,
-  });
-}
-
-return res.status(200).json({
-  success: true,
-  message: "Сотрудник удалён.",
 });
 
-
-} catch (error) {
-return res.status(500).json({
-success: false,
-message: error.message || "Ошибка удаления сотрудника.",
-});
-}
-});
 
 router.post("/employee-documents", upload.any(), async (req, res) => {
 try {
-const organizationId = getOrganizationId(req);
+const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+if (!ctx) return;
+const organizationId = ctx.organizationId;
 const employeeId = req.body.employee_id || req.body.employeeId;
+
+if (ctx.role === "organization_admin") {
+  const { data: empCheck } = await supabase
+    .from("organization_employees")
+    .select("organization_id")
+    .eq("id", employeeId)
+    .maybeSingle();
+  if (!empCheck || empCheck.organization_id !== ctx.organizationId) {
+    return res.status(403).json({ success: false, message: "Доступ запрещен." });
+  }
+}
 
 
 if (!organizationId || !employeeId) {
@@ -749,104 +922,27 @@ message: error.message || "Ошибка загрузки документов.",
 }
 });
 
-router.patch("/employees/:id/chief-approve", async (req, res) => {
-try {
-const organizationId = getOrganizationId(req);
-const employeeId = req.params.id;
 
 
-if (!organizationId || !employeeId) {
-  return res.status(400).json({
-    success: false,
-    message: "organization_id и сотрудник обязательны.",
-  });
-}
 
-const { data: updatedEmployee, error } = await supabase
-  .from("organization_employees")
-  .update({
-    status: "approved_for_access",
-    updated_at: new Date().toISOString(),
-  })
-  .eq("id", employeeId)
-  .eq("organization_id", organizationId)
-  .select("*")
-  .single();
-
-if (error) {
-  return res.status(500).json({
-    success: false,
-    message: error.message,
-  });
-}
-
-return res.status(200).json({
-  success: true,
-  message: "Сотрудник одобрен.",
-  employee: updatedEmployee,
-});
-
-
-} catch (error) {
-return res.status(500).json({
-success: false,
-message: error.message || "Ошибка одобрения сотрудника.",
-});
-}
-});
-
-router.patch("/employees/:id/chief-reject", async (req, res) => {
-try {
-const organizationId = getOrganizationId(req);
-const employeeId = req.params.id;
-const rejectReason = safeText(req.body.rejectReason || req.body.reason);
-
-
-if (!organizationId || !employeeId) {
-  return res.status(400).json({
-    success: false,
-    message: "organization_id и сотрудник обязательны.",
-  });
-}
-
-const { data: updatedEmployee, error } = await supabase
-  .from("organization_employees")
-  .update({
-    status: "rejected_by_chief",
-    rejection_reason: rejectReason || null,
-    updated_at: new Date().toISOString(),
-  })
-  .eq("id", employeeId)
-  .eq("organization_id", organizationId)
-  .select("*")
-  .single();
-
-if (error) {
-  return res.status(500).json({
-    success: false,
-    message: error.message,
-  });
-}
-
-return res.status(200).json({
-  success: true,
-  message: "Сотрудник отклонён.",
-  employee: updatedEmployee,
-});
-
-
-} catch (error) {
-return res.status(500).json({
-success: false,
-message: error.message || "Ошибка отклонения сотрудника.",
-});
-}
-});
 
 router.post("/employees/:id/access", async (req, res) => {
 try {
-const organizationId = getOrganizationId(req);
+const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+if (!ctx) return;
+const organizationId = ctx.organizationId;
 const employeeId = req.params.id;
+
+if (ctx.role === "organization_admin") {
+  const { data: empCheck } = await supabase
+    .from("organization_employees")
+    .select("organization_id")
+    .eq("id", employeeId)
+    .maybeSingle();
+  if (!empCheck || empCheck.organization_id !== ctx.organizationId) {
+    return res.status(403).json({ success: false, message: "Доступ запрещен." });
+  }
+}
 
 
 const login = safeText(req.body.login);
@@ -874,36 +970,14 @@ if (employeeError || !employee) {
 }
 
 const passwordHash = hashPassword(tempPassword);
-let role = employee.role || getRoleByPosition(employee.position);
-if (role === "chief" || role === "chief_doctor") {
-  role = "chief_doctor";
-} else if (role === "admin" || role === "organization_admin") {
-  role = "organization_admin";
-} else if (role === "hr") {
-  role = "hr";
-} else if (["doctor", "nurse", "registrar", "department_head", "deputy_chief_doctor"].includes(role)) {
-  // Keep the role as is
-} else {
-  role = "employee";
-}
-
-// Map the role to a DB-compatible value to satisfy organization_users_role_check constraint
-let dbRole = "employee";
-if (role === "chief_doctor" || role === "chief") {
-  dbRole = "chief_doctor";
-} else if (role === "organization_admin" || role === "admin") {
-  dbRole = "organization_admin";
-} else if (role === "hr") {
-  dbRole = "hr";
-} else {
-  dbRole = "employee";
-}
+const dbRole = "doctor";
 
 const { data: updatedEmployee, error: updateError } = await supabase
   .from("organization_employees")
   .update({
     login,
     password_hash: passwordHash,
+    role: "doctor",
     must_change_password: true,
     status: "active",
     updated_at: new Date().toISOString(),
@@ -929,7 +1003,7 @@ const { error: userError } = await supabase.from("organization_users").upsert(
     full_name: employee.full_name,
     phone: employee.phone || "",
     email: employee.email || "",
-    role: dbRole,
+    role: "doctor",
     login,
     password_hash: passwordHash,
     must_change_password: true,
@@ -956,18 +1030,7 @@ if (employee.email) {
       .eq("id", organizationId)
       .single();
 
-    const roleLabels = {
-      chief_doctor: "Главный врач",
-      organization_admin: "Администратор организации",
-      hr: "Кадровый специалист",
-      registrar: "Регистратор",
-      nurse: "Медсестра / медбрат",
-      doctor: "Врач",
-      employee: "Сотрудник"
-    };
-
-    const resolvedRole = employee.role || getRoleByPosition(employee.position);
-    const roleLabel = roleLabels[resolvedRole] || employee.position || "Сотрудник";
+    const roleLabel = "Врач";
 
     await sendOrganizationAccessEmail({
       to: employee.email,
@@ -1003,8 +1066,21 @@ message: error.message || "Ошибка создания доступа.",
 
 router.patch("/employees/:id/reset-password", async (req, res) => {
 try {
-const organizationId = getOrganizationId(req);
+const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+if (!ctx) return;
+const organizationId = ctx.organizationId;
 const employeeId = req.params.id;
+
+if (ctx.role === "organization_admin") {
+  const { data: empCheck } = await supabase
+    .from("organization_employees")
+    .select("organization_id")
+    .eq("id", employeeId)
+    .maybeSingle();
+  if (!empCheck || empCheck.organization_id !== ctx.organizationId) {
+    return res.status(403).json({ success: false, message: "Доступ запрещен." });
+  }
+}
 const tempPassword = safeText(req.body.tempPassword) || generatePassword();
 
 
@@ -1092,8 +1168,21 @@ message: error.message || "Ошибка сброса пароля.",
 
 router.patch("/employees/:id/block", async (req, res) => {
 try {
-const organizationId = getOrganizationId(req);
+const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+if (!ctx) return;
+const organizationId = ctx.organizationId;
 const employeeId = req.params.id;
+
+if (ctx.role === "organization_admin") {
+  const { data: empCheck } = await supabase
+    .from("organization_employees")
+    .select("organization_id")
+    .eq("id", employeeId)
+    .maybeSingle();
+  if (!empCheck || empCheck.organization_id !== ctx.organizationId) {
+    return res.status(403).json({ success: false, message: "Доступ запрещен." });
+  }
+}
 
 
 const { data: employee, error: employeeError } = await supabase
@@ -1156,8 +1245,21 @@ message: error.message || "Ошибка блокировки доступа.",
 
 router.patch("/employees/:id/unblock", async (req, res) => {
 try {
-const organizationId = getOrganizationId(req);
+const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+if (!ctx) return;
+const organizationId = ctx.organizationId;
 const employeeId = req.params.id;
+
+if (ctx.role === "organization_admin") {
+  const { data: empCheck } = await supabase
+    .from("organization_employees")
+    .select("organization_id")
+    .eq("id", employeeId)
+    .maybeSingle();
+  if (!empCheck || empCheck.organization_id !== ctx.organizationId) {
+    return res.status(403).json({ success: false, message: "Доступ запрещен." });
+  }
+}
 
 
 const { data: employee, error: employeeError } = await supabase
@@ -1219,66 +1321,39 @@ message: error.message || "Ошибка разблокировки доступ�
 });
 
 // Persistent JSON fallback for appointments if DB table does not exist
-const FALLBACK_FILE = path.resolve("appointments_fallback.json");
 
-function loadFallbackAppointments() {
-  try {
-    if (fs.existsSync(FALLBACK_FILE)) {
-      const content = fs.readFileSync(FALLBACK_FILE, "utf8");
-      return JSON.parse(content) || [];
-    }
-  } catch (err) {
-    console.error("Failed to read appointments fallback file:", err);
-  }
-  return [];
-}
 
-function saveFallbackAppointment(app) {
-  try {
-    const list = loadFallbackAppointments();
-    const idx = list.findIndex((a) => a.id === app.id);
-    if (idx !== -1) {
-      list[idx] = { ...list[idx], ...app, updated_at: new Date().toISOString() };
-    } else {
-      list.push(app);
-    }
-    fs.writeFileSync(FALLBACK_FILE, JSON.stringify(list, null, 2), "utf8");
-  } catch (err) {
-    console.error("Failed to write appointments fallback file:", err);
-  }
-}
 
-// GET /api/organization-structure/public/organizations
-router.get("/public/organizations", async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from("organizations")
-      .select("id, organization_name, bin, city, status")
-      .in("status", ["approved", "waiting_first_login"]);
 
-    if (error) {
-      // In case status filter doesn't match or table issues, query raw
-      const { data: rawData, error: rawError } = await supabase
-        .from("organizations")
-        .select("id, organization_name, bin, city");
-      if (rawError) throw rawError;
-      return res.status(200).json({ success: true, organizations: rawData || [] });
-    }
 
-    return res.status(200).json({ success: true, organizations: data || [] });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message || "Ошибка получения списка организаций.",
-    });
-  }
-});
+
+
 
 // GET /api/organization-structure/appointments
 router.get("/appointments", async (req, res) => {
   try {
-    const employeeId = req.query.employee_id || req.query.employeeId;
-    const organizationId = req.query.organization_id || req.query.organizationId;
+    const ctx = checkAuth(req, res, ["organization_admin", "doctor", "support"]);
+    if (!ctx) return;
+    let employeeId = req.query.employee_id || req.query.employeeId;
+    let organizationId = ctx.organizationId;
+
+    if (ctx.role === "doctor") {
+      employeeId = ctx.employeeId;
+    } else if (ctx.role === "organization_admin") {
+      if (employeeId) {
+        const { data: empCheck } = await supabase
+          .from("organization_employees")
+          .select("organization_id")
+          .eq("id", employeeId)
+          .maybeSingle();
+        if (!empCheck || empCheck.organization_id !== ctx.organizationId) {
+          return res.status(403).json({ success: false, message: "Доступ запрещен." });
+        }
+      }
+    } else if (ctx.role === "support") {
+      organizationId = req.query.organization_id || req.query.organizationId;
+      employeeId = req.query.employee_id || req.query.employeeId;
+    }
     const date = req.query.date;
     const startDate = req.query.startDate;
     const endDate = req.query.endDate;
@@ -1290,62 +1365,48 @@ router.get("/appointments", async (req, res) => {
       });
     }
 
-    try {
-      let query = supabase
-        .from("organization_appointments")
-        .select("*");
+    
+let query = supabase
+  .from("organization_appointments")
+  .select("*");
 
-      if (employeeId) {
-        query = query.eq("employee_id", employeeId);
-      } else {
-        query = query.eq("organization_id", organizationId);
-      }
+if (employeeId) {
+  query = query.eq("employee_id", employeeId);
+} else {
+  query = query.eq("organization_id", organizationId);
+}
 
-      if (date) {
-        query = query.eq("date", date);
-      } else {
-        if (startDate) query = query.gte("date", startDate);
-        if (endDate) query = query.lte("date", endDate);
-      }
+if (date) {
+  query = query.eq("date", date);
+} else {
+  if (startDate) {
+    query = query.gte("date", startDate);
+  }
 
-      query = query.order("date", { ascending: true }).order("time", { ascending: true });
+  if (endDate) {
+    query = query.lte("date", endDate);
+  }
+}
 
-      const { data, error } = await query;
-      if (error) throw error;
+query = query
+  .order("date", { ascending: true })
+  .order("time", { ascending: true });
 
-      return res.status(200).json({
-        success: true,
-        appointments: data || [],
-      });
-    } catch (dbErr) {
-      console.warn("DB appointments query failed, fallback to memory:", dbErr.message);
-      const list = loadFallbackAppointments();
-      let filtered = list;
+const { data: appointments, error } = await query;
 
-      if (employeeId) {
-        filtered = filtered.filter((app) => app.employee_id === employeeId);
-      } else {
-        filtered = filtered.filter((app) => app.organization_id === organizationId);
-      }
-
-      if (date) {
-        filtered = filtered.filter((app) => app.date === date);
-      } else {
-        if (startDate) filtered = filtered.filter((app) => app.date >= startDate);
-        if (endDate) filtered = filtered.filter((app) => app.date <= endDate);
-      }
-
-      filtered.sort((a, b) => {
-        const da = `${a.date}T${a.time}`;
-        const db = `${b.date}T${b.time}`;
-        return da.localeCompare(db);
-      });
-
-      return res.status(200).json({
-        success: true,
-        appointments: filtered,
-      });
-    }
+if (error) {
+  return res.status(500).json({
+    success: false,
+    code: "APPOINTMENTS_LOAD_FAILED",
+    message:
+      error.message ||
+      "Не удалось загрузить записи.",
+  });
+}
+    return res.status(200).json({
+      success: true,
+      appointments: appointments || [],
+    });
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -1357,7 +1418,12 @@ router.get("/appointments", async (req, res) => {
 // GET /api/organization-structure/appointments/patient/:iin
 router.get("/appointments/patient/:iin", async (req, res) => {
   try {
-    const { iin } = req.params;
+    const ctx = checkAuth(req, res, ["patient", "doctor", "organization_admin", "support"]);
+    if (!ctx) return;
+    let iin = req.params.iin;
+    if (ctx.role === "patient") {
+      iin = ctx.patientIin;
+    }
     if (!iin) {
       return res.status(400).json({
         success: false,
@@ -1365,25 +1431,16 @@ router.get("/appointments/patient/:iin", async (req, res) => {
       });
     }
 
-    let appointments = [];
-    try {
-      const { data, error } = await supabase
-        .from("organization_appointments")
-        .eq("patient_iin", iin)
-        .order("date", { ascending: false })
-        .order("time", { ascending: false });
+    const { data: appointments, error } = await supabase
+      .from("organization_appointments")
+      .eq("patient_iin", iin)
+      .order("date", { ascending: false })
+      .order("time", { ascending: false });
 
-      if (error) throw error;
-      appointments = data || [];
-    } catch (dbErr) {
-      console.warn("DB patient appointments query failed, fallback to memory:", dbErr.message);
-      const list = loadFallbackAppointments();
-      appointments = list.filter((app) => app.patient_iin === iin);
-      // Sort desc by date, time
-      appointments.sort((a, b) => {
-        const ad = `${a.date}T${a.time}`;
-        const bd = `${b.date}T${b.time}`;
-        return bd.localeCompare(ad);
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message || "Не удалось загрузить записи.",
       });
     }
 
@@ -1423,23 +1480,14 @@ router.get("/appointments/patient/:iin", async (req, res) => {
     const orgMap = Object.fromEntries(organizations.map(o => [o.id, o]));
     const empMap = Object.fromEntries(employees.map(e => [e.id, e]));
 
-    let ratedAppIds = [];
-    try {
-      const { data: ratings } = await supabase
-        .from("doctor_ratings")
-        .select("appointment_id")
-        .eq("patient_id", iin);
-      if (ratings) {
-        ratedAppIds = ratings.map(r => r.appointment_id);
-      }
-    } catch (e) {}
+    
 
     const formatted = appointments.map(app => {
       const org = orgMap[app.organization_id];
       const emp = empMap[app.employee_id];
       return {
         ...app,
-        rated: ratedAppIds.includes(app.id),
+        
         organization_name: org ? org.organization_name : "Медицинская организация",
         doctor_name: emp ? emp.full_name : "Врач",
         doctor_position: emp ? emp.position : "",
@@ -1462,11 +1510,18 @@ router.get("/appointments/patient/:iin", async (req, res) => {
 // POST /api/organization-structure/appointments
 router.post("/appointments", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["patient", "organization_admin", "support"]);
+    if (!ctx) return;
+    let patient_iin = req.body.patient_iin;
+    let organization_id = req.body.organization_id;
+    if (ctx.role === "patient") {
+      patient_iin = ctx.patientIin;
+    } else if (ctx.role === "organization_admin") {
+      organization_id = ctx.organizationId;
+    }
     const {
-      organization_id,
       employee_id,
       patient_name,
-      patient_iin,
       patient_phone,
       patient_email,
       date,
@@ -1484,29 +1539,20 @@ router.post("/appointments", async (req, res) => {
     }
 
     // Check for double booking
-    let existingApp = null;
-    try {
-      const { data, error } = await supabase
-        .from("organization_appointments")
-        .select("id")
-        .eq("employee_id", employee_id)
-        .eq("date", date)
-        .eq("time", time)
-        .not("status", "in", '("cancelled","rejected")')
-        .maybeSingle();
-      if (!error && data) {
-        existingApp = data;
-      }
-    } catch (dbErr) {
-      const list = loadFallbackAppointments();
-      existingApp = list.find(
-        (app) =>
-          app.employee_id === employee_id &&
-          app.date === date &&
-          app.time === time &&
-          app.status !== "cancelled" &&
-          app.status !== "rejected"
-      );
+    const { data: existingApp, error: checkErr } = await supabase
+      .from("organization_appointments")
+      .select("id")
+      .eq("employee_id", employee_id)
+      .eq("date", date)
+      .eq("time", time)
+      .not("status", "in", '("cancelled","rejected")')
+      .maybeSingle();
+
+    if (checkErr) {
+      return res.status(500).json({
+        success: false,
+        message: "Ошибка проверки доступности времени: " + checkErr.message,
+      });
     }
 
     if (existingApp) {
@@ -1529,7 +1575,7 @@ router.post("/appointments", async (req, res) => {
       date,
       time,
       reason: reason || "Прием к врачу",
-      status: "pending",
+      status: "scheduled",
       cabinet: cabinet || "",
       comment: comment || "",
       verification_code,
@@ -1537,24 +1583,17 @@ router.post("/appointments", async (req, res) => {
       updated_at: new Date().toISOString(),
     };
 
-    let savedApp = null;
-    let isInMemory = false;
+    const { data: savedApp, error: insertErr } = await supabase
+      .from("organization_appointments")
+      .insert(newApp)
+      .select("*")
+      .single();
 
-    try {
-      const { data, error } = await supabase
-        .from("organization_appointments")
-        .insert(newApp)
-        .select("*")
-        .single();
-
-      if (error) throw error;
-      savedApp = data;
-      saveFallbackAppointment(savedApp);
-    } catch (dbErr) {
-      console.warn("DB appointments insert failed, fallback to memory:", dbErr.message);
-      saveFallbackAppointment(newApp);
-      savedApp = newApp;
-      isInMemory = true;
+    if (insertErr) {
+      return res.status(500).json({
+        success: false,
+        message: "Не удалось создать запись на прием: " + insertErr.message,
+      });
     }
 
     // Load organization name and doctor name for email details
@@ -1570,13 +1609,7 @@ router.post("/appointments", async (req, res) => {
         docName = emp.full_name;
         if (!cabinet && emp.cabinet) {
           savedApp.cabinet = emp.cabinet;
-          if (isInMemory) {
-            newApp.cabinet = emp.cabinet;
-            saveFallbackAppointment(newApp);
-          } else {
-            await supabase.from("organization_appointments").update({ cabinet: emp.cabinet }).eq("id", savedApp.id);
-            saveFallbackAppointment(savedApp);
-          }
+          await supabase.from("organization_appointments").update({ cabinet: emp.cabinet }).eq("id", savedApp.id);
         }
       }
     } catch (metaErr) {
@@ -1618,6 +1651,8 @@ router.post("/appointments", async (req, res) => {
 // PATCH /api/organization-structure/appointments/:id/status
 router.patch("/appointments/:id/status", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["patient", "doctor", "organization_admin", "support"]);
+    if (!ctx) return;
     const appId = req.params.id;
     const { status, verificationCode } = req.body;
 
@@ -1629,22 +1664,17 @@ router.patch("/appointments/:id/status", async (req, res) => {
     }
 
     // Fetch current appointment to check code
-    let appointment = null;
-    try {
-      const { data, error } = await supabase
-        .from("organization_appointments")
-        .select("*")
-        .eq("id", appId)
-        .maybeSingle();
-      if (!error && data) {
-        appointment = data;
-      } else {
-        const list = loadFallbackAppointments();
-        appointment = list.find((a) => a.id === appId);
-      }
-    } catch (e) {
-      const list = loadFallbackAppointments();
-      appointment = list.find((a) => a.id === appId);
+    const { data: appointment, error: fetchErr } = await supabase
+      .from("organization_appointments")
+      .select("*")
+      .eq("id", appId)
+      .maybeSingle();
+
+    if (fetchErr) {
+      return res.status(500).json({
+        success: false,
+        message: "Ошибка базы данных при получении записи: " + fetchErr.message,
+      });
     }
 
     if (!appointment) {
@@ -1652,6 +1682,16 @@ router.patch("/appointments/:id/status", async (req, res) => {
         success: false,
         message: "Запись не найдена.",
       });
+    }
+
+    if (ctx.role === "patient" && appointment.patient_iin !== ctx.patientIin) {
+      return res.status(403).json({ success: false, message: "Доступ запрещен." });
+    }
+    if (ctx.role === "doctor" && appointment.employee_id !== ctx.employeeId) {
+      return res.status(403).json({ success: false, message: "Доступ запрещен." });
+    }
+    if (ctx.role === "organization_admin" && appointment.organization_id !== ctx.organizationId) {
+      return res.status(403).json({ success: false, message: "Доступ запрещен." });
     }
 
     if (status === "completed") {
@@ -1665,42 +1705,25 @@ router.patch("/appointments/:id/status", async (req, res) => {
       }
     }
 
-    try {
-      const { data, error } = await supabase
-        .from("organization_appointments")
-        .update({ status, updated_at: new Date().toISOString() })
-        .eq("id", appId)
-        .select("*")
-        .single();
+    const { data, error: updateErr } = await supabase
+      .from("organization_appointments")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", appId)
+      .select("*")
+      .single();
 
-      if (error) throw error;
-
-      saveFallbackAppointment(data);
-
-      return res.status(200).json({
-        success: true,
-        message: "Статус записи обновлен.",
-        appointment: data,
-      });
-    } catch (dbErr) {
-      console.warn("DB appointments status patch failed, fallback to memory:", dbErr.message);
-      const list = loadFallbackAppointments();
-      const appIndex = list.findIndex((app) => app.id === appId);
-      if (appIndex !== -1) {
-        list[appIndex].status = status;
-        list[appIndex].updated_at = new Date().toISOString();
-        saveFallbackAppointment(list[appIndex]);
-        return res.status(200).json({
-          success: true,
-          message: "Статус записи обновлен (memory).",
-          appointment: list[appIndex],
-        });
-      }
-      return res.status(404).json({
+    if (updateErr) {
+      return res.status(500).json({
         success: false,
-        message: "Запись не найдена в памяти.",
+        message: "Не удалось обновить статус записи: " + updateErr.message,
       });
     }
+
+    return res.status(200).json({
+      success: true,
+      message: "Статус записи обновлен.",
+      appointment: data,
+    });
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -1712,7 +1735,9 @@ router.patch("/appointments/:id/status", async (req, res) => {
 // GET /api/organization-structure/support-messages
 router.get("/support-messages", async (req, res) => {
   try {
-    const organizationId = getOrganizationId(req);
+    const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+    if (!ctx) return;
+    const organizationId = ctx.organizationId;
     if (!organizationId) {
       return res.status(400).json({
         success: false,
@@ -1743,7 +1768,9 @@ router.get("/support-messages", async (req, res) => {
 // POST /api/organization-structure/support-messages
 router.post("/support-messages", async (req, res) => {
   try {
-    const organizationId = getOrganizationId(req);
+    const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+    if (!ctx) return;
+    const organizationId = ctx.organizationId;
     const { message, senderUsername, senderFullName } = req.body;
 
     if (!organizationId) {
@@ -1790,7 +1817,9 @@ router.post("/support-messages", async (req, res) => {
 // POST /api/organization-structure/support-upload
 router.post("/support-upload", upload.any(), async (req, res) => {
   try {
-    const organizationId = getOrganizationId(req);
+    const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+    if (!ctx) return;
+    const organizationId = ctx.organizationId;
     if (!organizationId) {
       return res.status(400).json({
         success: false,
@@ -1843,7 +1872,20 @@ router.post("/support-upload", upload.any(), async (req, res) => {
 // POST /api/organization-structure/employees/:id/schedule
 router.post("/employees/:id/schedule", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+    if (!ctx) return;
     const employeeId = req.params.id;
+
+    if (ctx.role === "organization_admin") {
+      const { data: empCheck } = await supabase
+        .from("organization_employees")
+        .select("organization_id")
+        .eq("id", employeeId)
+        .maybeSingle();
+      if (!empCheck || empCheck.organization_id !== ctx.organizationId) {
+        return res.status(403).json({ success: false, message: "Доступ запрещен." });
+      }
+    }
     const { work_days, work_start, work_end, lunch_start, lunch_end, slot_duration, start_date, end_date, daily_schedules } = req.body;
 
     const schedule = {
@@ -1859,7 +1901,7 @@ router.post("/employees/:id/schedule", async (req, res) => {
       daily_schedules: daily_schedules || null
     };
 
-    saveFallbackShift(employeeId, { work_start: schedule.work_start, work_end: schedule.work_end });
+    
 
     const { data, error } = await supabase
       .from("doctor_schedules")
@@ -1867,10 +1909,16 @@ router.post("/employees/:id/schedule", async (req, res) => {
       .select("*")
       .single();
 
-    if (error) {
-      console.warn("doctor_schedules table failed, saving fallback:", error.message);
-      return res.status(200).json({ success: true, message: "График сохранен (fallback).", schedule });
-    }
+    
+if (error) {
+  return res.status(500).json({
+    success: false,
+    code: "SCHEDULE_SAVE_FAILED",
+    message: error.message || "Не удалось сохранить график врача.",
+  });
+}
+
+
 
     return res.status(200).json({
       success: true,
@@ -1885,28 +1933,33 @@ router.post("/employees/:id/schedule", async (req, res) => {
 // GET /api/organization-structure/employees/:id/schedule
 router.get("/employees/:id/schedule", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["organization_admin", "doctor", "support", "patient"]);
+    if (!ctx) return;
     const employeeId = req.params.id;
+
+    if (ctx.role === "doctor" && employeeId !== ctx.employeeId) {
+      return res.status(403).json({ success: false, message: "Доступ запрещен." });
+    }
     const { data, error } = await supabase
       .from("doctor_schedules")
       .select("*")
       .eq("employee_id", employeeId)
       .maybeSingle();
 
-    if (error || !data) {
-      const shift = loadFallbackShifts()[employeeId] || { work_start: "08:00", work_end: "17:00" };
-      return res.status(200).json({
-        success: true,
-        schedule: {
-          employee_id: employeeId,
-          work_days: [1, 2, 3, 4, 5],
-          work_start: shift.work_start,
-          work_end: shift.work_end,
-          lunch_start: "13:00",
-          lunch_end: "14:00",
-          slot_duration: 30
-        }
-      });
-    }
+    if (error) {
+  return res.status(500).json({
+    success: false,
+    code: "SCHEDULE_LOAD_FAILED",
+    message: error.message,
+  });
+}
+
+if (!data) {
+  return res.status(200).json({
+    success: true,
+    schedule: null,
+  });
+}
 
     return res.status(200).json({ success: true, schedule: data });
   } catch (error) {
@@ -1917,36 +1970,36 @@ router.get("/employees/:id/schedule", async (req, res) => {
 // GET /api/organization-structure/employees/:id/slots
 router.get("/employees/:id/slots", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["organization_admin", "doctor", "support", "patient"]);
+    if (!ctx) return;
     const employeeId = req.params.id;
     const dateStr = req.query.date;
     if (!dateStr) {
       return res.status(400).json({ success: false, message: "date обязателен." });
     }
+const { data: schedule, error: scheduleError } = await supabase
+  .from("doctor_schedules")
+  .select("*")
+  .eq("employee_id", employeeId)
+  .maybeSingle();
 
-    let schedule = {
-      work_days: [1, 2, 3, 4, 5],
-      work_start: "09:00",
-      work_end: "18:00",
-      lunch_start: "13:00",
-      lunch_end: "14:00",
-      slot_duration: 30
-    };
+if (scheduleError) {
+  return res.status(500).json({
+    success: false,
+    code: "SCHEDULE_LOAD_FAILED",
+    message:
+      scheduleError.message ||
+      "Не удалось загрузить график врача.",
+  });
+}
 
-    try {
-      const { data: dbSched } = await supabase
-        .from("doctor_schedules")
-        .select("*")
-        .eq("employee_id", employeeId)
-        .maybeSingle();
-      if (dbSched) schedule = dbSched;
-      else {
-        const fallbackShift = loadFallbackShifts()[employeeId];
-        if (fallbackShift) {
-          schedule.work_start = fallbackShift.work_start;
-          schedule.work_end = fallbackShift.work_end;
-        }
-      }
-    } catch (e) {}
+if (!schedule) {
+  return res.status(200).json({
+    success: true,
+    slots: [],
+  });
+}
+
 
     const targetDate = new Date(dateStr + "T00:00:00");
     const dayOfWeek = targetDate.getDay();
@@ -2029,10 +2082,7 @@ router.get("/employees/:id/slots", async (req, res) => {
         bookedTimes = appointments.map(a => a.time);
       }
     } catch (e) {
-      const list = loadFallbackAppointments();
-      bookedTimes = list
-        .filter(a => a.employee_id === employeeId && a.date === dateStr && a.status !== "cancelled" && a.status !== "rejected")
-        .map(a => a.time);
+      console.error("Failed to query appointments:", e.message);
     }
 
     const slots = [];
@@ -2052,7 +2102,11 @@ router.get("/employees/:id/slots", async (req, res) => {
     const todayStr = now.toISOString().split("T")[0];
 
     while (currentMinutes + duration <= endMinutes) {
-      const isLunch = currentMinutes >= lunchStartMinutes && currentMinutes < lunchEndMinutes;
+      const slotEndMinutes = currentMinutes + duration;
+
+const isLunch =
+  currentMinutes < lunchEndMinutes &&
+  slotEndMinutes > lunchStartMinutes;
       if (!isLunch) {
         const slotHour = Math.floor(currentMinutes / 60);
         const slotMin = currentMinutes % 60;
@@ -2088,7 +2142,20 @@ router.get("/employees/:id/slots", async (req, res) => {
 // POST /api/organization-structure/employees/:id/absence
 router.post("/employees/:id/absence", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+    if (!ctx) return;
     const employeeId = req.params.id;
+
+    if (ctx.role === "organization_admin") {
+      const { data: empCheck } = await supabase
+        .from("organization_employees")
+        .select("organization_id")
+        .eq("id", employeeId)
+        .maybeSingle();
+      if (!empCheck || empCheck.organization_id !== ctx.organizationId) {
+        return res.status(403).json({ success: false, message: "Доступ запрещен." });
+      }
+    }
     const { absence_type, reason, start_date, end_date, comment } = req.body;
 
     if (!absence_type || !start_date || !end_date) {
@@ -2149,7 +2216,13 @@ router.post("/employees/:id/absence", async (req, res) => {
 // GET /api/organization-structure/employees/:id/absence
 router.get("/employees/:id/absence", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["organization_admin", "doctor", "support", "patient"]);
+    if (!ctx) return;
     const employeeId = req.params.id;
+
+    if (ctx.role === "doctor" && employeeId !== ctx.employeeId) {
+      return res.status(403).json({ success: false, message: "Доступ запрещен." });
+    }
     const { data, error } = await supabase
       .from("doctor_absences")
       .select("*")
@@ -2166,7 +2239,20 @@ router.get("/employees/:id/absence", async (req, res) => {
 // DELETE /api/organization-structure/employees/:id/absence/:absenceId
 router.delete("/employees/:id/absence/:absenceId", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+    if (!ctx) return;
     const { id, absenceId } = req.params;
+
+    if (ctx.role === "organization_admin") {
+      const { data: empCheck } = await supabase
+        .from("organization_employees")
+        .select("organization_id")
+        .eq("id", id)
+        .maybeSingle();
+      if (!empCheck || empCheck.organization_id !== ctx.organizationId) {
+        return res.status(403).json({ success: false, message: "Доступ запрещен." });
+      }
+    }
     const { error } = await supabase.from("doctor_absences").delete().eq("id", absenceId);
     if (error) throw error;
 
@@ -2181,7 +2267,20 @@ router.delete("/employees/:id/absence/:absenceId", async (req, res) => {
 // POST /api/organization-structure/employees/:id/exceptions
 router.post("/employees/:id/exceptions", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+    if (!ctx) return;
     const employeeId = req.params.id;
+
+    if (ctx.role === "organization_admin") {
+      const { data: empCheck } = await supabase
+        .from("organization_employees")
+        .select("organization_id")
+        .eq("id", employeeId)
+        .maybeSingle();
+      if (!empCheck || empCheck.organization_id !== ctx.organizationId) {
+        return res.status(403).json({ success: false, message: "Доступ запрещен." });
+      }
+    }
     const { exception_date, is_working, work_start, work_end, lunch_start, lunch_end, slot_duration } = req.body;
 
     if (!exception_date) {
@@ -2218,7 +2317,13 @@ router.post("/employees/:id/exceptions", async (req, res) => {
 // GET /api/organization-structure/employees/:id/exceptions
 router.get("/employees/:id/exceptions", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["organization_admin", "doctor", "support", "patient"]);
+    if (!ctx) return;
     const employeeId = req.params.id;
+
+    if (ctx.role === "doctor" && employeeId !== ctx.employeeId) {
+      return res.status(403).json({ success: false, message: "Доступ запрещен." });
+    }
     const { data, error } = await supabase
       .from("schedule_exceptions")
       .select("*")
@@ -2235,7 +2340,27 @@ router.get("/employees/:id/exceptions", async (req, res) => {
 // DELETE /api/organization-structure/employees/:id/exceptions/:exceptionId
 router.delete("/employees/:id/exceptions/:exceptionId", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+    if (!ctx) return;
     const { exceptionId } = req.params;
+
+    if (ctx.role === "organization_admin") {
+      const { data: exCheck } = await supabase
+        .from("schedule_exceptions")
+        .select("employee_id")
+        .eq("id", exceptionId)
+        .maybeSingle();
+      if (exCheck) {
+        const { data: empCheck } = await supabase
+          .from("organization_employees")
+          .select("organization_id")
+          .eq("id", exCheck.employee_id)
+          .maybeSingle();
+        if (!empCheck || empCheck.organization_id !== ctx.organizationId) {
+          return res.status(403).json({ success: false, message: "Доступ запрещен." });
+        }
+      }
+    }
     const { error } = await supabase.from("schedule_exceptions").delete().eq("id", exceptionId);
     if (error) throw error;
 
@@ -2248,6 +2373,8 @@ router.delete("/employees/:id/exceptions/:exceptionId", async (req, res) => {
 // POST /api/organization-structure/appointments/:id/transfer
 router.post("/appointments/:id/transfer", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+    if (!ctx) return;
     const appointmentId = req.params.id;
     const { new_doctor_id, new_date, new_time, transfer_reason } = req.body;
 
@@ -2263,6 +2390,10 @@ router.post("/appointments/:id/transfer", async (req, res) => {
 
     if (fetchErr || !currentApp) {
       return res.status(404).json({ success: false, message: "Запись не найдена." });
+    }
+
+    if (ctx.role === "organization_admin" && currentApp.organization_id !== ctx.organizationId) {
+      return res.status(403).json({ success: false, message: "Доступ запрещен." });
     }
 
     await supabase
@@ -2313,6 +2444,8 @@ router.post("/appointments/:id/transfer", async (req, res) => {
 // POST /api/organization-structure/appointments/:id/start
 router.post("/appointments/:id/start", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["doctor", "support"]);
+    if (!ctx) return;
     const appointmentId = req.params.id;
     const { code } = req.body;
 
@@ -2328,6 +2461,10 @@ router.post("/appointments/:id/start", async (req, res) => {
 
     if (error || !app) {
       return res.status(404).json({ success: false, message: "Запись не найдена." });
+    }
+
+    if (ctx.role === "doctor" && app.employee_id !== ctx.employeeId) {
+      return res.status(403).json({ success: false, message: "Доступ запрещен." });
     }
 
     if (app.status === "cancelled" || app.status === "completed") {
@@ -2362,8 +2499,24 @@ router.post("/appointments/:id/start", async (req, res) => {
 // POST /api/organization-structure/appointments/:id/draft
 router.post("/appointments/:id/draft", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["doctor", "support"]);
+    if (!ctx) return;
     const appointmentId = req.params.id;
     const { draft } = req.body;
+
+    const { data: app } = await supabase
+      .from("organization_appointments")
+      .select("employee_id")
+      .eq("id", appointmentId)
+      .maybeSingle();
+
+    if (!app) {
+      return res.status(404).json({ success: false, message: "Запись не найдена." });
+    }
+
+    if (ctx.role === "doctor" && app.employee_id !== ctx.employeeId) {
+      return res.status(403).json({ success: false, message: "Доступ запрещен." });
+    }
 
     const { error } = await supabase
       .from("organization_appointments")
@@ -2381,7 +2534,24 @@ router.post("/appointments/:id/draft", async (req, res) => {
 // GET /api/organization-structure/appointments/:id/draft
 router.get("/appointments/:id/draft", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["doctor", "support"]);
+    if (!ctx) return;
     const appointmentId = req.params.id;
+
+    const { data: appCheck } = await supabase
+      .from("organization_appointments")
+      .select("employee_id")
+      .eq("id", appointmentId)
+      .maybeSingle();
+
+    if (!appCheck) {
+      return res.status(404).json({ success: false, message: "Запись не найдена." });
+    }
+
+    if (ctx.role === "doctor" && appCheck.employee_id !== ctx.employeeId) {
+      return res.status(403).json({ success: false, message: "Доступ запрещен." });
+    }
+
     const { data, error } = await supabase
       .from("organization_appointments")
       .select("consultation_draft")
@@ -2399,8 +2569,24 @@ router.get("/appointments/:id/draft", async (req, res) => {
 // POST /api/organization-structure/appointments/:id/request-finish
 router.post("/appointments/:id/request-finish", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["doctor", "support"]);
+    if (!ctx) return;
     const appointmentId = req.params.id;
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
+
+    const { data: appCheck } = await supabase
+      .from("organization_appointments")
+      .select("employee_id")
+      .eq("id", appointmentId)
+      .maybeSingle();
+
+    if (!appCheck) {
+      return res.status(404).json({ success: false, message: "Запись не найдена." });
+    }
+
+    if (ctx.role === "doctor" && appCheck.employee_id !== ctx.employeeId) {
+      return res.status(403).json({ success: false, message: "Доступ запрещен." });
+    }
 
     const { error } = await supabase
       .from("organization_appointments")
@@ -2427,6 +2613,8 @@ router.post("/appointments/:id/request-finish", async (req, res) => {
 // POST /api/organization-structure/appointments/:id/finish
 router.post("/appointments/:id/finish", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["doctor", "support"]);
+    if (!ctx) return;
     const appointmentId = req.params.id;
     const { otp, complaints, symptoms, diagnosis, treatment, recommendations, comment, files } = req.body;
 
@@ -2442,6 +2630,10 @@ router.post("/appointments/:id/finish", async (req, res) => {
 
     if (error || !app) {
       return res.status(404).json({ success: false, message: "Запись не найдена." });
+    }
+
+    if (ctx.role === "doctor" && app.employee_id !== ctx.employeeId) {
+      return res.status(403).json({ success: false, message: "Доступ запрещен." });
     }
 
     if (String(app.finish_code).trim() !== String(otp).trim()) {
@@ -2487,7 +2679,7 @@ router.post("/appointments/:id/finish", async (req, res) => {
     await supabase.from("notifications").insert({
       user_id: app.patient_iin,
       title: "Приём завершён",
-      message: "Ваш приём успешно завершён. Пожалуйста, оцените работу врача в истории посещений.",
+      message: "Ваш приём успешно завершён. Результаты доступны в истории посещений.",
       link: `/visits-history`
     });
 
@@ -2498,105 +2690,16 @@ router.post("/appointments/:id/finish", async (req, res) => {
 });
 
 // POST /api/organization-structure/appointments/:id/rate
-router.post("/appointments/:id/rate", async (req, res) => {
-  try {
-    const appointmentId = req.params.id;
-    const { rating_value, comment } = req.body;
 
-    if (!rating_value || rating_value < 1 || rating_value > 10) {
-      return res.status(400).json({ success: false, message: "Оценка должна быть целым числом от 1 до 10." });
-    }
-
-    const { data: app, error } = await supabase
-      .from("organization_appointments")
-      .select("*")
-      .eq("id", appointmentId)
-      .single();
-
-    if (error || !app) {
-      return res.status(404).json({ success: false, message: "Запись не найдена." });
-    }
-
-    if (app.status !== "completed") {
-      return res.status(400).json({ success: false, message: "Оценить можно только завершённый приём." });
-    }
-
-    const { error: ratingErr } = await supabase
-      .from("doctor_ratings")
-      .insert({
-        appointment_id: appointmentId,
-        patient_id: app.patient_iin,
-        doctor_id: app.employee_id,
-        organization_id: app.organization_id,
-        rating_value: Number(rating_value),
-        comment
-      });
-
-    if (ratingErr) {
-      if (ratingErr.code === "23505") {
-        return res.status(400).json({ success: false, message: "Вы уже оставили отзыв для этого приёма." });
-      }
-      throw ratingErr;
-    }
-
-    const { data: ratings } = await supabase
-      .from("doctor_ratings")
-      .select("rating_value")
-      .eq("doctor_id", app.employee_id);
-
-    const countReal = ratings ? ratings.length : 0;
-    const sumReal = ratings ? ratings.reduce((sum, r) => sum + r.rating_value, 0) : 0;
-
-    const avgRating = Number((((8.0 * 5) + sumReal) / (5 + countReal)).toFixed(1));
-
-    await supabase
-      .from("organization_employees")
-      .update({
-        average_rating: avgRating,
-        rating_count: countReal,
-        rating_sum: sumReal + 40
-      })
-      .eq("id", app.employee_id);
-
-    return res.status(200).json({ success: true, message: "Спасибо! Ваш отзыв успешно сохранён.", average_rating: avgRating });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
-});
 
 // GET /api/organization-structure/employees/:id/reviews
-router.get("/employees/:id/reviews", async (req, res) => {
-  try {
-    const doctorId = req.params.id;
-    const { data, error } = await supabase
-      .from("doctor_ratings")
-      .select("id, rating_value, comment, created_at")
-      .eq("doctor_id", doctorId)
-      .order("created_at", { ascending: false });
 
-    if (error) throw error;
-
-    const formattedReviews = (data || []).map(item => {
-      const date = new Date(item.created_at);
-      const months = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
-      const label = `Пациент, ${months[date.getMonth()]} ${date.getFullYear()}`;
-      return {
-        id: item.id,
-        rating: item.rating_value,
-        comment: item.comment || "Без комментария",
-        dateLabel: label
-      };
-    });
-
-    return res.status(200).json({ success: true, reviews: formattedReviews });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
-});
 
 // POST /api/organization-structure/appointments/:id/certificate
 router.post("/appointments/:id/certificate", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["doctor", "support"]);
+    if (!ctx) return;
     const appointmentId = req.params.id;
     const { title, certificate_type, file_url, valid_until } = req.body;
 
@@ -2612,6 +2715,10 @@ router.post("/appointments/:id/certificate", async (req, res) => {
 
     if (!app) {
       return res.status(404).json({ success: false, message: "Запись не найдена." });
+    }
+
+    if (ctx.role === "doctor" && app.employee_id !== ctx.employeeId) {
+      return res.status(403).json({ success: false, message: "Доступ запрещен." });
     }
 
     const { data: cert, error } = await supabase
@@ -2639,7 +2746,12 @@ router.post("/appointments/:id/certificate", async (req, res) => {
 // GET /api/organization-structure/patients/:iin/certificates
 router.get("/patients/:iin/certificates", async (req, res) => {
   try {
-    const { iin } = req.params;
+    const ctx = checkAuth(req, res, ["patient", "doctor", "organization_admin", "support"]);
+    if (!ctx) return;
+    let iin = req.params.iin;
+    if (ctx.role === "patient") {
+      iin = ctx.patientIin;
+    }
     const { data, error } = await supabase
       .from("medical_certificates")
       .select("*, organization:organizations(organization_name), doctor:organization_employees(full_name)")
@@ -2656,7 +2768,18 @@ router.get("/patients/:iin/certificates", async (req, res) => {
 // GET /api/organization-structure/notifications/:userId
 router.get("/notifications/:userId", async (req, res) => {
   try {
-    const { userId } = req.params;
+    const ctx = checkAuth(req, res, ["patient", "doctor", "organization_admin", "support"]);
+    if (!ctx) return;
+    let userId = req.params.userId;
+    if (ctx.role === "patient") {
+      if (userId !== ctx.patientIin && userId !== ctx.userId) {
+        return res.status(403).json({ success: false, message: "Доступ запрещен." });
+      }
+    } else if (ctx.role === "doctor" || ctx.role === "organization_admin") {
+      if (userId !== ctx.userId) {
+        return res.status(403).json({ success: false, message: "Доступ запрещен." });
+      }
+    }
     const { data, error } = await supabase
       .from("notifications")
       .select("*")
@@ -2674,7 +2797,16 @@ router.get("/notifications/:userId", async (req, res) => {
 // PATCH /api/organization-structure/notifications/:id/read
 router.patch("/notifications/:id/read", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["patient", "doctor", "organization_admin", "support"]);
+    if (!ctx) return;
     const { id } = req.params;
+
+    if (ctx.role !== "support") {
+      const { data: notif } = await supabase.from("notifications").select("user_id").eq("id", id).maybeSingle();
+      if (notif && notif.user_id !== ctx.patientIin && notif.user_id !== ctx.userId) {
+        return res.status(403).json({ success: false, message: "Доступ запрещен." });
+      }
+    }
     const { error } = await supabase
       .from("notifications")
       .update({ is_read: true })
@@ -2690,7 +2822,18 @@ router.patch("/notifications/:id/read", async (req, res) => {
 // PATCH /api/organization-structure/notifications/read-all/:userId
 router.patch("/notifications/read-all/:userId", async (req, res) => {
   try {
-    const { userId } = req.params;
+    const ctx = checkAuth(req, res, ["patient", "doctor", "organization_admin", "support"]);
+    if (!ctx) return;
+    let userId = req.params.userId;
+    if (ctx.role === "patient") {
+      if (userId !== ctx.patientIin && userId !== ctx.userId) {
+        return res.status(403).json({ success: false, message: "Доступ запрещен." });
+      }
+    } else if (ctx.role === "doctor" || ctx.role === "organization_admin") {
+      if (userId !== ctx.userId) {
+        return res.status(403).json({ success: false, message: "Доступ запрещен." });
+      }
+    }
     const { error } = await supabase
       .from("notifications")
       .update({ is_read: true })
@@ -2706,7 +2849,9 @@ router.patch("/notifications/read-all/:userId", async (req, res) => {
 // GET /api/organization-structure/support/conversations
 router.get("/support/conversations", async (req, res) => {
   try {
-    const organizationId = getOrganizationId(req);
+    const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+    if (!ctx) return;
+    const organizationId = ctx.role === "organization_admin" ? ctx.organizationId : (getOrganizationId(req) || req.query.organization_id);
     if (!organizationId) {
       return res.status(400).json({ success: false, message: "organization_id обязателен." });
     }
@@ -2728,7 +2873,9 @@ router.get("/support/conversations", async (req, res) => {
 // POST /api/organization-structure/support/conversations
 router.post("/support/conversations", async (req, res) => {
   try {
-    const organizationId = getOrganizationId(req);
+    const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+    if (!ctx) return;
+    const organizationId = ctx.role === "organization_admin" ? ctx.organizationId : getOrganizationId(req);
     const { subject, description, senderName, senderId, messageText, attachmentUrl } = req.body;
 
     if (!organizationId || !subject || !description) {
@@ -2770,7 +2917,20 @@ router.post("/support/conversations", async (req, res) => {
 // GET /api/organization-structure/support/conversations/:id/messages
 router.get("/support/conversations/:id/messages", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+    if (!ctx) return;
     const { id } = req.params;
+
+    if (ctx.role === "organization_admin") {
+      const { data: conv } = await supabase
+        .from("support_conversations")
+        .select("organization_id")
+        .eq("id", id)
+        .maybeSingle();
+      if (!conv || conv.organization_id !== ctx.organizationId) {
+        return res.status(403).json({ success: false, message: "Доступ запрещен." });
+      }
+    }
     const { data, error } = await supabase
       .from("support_messages")
       .select("*")
@@ -2788,7 +2948,20 @@ router.get("/support/conversations/:id/messages", async (req, res) => {
 // POST /api/organization-structure/support/conversations/:id/messages
 router.post("/support/conversations/:id/messages", async (req, res) => {
   try {
+    const ctx = checkAuth(req, res, ["organization_admin", "support"]);
+    if (!ctx) return;
     const { id } = req.params;
+
+    if (ctx.role === "organization_admin") {
+      const { data: conv } = await supabase
+        .from("support_conversations")
+        .select("organization_id")
+        .eq("id", id)
+        .maybeSingle();
+      if (!conv || conv.organization_id !== ctx.organizationId) {
+        return res.status(403).json({ success: false, message: "Доступ запрещен." });
+      }
+    }
     const { senderType, senderId, senderName, messageText, attachmentUrl } = req.body;
 
     const { data: msg, error } = await supabase
@@ -2818,77 +2991,6 @@ router.post("/support/conversations/:id/messages", async (req, res) => {
   }
 });
 
-router.post("/clean-slate-db", async (req, res) => {
-  try {
-    const secret = req.query.secret || req.body.secret;
-    if (secret !== "clinic_os_reset_2026") {
-      return res.status(403).json({ success: false, message: "Неверный секретный ключ." });
-    }
 
-    console.log("Starting DB clean slate reset...");
-
-    // 1. Delete appointments (ignore database errors since we reset file fallback)
-    try {
-      await supabase.from("organization_appointments").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    } catch (e) {
-      console.warn("DB appointments delete failed:", e.message);
-    }
-    
-    // 2. Delete employee documents
-    const { error: docErr } = await supabase.from("organization_employee_documents").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-
-    // 3. Delete departments
-    const { error: deptErr } = await supabase.from("organization_departments").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-
-    // 4. Delete employees
-    const { error: empErr } = await supabase.from("organization_employees").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-
-    // 5. Delete non-admin users from organization_users
-    const { error: usersErr } = await supabase.from("organization_users").delete().not("role", "in", '("organization_admin","super_admin","admin")');
-
-    // 6. Reset fallbacks
-    try {
-      const appointmentsFile = path.resolve("appointments_fallback.json");
-      if (fs.existsSync(appointmentsFile)) {
-        fs.writeFileSync(appointmentsFile, JSON.stringify([], null, 2), "utf8");
-      }
-    } catch (e) {
-      console.warn("Failed to reset appointments_fallback.json:", e.message);
-    }
-
-    try {
-      const shiftsFile = path.resolve("employee_shifts_fallback.json");
-      if (fs.existsSync(shiftsFile)) {
-        fs.writeFileSync(shiftsFile, JSON.stringify({}, null, 2), "utf8");
-      }
-    } catch (e) {
-      console.warn("Failed to reset employee_shifts_fallback.json:", e.message);
-    }
-
-    if (docErr || deptErr || empErr || usersErr) {
-      return res.status(500).json({
-        success: false,
-        message: "Частичная ошибка при очистке БД.",
-        errors: {
-          documents: docErr?.message,
-          departments: deptErr?.message,
-          employees: empErr?.message,
-          users: usersErr?.message
-        }
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "База данных успешно очищена. Сохранены только организации и администраторы."
-    });
-
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message || "Ошибка при очистке БД."
-    });
-  }
-});
 
 export default router;
