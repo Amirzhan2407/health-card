@@ -301,3 +301,24 @@ CREATE TABLE IF NOT EXISTS ai_history_new (
     message_text TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- 24. user_refresh_tokens_new (for secure refresh token rotation)
+CREATE TABLE IF NOT EXISTS user_refresh_tokens_new (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    profile_id UUID REFERENCES profiles_new(id) ON DELETE CASCADE,
+    token VARCHAR(512) UNIQUE NOT NULL,
+    family_id UUID NOT NULL,
+    is_revoked BOOLEAN DEFAULT false,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 25. medicine_cache_new (for caching parsed drug results from i-teka.kz)
+CREATE TABLE IF NOT EXISTS medicine_cache_new (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    query VARCHAR(255) UNIQUE NOT NULL,
+    results JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+

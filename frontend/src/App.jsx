@@ -1,120 +1,15 @@
-
-
-import { Routes, Route, Navigate } from "react-router-dom";
-
+import { AuthProvider } from "./context/AuthContext";
 import { LanguageProvider } from "./i18n/LanguageContext";
-
-import MainLayout from "./layout/MainLayout";
-
-import HomePage from "./pages/HomePage";
-import Search from "./pages/Search";
-import HealthPage from "./pages/HealthPage";
-import DocumentsPage from "./pages/DocumentsPage";
-import DocumentsCloudPage from "./pages/DocumentsCloudPage";
-import AiAssistantPage from "./pages/AiAssistantPage";
-import Login from "./pages/Login";
-import Passport from "./pages/Passport";
-import OrganizationApplication from "./pages/OrganizationApplication";
-import BookAppointmentPage from "./pages/BookAppointmentPage";
-import VisitsHistoryPage from "./pages/VisitsHistoryPage";
-
-
-import AdminLogin from "./pages/AdminLogin";
-import AdminLayout from "./pages/AdminLayout";
-import AdminDashboard from "./pages/AdminDashboard";
-import AdminStaff from "./pages/AdminStaff";
-import AdminApplications from "./pages/AdminApplications";
-import AdminOrganizations from "./pages/AdminOrganizations";
-import AdminChannels from "./pages/AdminChannels";
-import AdminAuditLogs from "./pages/AdminAuditLogs";
-import AdminRoles from "./pages/AdminRoles";
-
-import OrganizationLogin from "./pages/OrganizationLogin";
-
-import GovClinicLayout from "./organization/govClinic/GovClinicLayout";
-import GovClinicSystemAdmin from "./organization/govClinic/GovClinicSystemAdmin";
-import GovClinicEmployee from "./organization/govClinic/GovClinicEmployee";
+import AppRoutes from "./routes/AppRoutes";
 
 function App() {
-return ( <LanguageProvider> <Routes>
-<Route path="/login" element={<Login />} />
-
-    <Route
-      path="/organization-application"
-      element={<OrganizationApplication />}
-    />
-
-    <Route
-      path="/organization-login"
-      element={<OrganizationLogin />}
-    />
-
-    <Route path="/" element={<MainLayout />}>
-      <Route index element={<HomePage />} />
-      <Route path="search" element={<Search />} />
-      <Route path="health" element={<HealthPage />} />
-      <Route path="documents" element={<DocumentsPage />} />
-      <Route path="documents-cloud" element={<DocumentsCloudPage />} />
-      <Route path="my-documents" element={<DocumentsPage />} />
-      <Route path="ai-assistant" element={<AiAssistantPage />} />
-      <Route path="passport" element={<Passport />} />
-      <Route path="book-appointment" element={<BookAppointmentPage />} />
-      <Route path="visits-history" element={<VisitsHistoryPage />} />
-    </Route>
-
-    <Route path="/admin" element={<AdminLogin />} />
-
-    <Route path="/admin-panel" element={<AdminLayout />}>
-      <Route index element={<AdminDashboard />} />
-      <Route path="staff" element={<AdminStaff />} />
-      <Route path="applications" element={<AdminApplications />} />
-      <Route path="orgs" element={<AdminOrganizations />} />
-      <Route path="channels" element={<AdminChannels />} />
-      <Route path="logs" element={<AdminAuditLogs />} />
-    </Route>
-
-    <Route
-      path="/admin-panel/organizations"
-      element={<Navigate to="/admin-panel/orgs" replace />}
-    />
-
-    <Route
-      path="/admin-panel/orgs-old"
-      element={<Navigate to="/admin-panel/orgs" replace />}
-    />
-
-    <Route
-      path="/admin-panel/applications-old"
-      element={<Navigate to="/admin-panel/applications" replace />}
-    />
-
-    <Route
-      path="/organization/gov-clinic"
-      element={<GovClinicLayout />}
-    >
-      <Route
-        index
-        element={<Navigate to="system-admin" replace />}
-      />
-
-      <Route
-        path="system-admin"
-        element={<GovClinicSystemAdmin />}
-      />
-
-      <Route
-        path="employee"
-        element={<GovClinicEmployee />}
-      />
-    </Route>
-
-    <Route path="*" element={<Navigate to="/" replace />} />
-  </Routes>
-</LanguageProvider>
-
-
-);
+  return (
+    <LanguageProvider>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </LanguageProvider>
+  );
 }
 
 export default App;
-
