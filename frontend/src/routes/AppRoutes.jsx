@@ -7,6 +7,9 @@ import DashboardLayout from "../layouts/DashboardLayout";
 // Auth Pages
 import Login from "../pages/auth/Login";
 import Register from "../pages/auth/Register";
+import OrganizationApplication from "../pages/auth/OrganizationApplication";
+
+
 
 // Patient Pages
 import PatientDashboard from "../pages/patient/Dashboard";
@@ -116,6 +119,13 @@ export default function AppRoutes() {
       {/* Public Auth routes */}
       <Route path="/login" element={!user ? <Login /> : getRootRedirect()} />
       <Route path="/register" element={!user ? <Register /> : getRootRedirect()} />
+    
+<Route
+  path="/organization-application"
+  element={!user ? <OrganizationApplication /> : getRootRedirect()}
+/>
+
+
 
       {/* Patient Cabinet */}
       <Route

@@ -1,253 +1,1005 @@
+
 import { supabase } from "../config/supabaseClient.js";
 
-/**
- * Creates or updates standard schedule settings for a doctor
- */
-export async function setStandardSchedule(doctorId, scheduleData) {
-  const { workDays, workStart, workEnd, lunchStart, lunchEnd, slotDuration, startDate, endDate } = scheduleData;
+const ACTIVE_APPOINTMENT_STATUSES = [
+  "scheduled",
+  "confirmed",
+  "transfer_pending",
+  "transferred",
+  "in_progress",
+  "waiting_finish_confirmation",
+  "completed",
+];
 
-  // Check if schedule already exists
-  const { data: existing, error: getErr } = await supabase
-    .from("doctor_schedules")
-    .select("id")
-    .eq("doctor_id", doctorId)
-    .maybeSingle();
+const DAY_NUMBERS = [1, 2, 3, 4, 5, 6, 7];
 
-  let result;
-  if (existing) {
-    const { data, error } = await supabase
-      .from("doctor_schedules")
-      .update({
-        work_days: workDays,
-        work_start: workStart || "09:00",
-        work_end: workEnd || "18:00",
-        lunch_start: lunchStart || "13:00",
-        lunch_end: lunchEnd || "14:00",
-        slot_duration: slotDuration || 30,
-        start_date: startDate || new Date().toISOString().split("T")[0],
-        end_date: endDate || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", existing.id)
-      .select("*")
-      .single();
+function createServiceError(message, statusCode = 500) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
 
-    if (error) throw new Error(error.message);
-    result = data;
-  } else {
-    const { data, error } = await supabase
-      .from("doctor_schedules")
-      .insert({
-        doctor_id: doctorId,
-        work_days: workDays,
-        work_start: workStart || "09:00",
-        work_end: workEnd || "18:00",
-        lunch_start: lunchStart || "13:00",
-        lunch_end: lunchEnd || "14:00",
-        slot_duration: slotDuration || 30,
-        start_date: startDate || new Date().toISOString().split("T")[0],
-        end_date: endDate || null,
-      })
-      .select("*")
-      .single();
+function clean(value) {
+  return String(value ?? "").trim();
+}
 
-    if (error) throw new Error(error.message);
-    result = data;
+function normalizeDoctorId(value) {
+  const doctorId = clean(value);
+
+  if (!doctorId) {
+    throw createServiceError(
+      "Не указан идентификатор врача.",
+      400
+    );
   }
 
-  return result;
+  return doctorId;
+}
+
+function normalizeDate(value, fieldName) {
+  const date = clean(value);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw createServiceError(
+      `${fieldName} должна быть указана в формате ГГГГ-ММ-ДД.`,
+      400
+    );
+  }
+
+  const parsedDate = new Date(`${date}T00:00:00`);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    throw createServiceError(
+      `${fieldName} содержит некорректную дату.`,
+      400
+    );
+  }
+
+  return date;
+}
+
+function normalizeOptionalDate(value, fieldName) {
+  const date = clean(value);
+
+  if (!date) {
+    return null;
+  }
+
+  return normalizeDate(date, fieldName);
+}
+
+function normalizeTime(
+  value,
+  fieldName,
+  fallback = null
+) {
+  const normalizedValue = clean(value || fallback);
+
+  if (!normalizedValue) {
+    return null;
+  }
+
+  const match = normalizedValue.match(
+    /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/
+  );
+
+  if (!match) {
+    throw createServiceError(
+      `${fieldName} должно быть указано в формате ЧЧ:ММ.`,
+      400
+    );
+  }
+
+  return `${match[1]}:${match[2]}`;
+}
+
+function normalizeSlotDuration(
+  value,
+  fallback = 30
+) {
+  const duration = Number(value ?? fallback);
+
+  if (
+    !Number.isInteger(duration) ||
+    duration < 5 ||
+    duration > 480
+  ) {
+    throw createServiceError(
+      "Продолжительность приёма должна составлять от 5 до 480 минут.",
+      400
+    );
+  }
+
+  return duration;
+}
+
+function parseTimeToMinutes(time) {
+  const normalizedTime = normalizeTime(
+    time,
+    "Время"
+  );
+
+  const [hours, minutes] = normalizedTime
+    .split(":")
+    .map(Number);
+
+  return hours * 60 + minutes;
+}
+
+function formatMinutesToTime(totalMinutes) {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return `${String(hours).padStart(
+    2,
+    "0"
+  )}:${String(minutes).padStart(2, "0")}`;
+}
+
+function normalizeStoredTime(value) {
+  if (!value) {
+    return "";
+  }
+
+  return String(value).slice(0, 5);
+}
+
+function getLocalDateString(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(
+    date.getMonth() + 1
+  ).padStart(2, "0");
+  const day = String(date.getDate()).padStart(
+    2,
+    "0"
+  );
+
+  return `${year}-${month}-${day}`;
+}
+
+function getDayNumber(dateString) {
+  const date = new Date(`${dateString}T00:00:00`);
+  const jsDay = date.getDay();
+
+  return jsDay === 0 ? 7 : jsDay;
+}
+
+function validateWorkingPeriod({
+  workStart,
+  workEnd,
+  lunchStart,
+  lunchEnd,
+}) {
+  const workStartMinutes =
+    parseTimeToMinutes(workStart);
+
+  const workEndMinutes =
+    parseTimeToMinutes(workEnd);
+
+  if (workEndMinutes <= workStartMinutes) {
+    throw createServiceError(
+      "Время окончания работы должно быть позже времени начала.",
+      400
+    );
+  }
+
+  if (
+    Boolean(lunchStart) !== Boolean(lunchEnd)
+  ) {
+    throw createServiceError(
+      "Необходимо указать и начало, и окончание обеда.",
+      400
+    );
+  }
+
+  if (lunchStart && lunchEnd) {
+    const lunchStartMinutes =
+      parseTimeToMinutes(lunchStart);
+
+    const lunchEndMinutes =
+      parseTimeToMinutes(lunchEnd);
+
+    if (
+      lunchEndMinutes <= lunchStartMinutes
+    ) {
+      throw createServiceError(
+        "Окончание обеда должно быть позже его начала.",
+        400
+      );
+    }
+
+    if (
+      lunchStartMinutes < workStartMinutes ||
+      lunchEndMinutes > workEndMinutes
+    ) {
+      throw createServiceError(
+        "Обед должен находиться внутри рабочего времени.",
+        400
+      );
+    }
+  }
+}
+
+function normalizeWorkingDay(
+  rawDay,
+  defaults
+) {
+  const isWorking =
+    rawDay?.isWorking === true ||
+    rawDay?.is_working === true;
+
+  if (!isWorking) {
+    return {
+      isWorking: false,
+    };
+  }
+
+  const workStart = normalizeTime(
+    rawDay?.workStart ??
+      rawDay?.work_start,
+    "Начало рабочего дня",
+    defaults.workStart
+  );
+
+  const workEnd = normalizeTime(
+    rawDay?.workEnd ??
+      rawDay?.work_end,
+    "Окончание рабочего дня",
+    defaults.workEnd
+  );
+
+  const lunchStart = normalizeTime(
+    rawDay?.lunchStart ??
+      rawDay?.lunch_start,
+    "Начало обеда",
+    defaults.lunchStart
+  );
+
+  const lunchEnd = normalizeTime(
+    rawDay?.lunchEnd ??
+      rawDay?.lunch_end,
+    "Окончание обеда",
+    defaults.lunchEnd
+  );
+
+  const slotDuration =
+    normalizeSlotDuration(
+      rawDay?.slotDuration ??
+        rawDay?.slot_duration,
+      defaults.slotDuration
+    );
+
+  validateWorkingPeriod({
+    workStart,
+    workEnd,
+    lunchStart,
+    lunchEnd,
+  });
+
+  return {
+    isWorking: true,
+    workStart,
+    workEnd,
+    lunchStart,
+    lunchEnd,
+    slotDuration,
+  };
+}
+
+function buildDaySchedules(scheduleData) {
+  const defaults = {
+    workStart: normalizeTime(
+      scheduleData?.workStart,
+      "Начало рабочего дня",
+      "09:00"
+    ),
+    workEnd: normalizeTime(
+      scheduleData?.workEnd,
+      "Окончание рабочего дня",
+      "18:00"
+    ),
+    lunchStart: normalizeTime(
+      scheduleData?.lunchStart,
+      "Начало обеда",
+      "13:00"
+    ),
+    lunchEnd: normalizeTime(
+      scheduleData?.lunchEnd,
+      "Окончание обеда",
+      "14:00"
+    ),
+    slotDuration: normalizeSlotDuration(
+      scheduleData?.slotDuration,
+      30
+    ),
+  };
+
+  validateWorkingPeriod(defaults);
+
+  const rawDaySchedules =
+    scheduleData?.daySchedules &&
+    typeof scheduleData.daySchedules ===
+      "object"
+      ? scheduleData.daySchedules
+      : null;
+
+  const requestedWorkDays = Array.isArray(
+    scheduleData?.workDays
+  )
+    ? scheduleData.workDays
+        .map(Number)
+        .filter((day) =>
+          DAY_NUMBERS.includes(day)
+        )
+    : [1, 2, 3, 4, 5];
+
+  const daySchedules = {};
+  const workDays = [];
+
+  for (const dayNumber of DAY_NUMBERS) {
+    let rawDay;
+
+    if (rawDaySchedules) {
+      rawDay =
+        rawDaySchedules[String(dayNumber)] ??
+        rawDaySchedules[dayNumber] ??
+        {
+          isWorking: false,
+        };
+    } else {
+      rawDay = {
+        isWorking:
+          requestedWorkDays.includes(dayNumber),
+        ...defaults,
+      };
+    }
+
+    const normalizedDay =
+      normalizeWorkingDay(rawDay, defaults);
+
+    daySchedules[String(dayNumber)] =
+      normalizedDay;
+
+    if (normalizedDay.isWorking) {
+      workDays.push(dayNumber);
+    }
+  }
+
+  if (workDays.length === 0) {
+    throw createServiceError(
+      "Выберите хотя бы один рабочий день.",
+      400
+    );
+  }
+
+  const firstWorkingDay =
+    daySchedules[String(workDays[0])];
+
+  return {
+    workDays,
+    daySchedules,
+    workStart: firstWorkingDay.workStart,
+    workEnd: firstWorkingDay.workEnd,
+    lunchStart:
+      firstWorkingDay.lunchStart || null,
+    lunchEnd:
+      firstWorkingDay.lunchEnd || null,
+    slotDuration:
+      firstWorkingDay.slotDuration,
+  };
+}
+
+async function ensureDoctorExists(doctorId) {
+  const { data, error } = await supabase
+    .from("doctors")
+    .select("id")
+    .eq("id", doctorId)
+    .maybeSingle();
+
+  if (error) {
+    throw createServiceError(
+      `Ошибка проверки врача: ${error.message}`
+    );
+  }
+
+  if (!data) {
+    throw createServiceError(
+      "Врач не найден.",
+      404
+    );
+  }
+
+  return data;
+}
+
+export async function getStandardSchedule(
+  doctorId
+) {
+  const normalizedDoctorId =
+    normalizeDoctorId(doctorId);
+
+  const { data, error } = await supabase
+    .from("doctor_schedules")
+    .select("*")
+    .eq("doctor_id", normalizedDoctorId)
+    .maybeSingle();
+
+  if (error) {
+    throw createServiceError(
+      `Ошибка получения расписания: ${error.message}`
+    );
+  }
+
+  return data || null;
 }
 
 /**
- * Adds an exception to a doctor's schedule (e.g. working weekend or holiday hours)
+ * Создание или обновление стандартного графика.
  */
-export async function addScheduleException(doctorId, exceptionData) {
-  const { exceptionDate, isWorking, workStart, workEnd, lunchStart, lunchEnd, slotDuration } = exceptionData;
+export async function setStandardSchedule(
+  doctorId,
+  scheduleData
+) {
+  const normalizedDoctorId =
+    normalizeDoctorId(doctorId);
+
+  await ensureDoctorExists(normalizedDoctorId);
+
+  const normalizedSchedule =
+    buildDaySchedules(scheduleData);
+
+  const startDate = normalizeDate(
+    scheduleData?.startDate ||
+      getLocalDateString(),
+    "Дата начала действия расписания"
+  );
+
+  const endDate = normalizeOptionalDate(
+    scheduleData?.endDate,
+    "Дата окончания действия расписания"
+  );
+
+  if (endDate && endDate < startDate) {
+    throw createServiceError(
+      "Дата окончания расписания не может быть раньше даты начала.",
+      400
+    );
+  }
+
+  const payload = {
+    doctor_id: normalizedDoctorId,
+    work_days: normalizedSchedule.workDays,
+    work_start:
+      normalizedSchedule.workStart,
+    work_end: normalizedSchedule.workEnd,
+    lunch_start:
+      normalizedSchedule.lunchStart,
+    lunch_end: normalizedSchedule.lunchEnd,
+    slot_duration:
+      normalizedSchedule.slotDuration,
+    start_date: startDate,
+    end_date: endDate,
+    day_schedules:
+      normalizedSchedule.daySchedules,
+    updated_at: new Date().toISOString(),
+  };
 
   const { data, error } = await supabase
-    .from("schedule_exceptions")
-    .insert({
-      doctor_id: doctorId,
-      exception_date: exceptionDate,
-      is_working: isWorking ?? false,
-      work_start: workStart,
-      work_end: workEnd,
-      lunch_start: lunchStart,
-      lunch_end: lunchEnd,
-      slot_duration: slotDuration,
+    .from("doctor_schedules")
+    .upsert(payload, {
+      onConflict: "doctor_id",
     })
     .select("*")
     .single();
 
   if (error) {
-    throw new Error(`Ошибка добавления исключения: ${error.message}`);
+    throw createServiceError(
+      `Ошибка сохранения расписания: ${error.message}`
+    );
   }
+
   return data;
 }
 
 /**
- * Registers a doctor's absence (vacation, sick leave, planned absence)
+ * Разовое изменение графика на конкретную дату.
  */
-export async function addDoctorAbsence(doctorId, absenceData) {
-  const { absenceType, reason, startDate, endDate, comment } = absenceData;
+export async function addScheduleException(
+  doctorId,
+  exceptionData
+) {
+  const normalizedDoctorId =
+    normalizeDoctorId(doctorId);
 
-  if (!["planned", "emergency"].includes(absenceType)) {
-    throw new Error("Неверный тип отсутствия. Разрешено: planned, emergency.");
+  await ensureDoctorExists(normalizedDoctorId);
+
+  const exceptionDate = normalizeDate(
+    exceptionData?.exceptionDate,
+    "Дата изменения графика"
+  );
+
+  const isWorking =
+    exceptionData?.isWorking === true;
+
+  let workStart = null;
+  let workEnd = null;
+  let lunchStart = null;
+  let lunchEnd = null;
+  let slotDuration = null;
+
+  if (isWorking) {
+    workStart = normalizeTime(
+      exceptionData?.workStart,
+      "Начало рабочего дня",
+      "09:00"
+    );
+
+    workEnd = normalizeTime(
+      exceptionData?.workEnd,
+      "Окончание рабочего дня",
+      "18:00"
+    );
+
+    lunchStart = normalizeTime(
+      exceptionData?.lunchStart,
+      "Начало обеда"
+    );
+
+    lunchEnd = normalizeTime(
+      exceptionData?.lunchEnd,
+      "Окончание обеда"
+    );
+
+    slotDuration = normalizeSlotDuration(
+      exceptionData?.slotDuration,
+      30
+    );
+
+    validateWorkingPeriod({
+      workStart,
+      workEnd,
+      lunchStart,
+      lunchEnd,
+    });
+  }
+
+  const { data, error } = await supabase
+    .from("schedule_exceptions")
+    .upsert(
+      {
+        doctor_id: normalizedDoctorId,
+        exception_date: exceptionDate,
+        is_working: isWorking,
+        work_start: workStart,
+        work_end: workEnd,
+        lunch_start: lunchStart,
+        lunch_end: lunchEnd,
+        slot_duration: slotDuration,
+        updated_at:
+          new Date().toISOString(),
+      },
+      {
+        onConflict:
+          "doctor_id,exception_date",
+      }
+    )
+    .select("*")
+    .single();
+
+  if (error) {
+    throw createServiceError(
+      `Ошибка сохранения изменения графика: ${error.message}`
+    );
+  }
+
+  return data;
+}
+
+/**
+ * Плановое или экстренное отсутствие врача.
+ */
+export async function addDoctorAbsence(
+  doctorId,
+  absenceData
+) {
+  const normalizedDoctorId =
+    normalizeDoctorId(doctorId);
+
+  await ensureDoctorExists(normalizedDoctorId);
+
+  const absenceType = clean(
+    absenceData?.absenceType
+  );
+
+  if (
+    !["planned", "emergency"].includes(
+      absenceType
+    )
+  ) {
+    throw createServiceError(
+      "Допустимые типы отсутствия: planned или emergency.",
+      400
+    );
+  }
+
+  const startDate = normalizeDate(
+    absenceData?.startDate,
+    "Дата начала отсутствия"
+  );
+
+  const endDate = normalizeDate(
+    absenceData?.endDate,
+    "Дата окончания отсутствия"
+  );
+
+  if (endDate < startDate) {
+    throw createServiceError(
+      "Дата окончания отсутствия не может быть раньше даты начала.",
+      400
+    );
+  }
+
+  const reason = clean(absenceData?.reason);
+  const comment = clean(absenceData?.comment);
+
+  if (!reason) {
+    throw createServiceError(
+      "Укажите причину отсутствия врача.",
+      400
+    );
   }
 
   const { data, error } = await supabase
     .from("doctor_absences")
     .insert({
-      doctor_id: doctorId,
+      doctor_id: normalizedDoctorId,
       absence_type: absenceType,
       reason,
       start_date: startDate,
       end_date: endDate,
-      comment,
+      comment: comment || null,
     })
     .select("*")
     .single();
 
   if (error) {
-    throw new Error(`Ошибка сохранения отсутствия: ${error.message}`);
+    throw createServiceError(
+      `Ошибка сохранения отсутствия: ${error.message}`
+    );
   }
+
   return data;
 }
 
-/**
- * Generates slots for a doctor on a specific date, filtering out lunches, absences, past slots, and booked appointments.
- */
-export async function generateDoctorSlots(doctorId, dateString) {
-  // 1. Check absences first
-  const { data: absences, error: absErr } = await supabase
-    .from("doctor_absences")
-    .select("*")
-    .eq("doctor_id", doctorId);
+function getStandardDayConfiguration(
+  schedule,
+  dayNumber
+) {
+  const detailedDay =
+    schedule?.day_schedules?.[
+      String(dayNumber)
+    ];
 
-  if (absErr) throw new Error(absErr.message);
+  if (
+    detailedDay &&
+    typeof detailedDay === "object"
+  ) {
+    if (!detailedDay.isWorking) {
+      return {
+        isWorking: false,
+      };
+    }
 
-  const targetDate = new Date(dateString);
-  const isAbsent = absences.some((abs) => {
-    const start = new Date(abs.start_date);
-    const end = new Date(abs.end_date);
-    // set times to midnight for comparison
-    start.setHours(0, 0, 0, 0);
-    end.setHours(23, 59, 59, 999);
-    return targetDate >= start && targetDate <= end;
-  });
-
-  if (isAbsent) {
-    return []; // Doctor is absent today
+    return {
+      isWorking: true,
+      workStart: normalizeStoredTime(
+        detailedDay.workStart
+      ),
+      workEnd: normalizeStoredTime(
+        detailedDay.workEnd
+      ),
+      lunchStart: normalizeStoredTime(
+        detailedDay.lunchStart
+      ),
+      lunchEnd: normalizeStoredTime(
+        detailedDay.lunchEnd
+      ),
+      slotDuration: Number(
+        detailedDay.slotDuration
+      ),
+    };
   }
 
-  // 2. Check exceptions
-  const { data: exception, error: excErr } = await supabase
+  const workDays = Array.isArray(
+    schedule?.work_days
+  )
+    ? schedule.work_days.map(Number)
+    : [];
+
+  if (!workDays.includes(dayNumber)) {
+    return {
+      isWorking: false,
+    };
+  }
+
+  return {
+    isWorking: true,
+    workStart: normalizeStoredTime(
+      schedule.work_start
+    ),
+    workEnd: normalizeStoredTime(
+      schedule.work_end
+    ),
+    lunchStart: normalizeStoredTime(
+      schedule.lunch_start
+    ),
+    lunchEnd: normalizeStoredTime(
+      schedule.lunch_end
+    ),
+    slotDuration: Number(
+      schedule.slot_duration
+    ),
+  };
+}
+
+/**
+ * Автоматическое формирование интервалов.
+ */
+export async function generateDoctorSlots(
+  doctorId,
+  dateString
+) {
+  const normalizedDoctorId =
+    normalizeDoctorId(doctorId);
+
+  const targetDate = normalizeDate(
+    dateString,
+    "Дата приёма"
+  );
+
+  const {
+    data: activeAbsences,
+    error: absenceError,
+  } = await supabase
+    .from("doctor_absences")
+    .select("id")
+    .eq("doctor_id", normalizedDoctorId)
+    .lte("start_date", targetDate)
+    .gte("end_date", targetDate)
+    .limit(1);
+
+  if (absenceError) {
+    throw createServiceError(
+      `Ошибка проверки отсутствия врача: ${absenceError.message}`
+    );
+  }
+
+  if (
+    Array.isArray(activeAbsences) &&
+    activeAbsences.length > 0
+  ) {
+    return [];
+  }
+
+  const { data: schedule, error: scheduleError } =
+    await supabase
+      .from("doctor_schedules")
+      .select("*")
+      .eq("doctor_id", normalizedDoctorId)
+      .maybeSingle();
+
+  if (scheduleError) {
+    throw createServiceError(
+      `Ошибка получения расписания: ${scheduleError.message}`
+    );
+  }
+
+  const {
+    data: exception,
+    error: exceptionError,
+  } = await supabase
     .from("schedule_exceptions")
     .select("*")
-    .eq("doctor_id", doctorId)
-    .eq("exception_date", dateString)
+    .eq("doctor_id", normalizedDoctorId)
+    .eq("exception_date", targetDate)
     .maybeSingle();
 
-  if (excErr) throw new Error(excErr.message);
+  if (exceptionError) {
+    throw createServiceError(
+      `Ошибка получения изменения графика: ${exceptionError.message}`
+    );
+  }
 
-  let workStart, workEnd, lunchStart, lunchEnd, slotDuration, isWorking;
+  if (!schedule && !exception) {
+    return [];
+  }
+
+  if (
+    schedule &&
+    targetDate < schedule.start_date
+  ) {
+    return [];
+  }
+
+  if (
+    schedule?.end_date &&
+    targetDate > schedule.end_date
+  ) {
+    return [];
+  }
+
+  const dayNumber =
+    getDayNumber(targetDate);
+
+  const standardDay = schedule
+    ? getStandardDayConfiguration(
+        schedule,
+        dayNumber
+      )
+    : {
+        isWorking: false,
+      };
+
+  let dayConfiguration;
 
   if (exception) {
     if (!exception.is_working) {
-      return []; // Exception marks day off
-    }
-    workStart = exception.work_start;
-    workEnd = exception.work_end;
-    lunchStart = exception.lunch_start;
-    lunchEnd = exception.lunch_end;
-    slotDuration = exception.slot_duration;
-    isWorking = true;
-  } else {
-    // 3. Load standard schedule
-    const { data: schedule, error: schErr } = await supabase
-      .from("doctor_schedules")
-      .select("*")
-      .eq("doctor_id", doctorId)
-      .maybeSingle();
-
-    if (schErr) throw new Error(schErr.message);
-    if (!schedule) {
-      return []; // No schedule configured
+      return [];
     }
 
-    // Check if targetDate falls within workDays (0 = Sunday, 6 = Saturday in JS; but let's check schema: work_days is integer array)
-    // In PostgreSQL, 1 = Monday, 7 = Sunday usually, but JS getDay() is 0 = Sunday, 1 = Monday.
-    // Let's standardise: 1 = Mon, 2 = Tue, 3 = Wed, 4 = Thu, 5 = Fri, 6 = Sat, 7 = Sun.
-    let jsDay = targetDate.getDay(); // 0-6
-    let targetDayNum = jsDay === 0 ? 7 : jsDay; // map Sunday to 7
-
-    if (!schedule.work_days.includes(targetDayNum)) {
-      return []; // Non-working day
-    }
-
-    workStart = schedule.work_start;
-    workEnd = schedule.work_end;
-    lunchStart = schedule.lunch_start;
-    lunchEnd = schedule.lunch_end;
-    slotDuration = schedule.slot_duration;
-    isWorking = true;
-  }
-
-  // 4. Generate candidate time slots
-  const slots = [];
-  const startMinutes = parseTimeToMinutes(workStart);
-  const endMinutes = parseTimeToMinutes(workEnd);
-  const lunchStartMin = lunchStart ? parseTimeToMinutes(lunchStart) : -1;
-  const lunchEndMin = lunchEnd ? parseTimeToMinutes(lunchEnd) : -1;
-
-  // Current date/time checks (to exclude past slots)
-  const now = new Date();
-  const todayStr = now.toISOString().split("T")[0];
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-  for (let min = startMinutes; min < endMinutes; min += slotDuration) {
-    // Exclude lunch hours
-    if (lunchStartMin !== -1 && min >= lunchStartMin && min < lunchEndMin) {
-      continue;
-    }
-
-    // Exclude past hours if date is today
-    if (dateString === todayStr && min <= currentMinutes) {
-      continue;
-    }
-
-    slots.push(formatMinutesToTime(min));
-  }
-
-  // 5. Query active appointments for this doctor on this day
-  const { data: appointments, error: appErr } = await supabase
-    .from("appointments")
-    .select("time")
-    .eq("doctor_id", doctorId)
-    .eq("date", dateString)
-    .in("status", ["scheduled", "confirmed", "transfer_pending", "in_progress", "waiting_finish_confirmation", "completed"]);
-
-  if (appErr) throw new Error(appErr.message);
-
-  const bookedTimes = appointments.map((app) => app.time);
-
-  // 6. Return slots mapping availability flag
-  return slots.map((time) => {
-    return {
-      time,
-      isAvailable: !bookedTimes.includes(time),
+    dayConfiguration = {
+      isWorking: true,
+      workStart: normalizeStoredTime(
+        exception.work_start ||
+          standardDay.workStart
+      ),
+      workEnd: normalizeStoredTime(
+        exception.work_end ||
+          standardDay.workEnd
+      ),
+      lunchStart: normalizeStoredTime(
+        exception.lunch_start ??
+          standardDay.lunchStart
+      ),
+      lunchEnd: normalizeStoredTime(
+        exception.lunch_end ??
+          standardDay.lunchEnd
+      ),
+      slotDuration: Number(
+        exception.slot_duration ||
+          standardDay.slotDuration ||
+          30
+      ),
     };
+  } else {
+    dayConfiguration = standardDay;
+  }
+
+  if (!dayConfiguration.isWorking) {
+    return [];
+  }
+
+  const workStart =
+    normalizeTime(
+      dayConfiguration.workStart,
+      "Начало рабочего дня"
+    );
+
+  const workEnd =
+    normalizeTime(
+      dayConfiguration.workEnd,
+      "Окончание рабочего дня"
+    );
+
+  const lunchStart =
+    normalizeTime(
+      dayConfiguration.lunchStart,
+      "Начало обеда"
+    );
+
+  const lunchEnd =
+    normalizeTime(
+      dayConfiguration.lunchEnd,
+      "Окончание обеда"
+    );
+
+  const slotDuration =
+    normalizeSlotDuration(
+      dayConfiguration.slotDuration,
+      30
+    );
+
+  validateWorkingPeriod({
+    workStart,
+    workEnd,
+    lunchStart,
+    lunchEnd,
   });
-}
 
-// Helpers
-function parseTimeToMinutes(timeStr) {
-  const [hours, minutes] = timeStr.split(":").map(Number);
-  return hours * 60 + minutes;
-}
+  const startMinutes =
+    parseTimeToMinutes(workStart);
 
-function formatMinutesToTime(minutes) {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+  const endMinutes =
+    parseTimeToMinutes(workEnd);
+
+  const lunchStartMinutes = lunchStart
+    ? parseTimeToMinutes(lunchStart)
+    : null;
+
+  const lunchEndMinutes = lunchEnd
+    ? parseTimeToMinutes(lunchEnd)
+    : null;
+
+  const now = new Date();
+  const today = getLocalDateString(now);
+  const currentMinutes =
+    now.getHours() * 60 + now.getMinutes();
+
+  const candidateSlots = [];
+
+  for (
+    let slotStart = startMinutes;
+    slotStart + slotDuration <= endMinutes;
+    slotStart += slotDuration
+  ) {
+    const slotEnd =
+      slotStart + slotDuration;
+
+    const overlapsLunch =
+      lunchStartMinutes !== null &&
+      lunchEndMinutes !== null &&
+      slotStart < lunchEndMinutes &&
+      slotEnd > lunchStartMinutes;
+
+    if (overlapsLunch) {
+      continue;
+    }
+
+    if (
+      targetDate === today &&
+      slotStart <= currentMinutes
+    ) {
+      continue;
+    }
+
+    candidateSlots.push({
+      time: formatMinutesToTime(slotStart),
+      startTime:
+        formatMinutesToTime(slotStart),
+      endTime: formatMinutesToTime(slotEnd),
+    });
+  }
+
+  const {
+    data: appointments,
+    error: appointmentsError,
+  } = await supabase
+    .from("appointments")
+    .select("time, status")
+    .eq("doctor_id", normalizedDoctorId)
+    .eq("date", targetDate)
+    .in(
+      "status",
+      ACTIVE_APPOINTMENT_STATUSES
+    );
+
+  if (appointmentsError) {
+    throw createServiceError(
+      `Ошибка проверки занятых интервалов: ${appointmentsError.message}`
+    );
+  }
+
+  const bookedTimes = new Set(
+    (appointments || []).map((appointment) =>
+      normalizeStoredTime(appointment.time)
+    )
+  );
+
+  return candidateSlots.map((slot) => ({
+    ...slot,
+    isAvailable: !bookedTimes.has(slot.time),
+    status: bookedTimes.has(slot.time)
+      ? "busy"
+      : "available",
+  }));
 }

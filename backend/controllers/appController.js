@@ -23,19 +23,60 @@ export async function getApplications(req, res, next) {
   }
 }
 
+
 export async function approveApp(req, res, next) {
   try {
-    const { id } = req.params;
-    const result = await appService.approveApplication(id);
+    const applicationId = String(
+      req.params?.id || ""
+    ).trim();
+
+    const username = String(
+      req.body?.username || ""
+    )
+      .trim()
+      .toLowerCase();
+
+    if (!applicationId) {
+      return res.status(400).json({
+        success: false,
+        message: "Не указан идентификатор заявки.",
+      });
+    }
+
+    if (!username) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Перед одобрением укажите логин администратора.",
+      });
+    }
+
+    if (!/^[a-z0-9._-]{3,30}$/.test(username)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Логин должен содержать от 3 до 30 латинских букв, цифр или символов . _ -",
+      });
+    }
+
+    const result =
+      await appService.approveApplication(
+        applicationId,
+        username
+      );
+
     return res.status(200).json({
       success: true,
-      message: "Заявка успешно одобрена. Администратору клиники отправлено письмо с доступами.",
+      message:
+        "Заявка одобрена. БИН, логин и временный пароль отправлены администратору на Email.",
       data: result,
     });
   } catch (error) {
     next(error);
   }
 }
+
+
 
 export async function rejectApp(req, res, next) {
   try {

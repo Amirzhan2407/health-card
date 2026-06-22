@@ -1,5 +1,29 @@
 export const translations = {
     "ru": {
+
+      
+   
+"welcome_back": "Единый портал здоровья",
+"login_title": "Вход в систему",
+"username_label": "Логин или электронная почта",
+"username_placeholder": "Введите логин или Email",
+"password_label": "Пароль",
+"login_button": "Войти",
+"logging_in": "Выполняется вход...",
+"no_account": "Нет аккаунта?",
+"register_button": "Зарегистрироваться",
+"or": "или",
+"clinic_application_link": "Подать заявку от медицинской организации",
+
+"registration_title": "Регистрация",
+"registration_subtitle": "Создание аккаунта пациента",
+"confirm_password_label": "Повторите пароль",
+"already_have_account": "Уже есть аккаунт?",
+"login_link": "Войти",
+
+
+
+
     "orgLoginTitle": "Вход в кабинет медицинской организации",
     "orgLoginInstructions": "Для авторизации укажите данные",
     "orgLoginCityHint": "Город нахождения организации",
@@ -424,6 +448,29 @@ export const translations = {
     "personal": "Личные обстоятельства"
   },
     "kz": {
+      
+    
+"welcome_back": "Бірыңғай денсаулық порталы",
+"login_title": "Жүйеге кіру",
+"username_label": "Логин немесе электрондық пошта",
+"username_placeholder": "Логинді немесе Email енгізіңіз",
+"password_label": "Құпиясөз",
+"login_button": "Кіру",
+"logging_in": "Жүйеге кіру орындалуда...",
+"no_account": "Аккаунтыңыз жоқ па?",
+"register_button": "Тіркелу",
+"or": "немесе",
+"clinic_application_link": "Медициналық ұйым атынан өтінім беру",
+
+"registration_title": "Тіркелу",
+"registration_subtitle": "Пациент аккаунтын жасау",
+"confirm_password_label": "Құпиясөзді қайталаңыз",
+"already_have_account": "Аккаунтыңыз бар ма?",
+"login_link": "Кіру",
+
+
+
+
     "orgLoginTitle": "Медициналық ұйымның кабинетіне кіру",
     "orgLoginInstructions": "Авторизациялау үшін деректерді көрсетіңіз",
     "orgLoginCityHint": "Ұйымның орналасқан қаласы",
@@ -848,6 +895,27 @@ export const translations = {
     "personal": "Жеке жағдайлар"
   },
     "en": {
+
+      
+"welcome_back": "Unified health portal",
+"login_title": "Sign in",
+"username_label": "Username or email",
+"username_placeholder": "Enter username or email",
+"password_label": "Password",
+"login_button": "Sign in",
+"logging_in": "Signing in...",
+"no_account": "No account?",
+"register_button": "Register",
+"or": "or",
+"clinic_application_link": "Submit a medical organization application",
+
+"registration_title": "Registration",
+"registration_subtitle": "Create a patient account",
+"confirm_password_label": "Confirm password",
+"already_have_account": "Already have an account?",
+"login_link": "Sign in",
+      
+
     "orgLoginTitle": "Medical Organization Cabinet Login",
     "orgLoginInstructions": "Please specify details for authorization",
     "orgLoginCityHint": "City of the organization",

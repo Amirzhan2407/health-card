@@ -1,61 +1,928 @@
-import { useState, useEffect } from "react";
+
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import { useNavigate } from "react-router-dom";
+
+import {
+  RiCheckboxCircleLine,
+  RiCloseCircleLine,
+  RiNotificationLine,
+  RiRefreshLine,
+  RiSearchLine,
+} from "react-icons/ri";
+
 import api from "../../api/api";
-import { RiNotificationLine } from "react-icons/ri";
+
+function getErrorMessage(error, fallback) {
+  return (
+    error?.response?.data?.message ||
+    error?.message ||
+    fallback
+  );
+}
+
+function extractNotifications(response) {
+  const body = response?.data;
+
+  if (Array.isArray(body)) {
+    return body;
+  }
+
+  if (Array.isArray(body?.data)) {
+    return body.data;
+  }
+
+  if (Array.isArray(body?.notifications)) {
+    return body.notifications;
+  }
+
+  if (Array.isArray(body?.items)) {
+    return body.items;
+  }
+
+  return [];
+}
+
+function formatDateTime(value) {
+  if (!value) {
+    return "Дата не указана";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Дата не указана";
+  }
+
+  return date.toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+async function runFirstSuccessful(requests) {
+  let lastError = null;
+
+  for (const request of requests) {
+    try {
+      return await request();
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("Запрос не выполнен.");
+}
 
 export default function SupportNotifications() {
-  const [notifications, setNotifications] = useState([]);
+  const navigate = useNavigate();
+
+  const [notifications, setNotifications] =
+    useState([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [actionId, setActionId] =
+    useState("");
+
+  const [search, setSearch] =
+    useState("");
+
+  const [filter, setFilter] =
+    useState("all");
+
+  const [errorMessage, setErrorMessage] =
+    useState("");
+
+  const [successMessage, setSuccessMessage] =
+    useState("");
+
+  const loadNotifications = useCallback(
+    async () => {
+      setLoading(true);
+      setErrorMessage("");
+
+      try {
+        const response =
+          await runFirstSuccessful([
+            () => api.get("/notifications"),
+            () =>
+              api.get(
+                "/notifications?recipientRole=support"
+              ),
+            () =>
+              api.get(
+                "/support/notifications"
+              ),
+          ]);
+
+        setNotifications(
+          extractNotifications(response)
+        );
+      } catch (error) {
+        setNotifications([]);
+
+        setErrorMessage(
+          getErrorMessage(
+            error,
+            "Не удалось загрузить уведомления."
+          )
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
-    async function loadNotifications() {
-      try {
-        const res = await api.get("/notifications");
-        if (res.data?.success) {
-          setNotifications(res.data.data);
-        }
-      } catch (err) {
-        console.warn(err);
-      }
-    }
     loadNotifications();
-  }, []);
+  }, [loadNotifications]);
+
+  const unreadCount = useMemo(
+    () =>
+      notifications.filter(
+        (notification) =>
+          !notification?.is_read &&
+          !notification?.read_at
+      ).length,
+    [notifications]
+  );
+
+  const filteredNotifications =
+    useMemo(() => {
+      const query = search
+        .trim()
+        .toLowerCase();
+
+      return notifications.filter(
+        (notification) => {
+          const isRead = Boolean(
+            notification?.is_read ||
+              notification?.read_at
+          );
+
+          if (
+            filter === "unread" &&
+            isRead
+          ) {
+            return false;
+          }
+
+          if (
+            filter === "read" &&
+            !isRead
+          ) {
+            return false;
+          }
+
+          if (!query) {
+            return true;
+          }
+
+          return [
+            notification?.title,
+            notification?.message,
+            notification?.text,
+            notification?.type,
+          ].some((value) =>
+            String(value || "")
+              .toLowerCase()
+              .includes(query)
+          );
+        }
+      );
+    }, [
+      notifications,
+      search,
+      filter,
+    ]);
+
+  async function markAsRead(
+    notificationId
+  ) {
+    if (
+      !notificationId ||
+      actionId
+    ) {
+      return;
+    }
+
+    const notification =
+      notifications.find(
+        (item) =>
+          item.id === notificationId
+      );
+
+    const alreadyRead = Boolean(
+      notification?.is_read ||
+        notification?.read_at
+    );
+
+    if (alreadyRead) {
+      return;
+    }
+
+    setActionId(notificationId);
+    setErrorMessage("");
+
+    try {
+      await runFirstSuccessful([
+        () =>
+          api.patch(
+            `/notifications/${notificationId}/read`
+          ),
+
+        () =>
+          api.post(
+            `/notifications/${notificationId}/read`
+          ),
+
+        () =>
+          api.patch(
+            `/support/notifications/${notificationId}/read`
+          ),
+      ]);
+
+      setNotifications((current) =>
+        current.map((item) =>
+          item.id === notificationId
+            ? {
+                ...item,
+                is_read: true,
+                read_at:
+                  new Date().toISOString(),
+              }
+            : item
+        )
+      );
+    } catch (error) {
+      setErrorMessage(
+        getErrorMessage(
+          error,
+          "Не удалось отметить уведомление как прочитанное."
+        )
+      );
+    } finally {
+      setActionId("");
+    }
+  }
+
+  async function markAllAsRead() {
+    if (
+      unreadCount === 0 ||
+      actionId
+    ) {
+      return;
+    }
+
+    setActionId("all");
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      await runFirstSuccessful([
+        () =>
+          api.patch(
+            "/notifications/read-all"
+          ),
+
+        () =>
+          api.post(
+            "/notifications/read-all"
+          ),
+
+        () =>
+          api.patch(
+            "/support/notifications/read-all"
+          ),
+      ]);
+
+      const readAt =
+        new Date().toISOString();
+
+      setNotifications((current) =>
+        current.map((item) => ({
+          ...item,
+          is_read: true,
+          read_at:
+            item.read_at || readAt,
+        }))
+      );
+
+      setSuccessMessage(
+        "Все уведомления отмечены как прочитанные."
+      );
+    } catch (error) {
+      setErrorMessage(
+        getErrorMessage(
+          error,
+          "Не удалось отметить все уведомления как прочитанные."
+        )
+      );
+    } finally {
+      setActionId("");
+    }
+  }
+
+  async function openNotification(
+    notification
+  ) {
+    await markAsRead(
+      notification?.id
+    );
+
+    const relatedPath =
+      notification?.link ||
+      notification?.related_url ||
+      notification?.action_url;
+
+    if (
+      relatedPath &&
+      relatedPath.startsWith("/")
+    ) {
+      navigate(relatedPath);
+    }
+  }
 
   return (
     <div style={styles.container}>
-      <h2 style={styles.title}>Уведомления техподдержки</h2>
-      <p style={styles.sub}>Уведомления о критических системных ошибках, новых заявках клиник.</p>
+      <div style={styles.header}>
+        <div>
+          <h1 style={styles.title}>
+            Уведомления
+          </h1>
+
+          <p style={styles.subtitle}>
+            Заявки организаций, обращения и системные сообщения.
+          </p>
+        </div>
+
+        <div style={styles.headerActions}>
+          <button
+            type="button"
+            onClick={markAllAsRead}
+            disabled={
+              unreadCount === 0 ||
+              actionId === "all"
+            }
+            style={{
+              ...styles.readAllButton,
+              ...(unreadCount === 0 ||
+              actionId === "all"
+                ? styles.disabledButton
+                : {}),
+            }}
+          >
+            <RiCheckboxCircleLine />
+
+            {actionId === "all"
+              ? "Обработка..."
+              : "Прочитать всё"}
+          </button>
+
+          <button
+            type="button"
+            onClick={loadNotifications}
+            disabled={loading}
+            style={{
+              ...styles.refreshButton,
+              ...(loading
+                ? styles.disabledButton
+                : {}),
+            }}
+          >
+            <RiRefreshLine />
+
+            {loading
+              ? "Обновление..."
+              : "Обновить"}
+          </button>
+        </div>
+      </div>
+
+      <div style={styles.stats}>
+        <div style={styles.statCard}>
+          <span style={styles.statValue}>
+            {notifications.length}
+          </span>
+
+          <span style={styles.statLabel}>
+            Всего уведомлений
+          </span>
+        </div>
+
+        <div style={styles.statCard}>
+          <span style={styles.unreadValue}>
+            {unreadCount}
+          </span>
+
+          <span style={styles.statLabel}>
+            Непрочитанных
+          </span>
+        </div>
+      </div>
+
+      {errorMessage && (
+        <div style={styles.errorAlert}>
+          <RiCloseCircleLine />
+          {errorMessage}
+        </div>
+      )}
+
+      {successMessage && (
+        <div style={styles.successAlert}>
+          <RiCheckboxCircleLine />
+          {successMessage}
+        </div>
+      )}
+
+      <div style={styles.filters}>
+        <div style={styles.searchBox}>
+          <RiSearchLine />
+
+          <input
+            type="search"
+            value={search}
+            onChange={(event) =>
+              setSearch(
+                event.target.value
+              )
+            }
+            placeholder="Поиск уведомлений"
+            style={styles.searchInput}
+          />
+        </div>
+
+        <select
+          value={filter}
+          onChange={(event) =>
+            setFilter(
+              event.target.value
+            )
+          }
+          style={styles.filterSelect}
+        >
+          <option value="all">
+            Все уведомления
+          </option>
+
+          <option value="unread">
+            Непрочитанные
+          </option>
+
+          <option value="read">
+            Прочитанные
+          </option>
+        </select>
+      </div>
 
       <div style={styles.card}>
-        <div style={styles.list}>
-          {notifications.length === 0 ? (
-            <div style={styles.item}>
-              <RiNotificationLine style={{ color: "#6366f1", fontSize: "20px" }} />
-              <div>
-                <h4 style={{ margin: "0 0 4px 0", fontWeight: 600 }}>Новых уведомлений нет</h4>
-                <p style={{ margin: 0, color: "#94a3b8", fontSize: "14px" }}>Здесь появятся критические оповещения.</p>
-              </div>
-            </div>
-          ) : (
-            notifications.map((n) => (
-              <div key={n.id} style={styles.item}>
-                <RiNotificationLine style={{ color: n.is_read ? "#64748b" : "#6366f1", fontSize: "20px" }} />
-                <div>
-                  <h4 style={{ margin: "0 0 4px 0", fontWeight: 600, color: n.is_read ? "#94a3b8" : "#fff" }}>{n.title}</h4>
-                  <p style={{ margin: 0, color: "#94a3b8", fontSize: "14px" }}>{n.message}</p>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+        {loading ? (
+          <div style={styles.emptyState}>
+            Загрузка уведомлений...
+          </div>
+        ) : filteredNotifications.length ===
+          0 ? (
+          <div style={styles.emptyState}>
+            <RiNotificationLine
+              style={styles.emptyIcon}
+            />
+
+            <strong>
+              Уведомлений нет
+            </strong>
+
+            <span>
+              Новые уведомления появятся здесь.
+            </span>
+          </div>
+        ) : (
+          <div style={styles.list}>
+            {filteredNotifications.map(
+              (notification) => {
+                const isRead = Boolean(
+                  notification?.is_read ||
+                    notification?.read_at
+                );
+
+                const isProcessing =
+                  actionId ===
+                  notification.id;
+
+                return (
+                  <button
+                    type="button"
+                    key={notification.id}
+                    onClick={() =>
+                      openNotification(
+                        notification
+                      )
+                    }
+                    disabled={isProcessing}
+                    style={{
+                      ...styles.item,
+                      ...(isRead
+                        ? styles.readItem
+                        : styles.unreadItem),
+                      ...(isProcessing
+                        ? styles.disabledButton
+                        : {}),
+                    }}
+                  >
+                    <div
+                      style={{
+                        ...styles.iconBox,
+                        ...(isRead
+                          ? styles.readIconBox
+                          : styles.unreadIconBox),
+                      }}
+                    >
+                      <RiNotificationLine />
+                    </div>
+
+                    <div style={styles.content}>
+                      <div
+                        style={
+                          styles.itemHeader
+                        }
+                      >
+                        <h2
+                          style={{
+                            ...styles.itemTitle,
+                            color: isRead
+                              ? "#94a3b8"
+                              : "#ffffff",
+                          }}
+                        >
+                          {notification?.title ||
+                            "Уведомление"}
+                        </h2>
+
+                        {!isRead && (
+                          <span
+                            style={
+                              styles.unreadBadge
+                            }
+                          >
+                            Новое
+                          </span>
+                        )}
+                      </div>
+
+                      <p
+                        style={
+                          styles.message
+                        }
+                      >
+                        {notification?.message ||
+                          notification?.text ||
+                          "Текст уведомления отсутствует."}
+                      </p>
+
+                      <div
+                        style={
+                          styles.itemFooter
+                        }
+                      >
+                        <span>
+                          {formatDateTime(
+                            notification?.created_at
+                          )}
+                        </span>
+
+                        {notification?.type && (
+                          <span
+                            style={
+                              styles.typeBadge
+                            }
+                          >
+                            {notification.type}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              }
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 const styles = {
-  container: { padding: "40px", color: "#fff", fontFamily: "'Outfit', sans-serif" },
-  title: { fontSize: "32px", fontWeight: 700, margin: "0 0 8px 0" },
-  sub: { color: "#94a3b8", fontSize: "16px", margin: "0 0 40px 0" },
-  card: { background: "rgba(30, 41, 59, 0.4)", borderRadius: "20px", border: "1px solid rgba(255, 255, 255, 0.05)", padding: "20px" },
-  list: { display: "flex", flexDirection: "column", gap: "12px" },
-  item: { display: "flex", gap: "16px", background: "rgba(0,0,0,0.15)", padding: "16px", borderRadius: "12px", alignItems: "center" }
+  container: {
+    padding: "36px",
+    color: "#ffffff",
+    fontFamily:
+      "'Outfit', 'Inter', sans-serif",
+  },
+
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "20px",
+    flexWrap: "wrap",
+    marginBottom: "24px",
+  },
+
+  title: {
+    margin: "0 0 7px",
+    fontSize: "32px",
+    fontWeight: 800,
+  },
+
+  subtitle: {
+    margin: 0,
+    color: "#94a3b8",
+  },
+
+  headerActions: {
+    display: "flex",
+    gap: "10px",
+    flexWrap: "wrap",
+  },
+
+  refreshButton: {
+    display: "flex",
+    alignItems: "center",
+    gap: "7px",
+    padding: "11px 15px",
+    borderRadius: "11px",
+    border:
+      "1px solid rgba(99,102,241,0.35)",
+    background:
+      "rgba(99,102,241,0.15)",
+    color: "#c7d2fe",
+    cursor: "pointer",
+    fontWeight: 700,
+  },
+
+  readAllButton: {
+    display: "flex",
+    alignItems: "center",
+    gap: "7px",
+    padding: "11px 15px",
+    borderRadius: "11px",
+    border:
+      "1px solid rgba(16,185,129,0.32)",
+    background:
+      "rgba(16,185,129,0.13)",
+    color: "#6ee7b7",
+    cursor: "pointer",
+    fontWeight: 700,
+  },
+
+  stats: {
+    display: "flex",
+    gap: "14px",
+    flexWrap: "wrap",
+    marginBottom: "20px",
+  },
+
+  statCard: {
+    minWidth: "180px",
+    padding: "16px 18px",
+    borderRadius: "14px",
+    background:
+      "rgba(30,41,59,0.45)",
+    border:
+      "1px solid rgba(255,255,255,0.06)",
+    display: "flex",
+    flexDirection: "column",
+  },
+
+  statValue: {
+    fontSize: "26px",
+    fontWeight: 800,
+  },
+
+  unreadValue: {
+    fontSize: "26px",
+    fontWeight: 800,
+    color: "#818cf8",
+  },
+
+  statLabel: {
+    marginTop: "3px",
+    color: "#94a3b8",
+    fontSize: "13px",
+  },
+
+  filters: {
+    display: "grid",
+    gridTemplateColumns:
+      "minmax(200px, 1fr) minmax(170px, 230px)",
+    gap: "12px",
+    marginBottom: "18px",
+  },
+
+  searchBox: {
+    display: "flex",
+    alignItems: "center",
+    gap: "9px",
+    padding: "0 13px",
+    borderRadius: "12px",
+    background:
+      "rgba(15,23,42,0.55)",
+    border:
+      "1px solid rgba(255,255,255,0.09)",
+    color: "#64748b",
+  },
+
+  searchInput: {
+    width: "100%",
+    padding: "12px 0",
+    border: "none",
+    background: "transparent",
+    color: "#ffffff",
+    outline: "none",
+  },
+
+  filterSelect: {
+    padding: "12px",
+    borderRadius: "12px",
+    border:
+      "1px solid rgba(255,255,255,0.09)",
+    background: "#111827",
+    color: "#ffffff",
+    outline: "none",
+  },
+
+  errorAlert: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    marginBottom: "16px",
+    padding: "12px 14px",
+    borderRadius: "11px",
+    background:
+      "rgba(239,68,68,0.13)",
+    border:
+      "1px solid rgba(239,68,68,0.3)",
+    color: "#fca5a5",
+  },
+
+  successAlert: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    marginBottom: "16px",
+    padding: "12px 14px",
+    borderRadius: "11px",
+    background:
+      "rgba(16,185,129,0.13)",
+    border:
+      "1px solid rgba(16,185,129,0.3)",
+    color: "#6ee7b7",
+  },
+
+  card: {
+    padding: "16px",
+    borderRadius: "18px",
+    background:
+      "rgba(30,41,59,0.43)",
+    border:
+      "1px solid rgba(255,255,255,0.06)",
+  },
+
+  list: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+  },
+
+  item: {
+    width: "100%",
+    padding: "15px",
+    borderRadius: "13px",
+    color: "#ffffff",
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "13px",
+    cursor: "pointer",
+    textAlign: "left",
+  },
+
+  unreadItem: {
+    background:
+      "rgba(99,102,241,0.11)",
+    border:
+      "1px solid rgba(99,102,241,0.25)",
+  },
+
+  readItem: {
+    background:
+      "rgba(0,0,0,0.14)",
+    border:
+      "1px solid rgba(255,255,255,0.04)",
+  },
+
+  iconBox: {
+    minWidth: "39px",
+    height: "39px",
+    borderRadius: "11px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "20px",
+  },
+
+  unreadIconBox: {
+    background:
+      "rgba(99,102,241,0.18)",
+    color: "#818cf8",
+  },
+
+  readIconBox: {
+    background:
+      "rgba(100,116,139,0.12)",
+    color: "#64748b",
+  },
+
+  content: {
+    minWidth: 0,
+    flex: 1,
+  },
+
+  itemHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+  },
+
+  itemTitle: {
+    margin: 0,
+    fontSize: "16px",
+    fontWeight: 750,
+  },
+
+  unreadBadge: {
+    padding: "4px 8px",
+    borderRadius: "999px",
+    background: "#4f46e5",
+    color: "#ffffff",
+    fontSize: "10px",
+    fontWeight: 700,
+  },
+
+  message: {
+    margin: "7px 0 10px",
+    color: "#94a3b8",
+    fontSize: "14px",
+    lineHeight: 1.5,
+    overflowWrap: "anywhere",
+  },
+
+  itemFooter: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "10px",
+    flexWrap: "wrap",
+    color: "#64748b",
+    fontSize: "11px",
+  },
+
+  typeBadge: {
+    padding: "3px 7px",
+    borderRadius: "999px",
+    background:
+      "rgba(255,255,255,0.05)",
+  },
+
+  emptyState: {
+    minHeight: "260px",
+    padding: "30px",
+    color: "#64748b",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "8px",
+    textAlign: "center",
+  },
+
+  emptyIcon: {
+    fontSize: "38px",
+    color: "#475569",
+  },
+
+  disabledButton: {
+    opacity: 0.55,
+    cursor: "not-allowed",
+  },
 };

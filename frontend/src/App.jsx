@@ -1,15 +1,12 @@
-import { AuthProvider } from "./context/AuthContext";
+
 import { LanguageProvider } from "./i18n/LanguageContext";
 import AppRoutes from "./routes/AppRoutes";
 
-function App() {
+export default function App() {
   return (
     <LanguageProvider>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <AppRoutes />
     </LanguageProvider>
   );
 }
 
-export default App;

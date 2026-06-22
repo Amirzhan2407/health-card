@@ -1,392 +1,567 @@
+
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  RiBuilding4Line,
+  RiLockPasswordLine,
+  RiUserAddLine,
+  RiUserHeartLine,
+  RiUserLine,
+} from "react-icons/ri";
+
 import { useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../i18n/LanguageContext";
-import ncalayer from "../../services/ncalayer";
-import { RiShieldKeyholeLine, RiLockPasswordLine, RiUserHeartLine } from "react-icons/ri";
 
 export default function Login() {
-  const { login, loginEds } = useAuth();
+  const { login } = useAuth();
   const { t, language, setLanguage } = useLanguage();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState("password"); // 'password' or 'eds'
-  const [username, setUsername] = useState("");
+  const [loginType, setLoginType] = useState("user");
+  const [loginValue, setLoginValue] = useState("");
+  const [organizationBin, setOrganizationBin] = useState("");
   const [password, setPassword] = useState("");
-  
-  const [edsLoading, setEdsLoading] = useState(false);
   const [authError, setAuthError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handlePasswordLogin = async (e) => {
-    e.preventDefault();
+  const isOrganizationAdmin = loginType === "organization_admin";
+
+  async function handleLogin(event) {
+    event.preventDefault();
+
+    if (loading) {
+      return;
+    }
+
+    const normalizedLogin = loginValue.trim();
+    const normalizedBin = organizationBin.trim();
+
+    if (!normalizedLogin) {
+      setAuthError("Введите логин.");
+      return;
+    }
+
+    if (
+      isOrganizationAdmin &&
+      !/^\d{12}$/.test(normalizedBin)
+    ) {
+      setAuthError(
+        "БИН организации должен содержать ровно 12 цифр."
+      );
+      return;
+    }
+
+    if (!password) {
+      setAuthError("Введите пароль.");
+      return;
+    }
+
     setAuthError("");
     setLoading(true);
+
     try {
-      await login(username, password);
-      // Auth success, redirect will be handled by Router based on role, or we can force refresh
-      navigate("/");
-    } catch (err) {
-      setAuthError(err.message);
+      await login(
+        normalizedLogin,
+        password,
+        isOrganizationAdmin ? normalizedBin : null
+      );
+
+      navigate("/", { replace: true });
+    } catch (error) {
+      setAuthError(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Не удалось выполнить вход. Проверьте введённые данные."
+      );
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleEdsLogin = async () => {
+  function switchLanguage() {
+    setLanguage(language === "ru" ? "kk" : "ru");
+  }
+
+  function selectLoginType(type) {
+    setLoginType(type);
     setAuthError("");
-    setEdsLoading(true);
-    try {
-      // 1. Generate a random challenge message to sign
-      const challengeText = `Auth challenge: ${Date.now()}`;
-      const challengeBase64 = btoa(challengeText);
 
-      // 2. Connect to local NCALayer and get keys info
-      await ncalayer.connect();
-      
-      // 3. Ask to sign CMS signature of challenge
-      const signature = await ncalayer.signData(challengeBase64);
-      if (!signature) {
-        throw new Error("Не удалось получить подпись от NCALayer.");
-      }
-
-      // 4. Authenticate signature with backend
-      const res = await loginEds(signature, challengeBase64);
-      if (res && res.needRegister) {
-        // Redirect to registration pre-populating details
-        navigate("/register", {
-          state: {
-            iin: res.details.iin,
-            fullName: res.details.fullName,
-          },
-        });
-      } else {
-        navigate("/");
-      }
-    } catch (err) {
-      setAuthError(err.message || "Ошибка подключения к NCALayer. Убедитесь, что приложение NCALayer запущено.");
-    } finally {
-      setEdsLoading(false);
+    if (type !== "organization_admin") {
+      setOrganizationBin("");
     }
-  };
+  }
 
   return (
     <div style={styles.container}>
-      {/* Background elements */}
-      <div style={styles.bgBlob1}></div>
-      <div style={styles.bgBlob2}></div>
+      <div style={styles.bgBlob1} />
+      <div style={styles.bgBlob2} />
 
-      {/* Language switcher */}
       <div style={styles.langSelector}>
         <button
-          onClick={() => setLanguage(language === "ru" ? "kk" : "ru")}
+          type="button"
+          onClick={switchLanguage}
           style={styles.langButton}
         >
           {language === "ru" ? "ҚАЗ" : "РУС"}
         </button>
       </div>
 
-      <div style={styles.card}>
-        <div style={styles.header}>
+      <main style={styles.card}>
+        <header style={styles.header}>
           <div style={styles.logoContainer}>
             <RiUserHeartLine style={styles.logoIcon} />
           </div>
-          <h2 style={styles.title}>Clinic OS</h2>
-          <p style={styles.subtitle}>{t("welcome_back") || "Единый портал здоровья"}</p>
+
+          <h1 style={styles.title}>Clinic OS</h1>
+
+          <p style={styles.subtitle}>
+            {t("welcome_back") || "Единый портал здоровья"}
+          </p>
+        </header>
+
+        <div style={styles.loginTitle}>
+          <RiLockPasswordLine style={styles.loginIcon} />
+          <span>{t("login_title") || "Вход в систему"}</span>
         </div>
 
-        {/* Tab Buttons */}
-        <div style={styles.tabContainer}>
+        <div style={styles.typeSelector}>
           <button
-            onClick={() => setActiveTab("password")}
+            type="button"
+            onClick={() => selectLoginType("user")}
+            disabled={loading}
             style={{
-              ...styles.tabButton,
-              ...(activeTab === "password" ? styles.activeTabButton : {}),
+              ...styles.typeButton,
+              ...(loginType === "user"
+                ? styles.activeTypeButton
+                : {}),
             }}
           >
-            <RiLockPasswordLine style={styles.tabIcon} />
-            {t("auth_via_password") || "Пароль"}
+            <RiUserLine />
+            <span>Пациент, врач или техподдержка</span>
           </button>
+
           <button
-            onClick={() => setActiveTab("eds")}
+            type="button"
+            onClick={() =>
+              selectLoginType("organization_admin")
+            }
+            disabled={loading}
             style={{
-              ...styles.tabButton,
-              ...(activeTab === "eds" ? styles.activeTabButton : {}),
+              ...styles.typeButton,
+              ...(isOrganizationAdmin
+                ? styles.activeTypeButton
+                : {}),
             }}
           >
-            <RiShieldKeyholeLine style={styles.tabIcon} />
-            {t("auth_via_eds") || "ЭЦП"}
+            <RiBuilding4Line />
+            <span>Администратор поликлиники</span>
           </button>
         </div>
 
-        {authError && <div style={styles.errorAlert}>{authError}</div>}
-
-        {activeTab === "password" ? (
-          <form onSubmit={handlePasswordLogin} style={styles.form}>
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>{t("username_label") || "ИИН или Email"}</label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="120304506070"
-                style={styles.input}
-                required
-              />
-            </div>
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>{t("password_label") || "Пароль"}</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                style={styles.input}
-                required
-              />
-            </div>
-            <button type="submit" disabled={loading} style={styles.submitButton}>
-              {loading ? (t("logging_in") || "Вход...") : (t("login_button") || "Войти")}
-            </button>
-          </form>
-        ) : (
-          <div style={styles.edsContainer}>
-            <p style={styles.edsInstructions}>
-              {t("eds_instructions") ||
-                "Для авторизации с помощью ЭЦП вам понадобится запущенное приложение NCALayer на вашем компьютере."}
-            </p>
-            <button
-              onClick={handleEdsLogin}
-              disabled={edsLoading}
-              style={{ ...styles.submitButton, ...styles.edsButton }}
-            >
-              {edsLoading ? (t("connecting_eds") || "Подключение...") : (t("select_cert_button") || "Выбрать сертификат")}
-            </button>
+        {authError && (
+          <div style={styles.errorAlert} role="alert">
+            {authError}
           </div>
         )}
 
+        <form onSubmit={handleLogin} style={styles.form}>
+          <div style={styles.inputGroup}>
+            <label htmlFor="login" style={styles.label}>
+              Логин
+            </label>
+
+            <input
+              id="login"
+              name="login"
+              type="text"
+              value={loginValue}
+              onChange={(event) =>
+                setLoginValue(event.target.value)
+              }
+              placeholder="Введите логин"
+              autoComplete="username"
+              disabled={loading}
+              style={styles.input}
+              required
+            />
+          </div>
+
+          {isOrganizationAdmin && (
+            <div style={styles.inputGroup}>
+              <label
+                htmlFor="organizationBin"
+                style={styles.label}
+              >
+                БИН организации
+              </label>
+
+              <input
+                id="organizationBin"
+                name="organizationBin"
+                type="text"
+                inputMode="numeric"
+                value={organizationBin}
+                onChange={(event) =>
+                  setOrganizationBin(
+                    event.target.value
+                      .replace(/\D/g, "")
+                      .slice(0, 12)
+                  )
+                }
+                placeholder="Введите 12 цифр БИН"
+                maxLength={12}
+                disabled={loading}
+                style={styles.input}
+                required
+              />
+
+              <span style={styles.binCounter}>
+                {organizationBin.length}/12
+              </span>
+            </div>
+          )}
+
+          <div style={styles.inputGroup}>
+            <label htmlFor="password" style={styles.label}>
+              {t("password_label") || "Пароль"}
+            </label>
+
+            <input
+              id="password"
+              name="password"
+              type="password"
+              value={password}
+              onChange={(event) =>
+                setPassword(event.target.value)
+              }
+              placeholder="••••••••"
+              autoComplete="current-password"
+              minLength={8}
+              disabled={loading}
+              style={styles.input}
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              ...styles.submitButton,
+              ...(loading ? styles.disabledButton : {}),
+            }}
+          >
+            {loading
+              ? t("logging_in") || "Выполняется вход..."
+              : t("login_button") || "Войти"}
+          </button>
+        </form>
+
         <div style={styles.footer}>
           <p style={styles.footerText}>
-            {t("no_account_yet") || "Еще нет аккаунта?"}{" "}
+            {t("no_account") || "Нет аккаунта?"}{" "}
             <Link to="/register" style={styles.footerLink}>
-              {t("register_link") || "Зарегистрироваться как пациент"}
+              <RiUserAddLine style={styles.footerLinkIcon} />
+              {t("register_button") || "Зарегистрироваться"}
             </Link>
           </p>
-          <p style={styles.footerText}>
-            <Link to="/organization-application" style={styles.footerLink}>
-              {t("clinic_application_link") || "Подать заявку для клиники"}
-            </Link>
-          </p>
+
+          <div style={styles.divider}>
+            <span style={styles.dividerLine} />
+            <span style={styles.dividerText}>
+              {t("or") || "или"}
+            </span>
+            <span style={styles.dividerLine} />
+          </div>
+
+          <Link
+            to="/organization-application"
+            style={styles.organizationLink}
+          >
+            {t("clinic_application_link") ||
+              "Подать заявку от медицинской организации"}
+          </Link>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
 
-// Sleek glassmorphism styles
 const styles = {
   container: {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
     minHeight: "100vh",
-    width: "100vw",
-    background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "80px 20px 40px",
+    background:
+      "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
     fontFamily: "'Outfit', 'Inter', sans-serif",
     position: "relative",
     overflow: "hidden",
   },
+
   bgBlob1: {
     position: "absolute",
-    width: "400px",
-    height: "400px",
-    background: "radial-gradient(circle, rgba(99,102,241,0.15) 0%, rgba(0,0,0,0) 70%)",
-    top: "-10%",
-    left: "-10%",
+    width: "420px",
+    height: "420px",
+    background:
+      "radial-gradient(circle, rgba(99,102,241,0.18) 0%, rgba(0,0,0,0) 70%)",
+    top: "-160px",
+    left: "-160px",
     borderRadius: "50%",
   },
+
   bgBlob2: {
     position: "absolute",
-    width: "500px",
-    height: "500px",
-    background: "radial-gradient(circle, rgba(16,185,129,0.1) 0%, rgba(0,0,0,0) 70%)",
-    bottom: "-10%",
-    right: "-10%",
+    width: "520px",
+    height: "520px",
+    background:
+      "radial-gradient(circle, rgba(16,185,129,0.12) 0%, rgba(0,0,0,0) 70%)",
+    right: "-200px",
+    bottom: "-220px",
     borderRadius: "50%",
   },
+
   langSelector: {
     position: "absolute",
     top: "20px",
     right: "20px",
+    zIndex: 20,
   },
+
   langButton: {
-    background: "rgba(255, 255, 255, 0.05)",
-    border: "1px solid rgba(255, 255, 255, 0.1)",
-    color: "#fff",
-    padding: "8px 16px",
+    background: "rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.14)",
+    color: "#ffffff",
+    padding: "9px 17px",
     borderRadius: "20px",
     cursor: "pointer",
     fontSize: "14px",
-    transition: "all 0.3s ease",
+    fontWeight: 700,
   },
+
   card: {
-    background: "rgba(15, 23, 42, 0.6)",
+    width: "100%",
+    maxWidth: "460px",
+    boxSizing: "border-box",
+    padding: "34px",
+    background: "rgba(15,23,42,0.72)",
     backdropFilter: "blur(20px)",
     WebkitBackdropFilter: "blur(20px)",
-    border: "1px solid rgba(255, 255, 255, 0.1)",
+    border: "1px solid rgba(255,255,255,0.1)",
     borderRadius: "24px",
-    padding: "40px",
-    width: "100%",
-    maxWidth: "440px",
-    boxShadow: "0 20px 40px rgba(0,0,0,0.3)",
+    boxShadow: "0 24px 60px rgba(0,0,0,0.35)",
+    position: "relative",
     zIndex: 10,
-    display: "flex",
-    flexDirection: "column",
   },
+
   header: {
     textAlign: "center",
-    marginBottom: "30px",
-  },
-  logoContainer: {
-    width: "60px",
-    height: "60px",
-    borderRadius: "16px",
-    background: "linear-gradient(135deg, #6366f1 0%, #10b981 100%)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    margin: "0 auto 16px auto",
-  },
-  logoIcon: {
-    fontSize: "30px",
-    color: "#fff",
-  },
-  title: {
-    fontSize: "28px",
-    fontWeight: 700,
-    color: "#fff",
-    margin: "0 0 4px 0",
-    letterSpacing: "-0.5px",
-  },
-  subtitle: {
-    fontSize: "14px",
-    color: "#94a3b8",
-    margin: 0,
-  },
-  tabContainer: {
-    display: "flex",
-    background: "rgba(0, 0, 0, 0.2)",
-    padding: "4px",
-    borderRadius: "12px",
     marginBottom: "24px",
-    border: "1px solid rgba(255, 255, 255, 0.05)",
   },
-  tabButton: {
-    flex: 1,
+
+  logoContainer: {
+    width: "62px",
+    height: "62px",
+    margin: "0 auto 16px",
+    borderRadius: "17px",
+    background:
+      "linear-gradient(135deg, #6366f1 0%, #10b981 100%)",
     display: "flex",
-    alignItems: "center",
     justifyContent: "center",
-    gap: "8px",
-    background: "none",
-    border: "none",
+    alignItems: "center",
+    boxShadow: "0 12px 28px rgba(99,102,241,0.28)",
+  },
+
+  logoIcon: {
+    fontSize: "31px",
+    color: "#ffffff",
+  },
+
+  title: {
+    margin: "0 0 5px",
+    color: "#ffffff",
+    fontSize: "29px",
+    fontWeight: 800,
+  },
+
+  subtitle: {
+    margin: 0,
     color: "#94a3b8",
-    padding: "10px",
-    borderRadius: "8px",
-    cursor: "pointer",
     fontSize: "14px",
-    fontWeight: 600,
-    transition: "all 0.2s ease",
   },
-  activeTabButton: {
-    background: "rgba(255, 255, 255, 0.1)",
-    color: "#fff",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-  },
-  tabIcon: {
-    fontSize: "16px",
-  },
-  errorAlert: {
-    background: "rgba(239, 68, 68, 0.15)",
-    border: "1px solid rgba(239, 68, 68, 0.3)",
-    color: "#fca5a5",
-    padding: "12px 16px",
+
+  loginTitle: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "8px",
+    marginBottom: "16px",
+    padding: "11px",
+    background: "rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.07)",
     borderRadius: "12px",
+    color: "#e2e8f0",
     fontSize: "14px",
-    marginBottom: "20px",
+    fontWeight: 700,
+  },
+
+  loginIcon: {
+    fontSize: "18px",
+  },
+
+  typeSelector: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "8px",
+    marginBottom: "18px",
+  },
+
+  typeButton: {
+    minHeight: "62px",
+    padding: "9px",
+    borderRadius: "11px",
+    border: "1px solid rgba(255,255,255,0.09)",
+    background: "rgba(0,0,0,0.16)",
+    color: "#94a3b8",
+    cursor: "pointer",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "5px",
+    fontSize: "11px",
+    fontWeight: 700,
+    lineHeight: 1.25,
+  },
+
+  activeTypeButton: {
+    background: "rgba(99,102,241,0.18)",
+    border: "1px solid rgba(99,102,241,0.55)",
+    color: "#c7d2fe",
+  },
+
+  errorAlert: {
+    marginBottom: "18px",
+    padding: "12px 15px",
+    borderRadius: "12px",
+    background: "rgba(239,68,68,0.15)",
+    border: "1px solid rgba(239,68,68,0.32)",
+    color: "#fca5a5",
+    fontSize: "14px",
+    lineHeight: 1.5,
     textAlign: "center",
   },
+
   form: {
     display: "flex",
     flexDirection: "column",
-    gap: "20px",
+    gap: "17px",
   },
+
   inputGroup: {
+    position: "relative",
     display: "flex",
     flexDirection: "column",
-    gap: "6px",
+    gap: "7px",
   },
+
   label: {
+    color: "#cbd5e1",
     fontSize: "13px",
-    color: "#94a3b8",
-    fontWeight: 600,
+    fontWeight: 700,
   },
+
   input: {
-    background: "rgba(0, 0, 0, 0.2)",
-    border: "1px solid rgba(255, 255, 255, 0.1)",
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "13px 15px",
+    background: "rgba(0,0,0,0.22)",
+    border: "1px solid rgba(255,255,255,0.12)",
     borderRadius: "12px",
-    padding: "12px 16px",
-    color: "#fff",
+    color: "#ffffff",
     fontSize: "15px",
     outline: "none",
-    transition: "all 0.3s ease",
   },
-  submitButton: {
-    background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
-    color: "#fff",
-    padding: "14px",
-    borderRadius: "12px",
-    border: "none",
-    fontSize: "16px",
-    fontWeight: 600,
-    cursor: "pointer",
-    transition: "all 0.3s ease",
-    boxShadow: "0 10px 20px rgba(99, 102, 241, 0.2)",
-    marginTop: "10px",
-  },
-  edsContainer: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    textAlign: "center",
-    gap: "20px",
-    padding: "10px 0",
-  },
-  edsInstructions: {
-    fontSize: "14px",
-    color: "#94a3b8",
-    lineHeight: "1.5",
-    margin: 0,
-  },
-  edsButton: {
-    width: "100%",
-    background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-    boxShadow: "0 10px 20px rgba(16, 185, 129, 0.15)",
-  },
-  footer: {
-    textAlign: "center",
-    marginTop: "30px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "10px",
-  },
-  footerText: {
-    fontSize: "13px",
+
+  binCounter: {
+    position: "absolute",
+    right: "12px",
+    bottom: "14px",
     color: "#64748b",
-    margin: 0,
+    fontSize: "11px",
   },
+
+  submitButton: {
+    width: "100%",
+    marginTop: "4px",
+    padding: "14px",
+    border: "none",
+    borderRadius: "12px",
+    background:
+      "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+    color: "#ffffff",
+    fontSize: "16px",
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+
+  disabledButton: {
+    cursor: "not-allowed",
+    opacity: 0.65,
+  },
+
+  footer: {
+    marginTop: "27px",
+    textAlign: "center",
+  },
+
+  footerText: {
+    margin: 0,
+    color: "#94a3b8",
+    fontSize: "14px",
+  },
+
   footerLink: {
-    color: "#6366f1",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "4px",
+    color: "#818cf8",
+    textDecoration: "none",
+    fontWeight: 700,
+  },
+
+  footerLinkIcon: {
+    fontSize: "16px",
+  },
+
+  divider: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    margin: "21px 0",
+  },
+
+  dividerLine: {
+    flex: 1,
+    height: "1px",
+    background: "rgba(255,255,255,0.1)",
+  },
+
+  dividerText: {
+    color: "#64748b",
+    fontSize: "12px",
+  },
+
+  organizationLink: {
+    color: "#94a3b8",
+    fontSize: "13px",
+    lineHeight: 1.5,
     textDecoration: "none",
     fontWeight: 600,
   },
 };
+

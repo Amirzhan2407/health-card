@@ -1,35 +1,63 @@
+  
 import express from "express";
+
 import {
   getOrganizations,
   getOrganization,
   updateOrg,
   changeOrgStatus,
+  deleteOrg,
 } from "../controllers/orgController.js";
-import { authenticateToken, requireRoles, requireOrganizationBoundary } from "../middleware/auth.js";
-import { validateOrgUpdate, validateBlockOrg } from "../validators/orgValidators.js";
+
+import {
+  authenticateToken,
+  requireRoles,
+  requireOrganizationBoundary,
+} from "../middleware/auth.js";
+
+import {
+  validateOrgUpdate,
+  validateBlockOrg,
+} from "../validators/orgValidators.js";
 
 const router = express.Router();
 
-// Support only lists all organizations
-router.get("/", authenticateToken, requireRoles(["support"]), getOrganizations);
+// Техподдержка получает все организации
+router.get(
+  "/",
+  authenticateToken,
+  requireRoles(["support"]),
+  getOrganizations
+);
 
-// Patients & other users can list active organizations
-router.get("/active/list", authenticateToken, getOrganizations);
+// Пользователи получают активные организации
+router.get(
+  "/active/list",
+  authenticateToken,
+  getOrganizations
+);
 
-// Any authenticated user can view details of an organization
-router.get("/:id", authenticateToken, getOrganization);
+// Просмотр организации
+router.get(
+  "/:id",
+  authenticateToken,
+  getOrganization
+);
 
-// Update organization details
+// Изменение организации
 router.put(
   "/:id",
   authenticateToken,
-  requireRoles(["organization_admin", "support"]),
+  requireRoles([
+    "organization_admin",
+    "support",
+  ]),
   requireOrganizationBoundary,
   validateOrgUpdate,
   updateOrg
 );
 
-// Block/Unblock organization (Support only)
+// Блокировка и разблокировка
 router.patch(
   "/:id/status",
   authenticateToken,
@@ -38,4 +66,13 @@ router.patch(
   changeOrgStatus
 );
 
+// Полное удаление организации техподдержкой
+router.delete(
+  "/:id",
+  authenticateToken,
+  requireRoles(["support"]),
+  deleteOrg
+);
+
 export default router;
+
