@@ -1,5 +1,6 @@
 import { supabase } from "../config/supabaseClient.js";
 import { hashPassword } from "../utils/crypto.js";
+import { AppError } from "../utils/errorHandler.js";
 
 export async function listDoctors(orgId, specialtyId) {
   let query = supabase
@@ -204,7 +205,7 @@ export async function updateDoctor(orgId, doctorId, data) {
   }
 
   if (doc.organization_members.organization_id !== orgId) {
-    throw new Error("Врач принадлежит другой организации.");
+    throw new AppError("Врач принадлежит другой организации.", 403);
   }
 
   const updateFields = {};

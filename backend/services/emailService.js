@@ -26,11 +26,16 @@ export async function sendEmail({ to, subject, text, html }) {
     html,
   };
 
-  // If credentials are not set, fallback to console log
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    console.log(`[SMTP DEV MODE - NO CREDENTIALS] Email to: ${to}, subject: ${subject}`);
+  // SMTP can only be bypassed if explicitly disabled via config
+  if (process.env.SMTP_DISABLED === "true") {
+    console.log(`[SMTP BYPASS - LOGGING ONLY] Email to: ${to}, subject: ${subject}`);
     console.log(`Text content:\n${text}`);
     return { success: true, logged: true };
+  }
+
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.error(`[SMTP ERROR] Missing credentials. Set SMTP_DISABLED=true to disable SMTP explicitly.`);
+    return { success: false, error: "SMTP credentials not configured" };
   }
 
   try {

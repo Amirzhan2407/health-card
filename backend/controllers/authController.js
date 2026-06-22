@@ -3,9 +3,15 @@ import { v4 as uuidv4 } from "uuid";
 import { supabase } from "../config/supabaseClient.js";
 import { verifyPassword, hashPassword } from "../utils/crypto.js";
 import { verifySignature } from "../services/edsService.js";
+import crypto from "crypto";
 
-const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || "your_jwt_secret_here";
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || "your_jwt_secret_here";
+function hashToken(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+
+const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET;
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 const ACCESS_TOKEN_EXPIRY = process.env.ACCESS_TOKEN_TTL || "15m";
 const REFRESH_TOKEN_TTL = process.env.REFRESH_TOKEN_TTL || "7d";
 
@@ -45,7 +51,7 @@ function setCookies(res, accessToken, refreshToken) {
   const refreshCookieOptions = {
     httpOnly: true,
     secure: isProd,
-    sameSite: isProd ? "strict" : "lax",
+    sameSite: isProd ? "none" : "lax",
     maxAge: refreshAge,
     path: "/",
   };
@@ -53,7 +59,7 @@ function setCookies(res, accessToken, refreshToken) {
   const accessCookieOptions = {
     httpOnly: true, // access token in httpOnly cookie for backup, though frontend can store in-memory
     secure: isProd,
-    sameSite: isProd ? "strict" : "lax",
+    sameSite: isProd ? "none" : "lax",
     maxAge: accessAge,
     path: "/",
   };
@@ -69,7 +75,7 @@ function clearCookies(res) {
   const cookieOptions = {
     httpOnly: true,
     secure: isProd,
-    sameSite: isProd ? "strict" : "lax",
+    sameSite: isProd ? "none" : "lax",
     path: "/",
   };
 
@@ -81,26 +87,19 @@ function clearCookies(res) {
 async function generateTokens(profileId, oldRefreshTokenId = null, familyId = null) {
   const accessToken = jwt.sign({ id: profileId }, JWT_ACCESS_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
   const refreshToken = uuidv4(); // Secure UUID token
+  const tokenHash = hashToken(refreshToken);
 
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_EXPIRY_DAYS);
 
   const finalFamilyId = familyId || uuidv4();
 
-  // If rotating, invalidate old refresh token
-  if (oldRefreshTokenId) {
-    await supabase
-      .from("user_refresh_tokens")
-      .update({ is_revoked: true })
-      .eq("id", oldRefreshTokenId);
-  }
-
   // Insert new refresh token
   const { data: tokenData, error: tokenErr } = await supabase
     .from("user_refresh_tokens")
     .insert({
       profile_id: profileId,
-      token: refreshToken,
+      token_hash: tokenHash,
       family_id: finalFamilyId,
       expires_at: expiresAt.toISOString(),
     })
@@ -109,6 +108,18 @@ async function generateTokens(profileId, oldRefreshTokenId = null, familyId = nu
 
   if (tokenErr) {
     throw new Error("Не удалось сохранить сессию авторизации.");
+  }
+
+  // If rotating, invalidate old refresh token and link it to the new one
+  if (oldRefreshTokenId) {
+    await supabase
+      .from("user_refresh_tokens")
+      .update({
+        is_revoked: true,
+        revoked_at: new Date().toISOString(),
+        replaced_by: tokenData.id
+      })
+      .eq("id", oldRefreshTokenId);
   }
 
   return {
@@ -289,11 +300,12 @@ export async function refresh(req, res, next) {
       return res.status(401).json({ success: false, message: "Отсутствует refresh токен." });
     }
 
+    const tokenHash = hashToken(oldRefreshToken);
     // Find token in database
     const { data: tokenRecord, error } = await supabase
       .from("user_refresh_tokens")
       .select("*")
-      .eq("token", oldRefreshToken)
+      .eq("token_hash", tokenHash)
       .maybeSingle();
 
     if (error || !tokenRecord) {
@@ -338,11 +350,12 @@ export async function logout(req, res, next) {
     const refreshToken = req.cookies.refreshToken;
 
     if (refreshToken) {
+      const tokenHash = hashToken(refreshToken);
       // Revoke in database
       await supabase
         .from("user_refresh_tokens")
         .update({ is_revoked: true })
-        .eq("token", refreshToken);
+        .eq("token_hash", tokenHash);
     }
 
     clearCookies(res);

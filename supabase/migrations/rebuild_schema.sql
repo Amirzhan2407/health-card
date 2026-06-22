@@ -306,9 +306,11 @@ CREATE TABLE IF NOT EXISTS ai_history_new (
 CREATE TABLE IF NOT EXISTS user_refresh_tokens_new (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     profile_id UUID REFERENCES profiles_new(id) ON DELETE CASCADE,
-    token VARCHAR(512) UNIQUE NOT NULL,
+    token_hash TEXT UNIQUE NOT NULL,
     family_id UUID NOT NULL,
     is_revoked BOOLEAN DEFAULT false,
+    revoked_at TIMESTAMPTZ,
+    replaced_by UUID REFERENCES user_refresh_tokens_new(id) ON DELETE SET NULL,
     expires_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now()
 );

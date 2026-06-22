@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import { supabase } from "../config/supabaseClient.js";
 
-const JWT_SECRET = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || "your_jwt_secret_here";
+const JWT_SECRET = process.env.JWT_ACCESS_SECRET;
 
 export async function authenticateToken(req, res, next) {
   try {

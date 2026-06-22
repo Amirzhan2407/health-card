@@ -201,3 +201,40 @@ SELECT id, conversation_id, sender_id, message_text, attachment_url, is_read, cr
 FROM support_messages
 WHERE sender_id IN (SELECT id FROM profiles_new)
 ON CONFLICT DO NOTHING;
+
+-- 15. Migrate Visit Records
+INSERT INTO visit_records_new (id, appointment_id, patient_id, doctor_id, organization_id, complaints, symptoms, preliminary_diagnosis, final_diagnosis, treatment, recommendations, comment, actual_start_time, actual_end_time, created_at)
+SELECT
+  vr.id,
+  vr.appointment_id,
+  p.id,
+  vr.doctor_id,
+  vr.organization_id,
+  vr.complaints,
+  vr.symptoms,
+  NULL, -- preliminary_diagnosis
+  vr.diagnosis, -- final_diagnosis
+  vr.treatment,
+  vr.recommendations,
+  vr.comment,
+  vr.actual_start_time,
+  vr.actual_end_time,
+  vr.created_at
+FROM visit_records vr
+JOIN profiles_new p ON p.iin = vr.patient_iin
+ON CONFLICT DO NOTHING;
+
+-- 16. Migrate Visit Documents
+INSERT INTO visit_documents_new (id, visit_record_id, file_name, file_url, file_size, mime_type, uploaded_at)
+SELECT id, visit_record_id, file_name, file_url, file_size, mime_type, uploaded_at
+FROM visit_documents
+WHERE visit_record_id IN (SELECT id FROM visit_records_new)
+ON CONFLICT DO NOTHING;
+
+-- 17. Migrate Health Metrics
+INSERT INTO health_metrics_new (id, patient_id, metric_type, value, unit, measured_at, created_at)
+SELECT id, patient_id, metric_type, value, unit, created_at, created_at
+FROM health_metric_records
+WHERE patient_id IN (SELECT id FROM profiles_new)
+ON CONFLICT DO NOTHING;
+

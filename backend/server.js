@@ -25,7 +25,10 @@ import aiRouter from "./routes/ai.js";
 import medicineRouter from "./routes/medicine.js";
 import notificationsRouter from "./routes/notifications.js";
 
+import { validateEnv } from "./config/env.js";
+
 dotenv.config();
+validateEnv();
 
 const app = express();
 
@@ -44,7 +47,9 @@ const corsOptions = {
     if (!origin || whitelist.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      callback(new Error("Не разрешено политикой CORS"));
+      const err = new Error("Не разрешено политикой CORS");
+      err.statusCode = 403;
+      callback(err);
     }
   },
   credentials: true,

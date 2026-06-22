@@ -14,11 +14,23 @@ export async function getMedicalCard(req, res, next) {
       });
     }
 
-    let patientProfile = null;
-
     if (user.role === "patient") {
       // Patients can only view their own card
-      targetPatientId = user.id;
+      if (targetPatientId && targetPatientId !== user.id) {
+        return res.status(403).json({
+          success: false,
+          message: "Доступ запрещен. Вы можете просматривать только собственную медицинскую карту.",
+        });
+      }
+      if (iin && iin !== user.iin) {
+        return res.status(403).json({
+          success: false,
+          message: "Доступ запрещен. Вы можете просматривать только собственную медицинскую карту.",
+        });
+      }
+      if (!targetPatientId && !iin) {
+        targetPatientId = user.id;
+      }
     }
 
     // 2. Fetch patient profile
@@ -36,7 +48,7 @@ export async function getMedicalCard(req, res, next) {
       return res.status(404).json({ success: false, message: "Профиль пациента не найден." });
     }
 
-    patientProfile = profile;
+    const patientProfile = profile;
     const patientId = patientProfile.id;
 
     // 3. If doctor is requesting, check organization boundaries

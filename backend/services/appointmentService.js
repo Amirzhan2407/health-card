@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import { supabase } from "../config/supabaseClient.js";
 import { generateDoctorSlots } from "./scheduleService.js";
+import { AppError } from "../utils/errorHandler.js";
 
 // Helper to generate a random numeric code
 function generateNumericCode(length = 6) {
@@ -22,7 +23,7 @@ export async function createAppointment(patientId, orgId, doctorId, date, time, 
   const slots = await generateDoctorSlots(doctorId, date);
   const slot = slots.find((s) => s.time === time);
   if (!slot || !slot.isAvailable) {
-    throw new Error("Выбранный временной слот недоступен для записи.");
+    throw new AppError("Выбранный временной слот недоступен для записи.", 409);
   }
 
   // Generate QR token
@@ -45,10 +46,10 @@ export async function createAppointment(patientId, orgId, doctorId, date, time, 
 
   if (error) {
     // If DB double-booking constraint triggers
-    if (error.code === "23505") {
-      throw new Error("Этот временной слот уже забронирован другим пациентом.");
+    if (error.code === "23505" || error.code === "23505") {
+      throw new AppError("Этот временной слот уже забронирован другим пациентом.", 409);
     }
-    throw new Error(`Ошибка создания записи: ${error.message}`);
+    throw new AppError(`Ошибка создания записи: ${error.message}`, 500);
   }
 
   return appointment;
