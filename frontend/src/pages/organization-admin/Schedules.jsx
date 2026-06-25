@@ -15,16 +15,329 @@ import {
 } from "react-icons/ri";
 
 import api from "../../api/api";
+import { useLanguage } from "../../i18n/LanguageContext";
 
 const DAYS = [
-  { id: 1, name: "Понедельник" },
-  { id: 2, name: "Вторник" },
-  { id: 3, name: "Среда" },
-  { id: 4, name: "Четверг" },
-  { id: 5, name: "Пятница" },
-  { id: 6, name: "Суббота" },
-  { id: 7, name: "Воскресенье" },
+  {
+    id: 1,
+    nameRu: "Понедельник",
+    nameKk: "Дүйсенбі",
+  },
+  {
+    id: 2,
+    nameRu: "Вторник",
+    nameKk: "Сейсенбі",
+  },
+  {
+    id: 3,
+    nameRu: "Среда",
+    nameKk: "Сәрсенбі",
+  },
+  {
+    id: 4,
+    nameRu: "Четверг",
+    nameKk: "Бейсенбі",
+  },
+  {
+    id: 5,
+    nameRu: "Пятница",
+    nameKk: "Жұма",
+  },
+  {
+    id: 6,
+    nameRu: "Суббота",
+    nameKk: "Сенбі",
+  },
+  {
+    id: 7,
+    nameRu: "Воскресенье",
+    nameKk: "Жексенбі",
+  },
 ];
+
+const TEXTS = {
+  ru: {
+    pageTitle: "Расписание врачей",
+    pageSubtitle:
+      "Назначьте врачу специальность, отделение, кабинет и настройте недельный график приёма.",
+
+    refreshLoading: "Обновление...",
+    refreshData: "Обновить данные",
+
+    doctorSetupTitle: "Настройка врача",
+    doctorSetupSubtitle:
+      "Выберите врача, специальность, отделение и рабочий кабинет.",
+
+    doctorLabel: "Врач",
+    specialtyLabel: "Специальность",
+    departmentLabel: "Отделение",
+    roomLabel: "Кабинет",
+    scheduleStartLabel:
+      "Начало действия графика",
+
+    selectDoctor: "Выберите врача",
+    selectSpecialty:
+      "Выберите специальность",
+    selectDepartment:
+      "Выберите отделение",
+    selectRoom: "Выберите кабинет",
+    loadingRooms:
+      "Загрузка кабинетов...",
+
+    notSelectedFeminine: "Не выбрана",
+    notSelectedNeuter: "Не выбрано",
+    notSelectedMasculine: "Не выбран",
+
+    commonSettingsTitle:
+      "Общие настройки",
+    commonSettingsSubtitle:
+      "Установите одинаковое время для всех выбранных рабочих дней.",
+
+    workStart: "Начало работы",
+    workEnd: "Конец работы",
+    lunchStart: "Начало обеда",
+    lunchEnd: "Конец обеда",
+    appointmentMinutes:
+      "Приём, минут",
+
+    disableAllDays:
+      "Отключить все дни",
+    selectAllDays:
+      "Выбрать все дни",
+    selectWeekdays:
+      "Выбрать понедельник–пятницу",
+    applyToWorkingDays:
+      "Применить время к рабочим дням",
+
+    weeklySchedule:
+      "Недельный график",
+    selectedWorkingDays:
+      "Рабочих дней выбрано",
+    loadingSchedule:
+      "Загрузка расписания...",
+
+    workingDay: "Рабочий день",
+    dayOff: "Выходной",
+    copyDayTitle:
+      "Скопировать настройки этого дня",
+
+    appointmentDuration:
+      "Продолжительность приёма",
+    minutes: "минут",
+
+    savePanelTitle:
+      "Сохранение расписания",
+    savePanelDescription:
+      "Специальность, кабинет и недельный график будут сохранены для выбранного врача.",
+    saving: "Сохранение...",
+    saveSchedule:
+      "Сохранить расписание",
+
+    doctorWithoutName:
+      "Врач без указанного имени",
+    unnamed: "Без названия",
+    roomDefault: "Кабинет",
+    roomPrefix: "Кабинет",
+
+    doctorsLoadError:
+      "Не удалось загрузить список врачей.",
+    referencesLoadError:
+      "Не удалось загрузить специальности или отделения.",
+    roomsLoadError:
+      "Не удалось загрузить кабинеты отделения.",
+    scheduleNotConfigured:
+      "Для выбранного врача расписание ещё не настроено.",
+    scheduleLoaded:
+      "Сохранённое расписание врача загружено.",
+    scheduleLoadError:
+      "Не удалось загрузить расписание врача.",
+    commonApplied:
+      "Общие настройки применены ко всем рабочим дням.",
+    cannotCopyDayOff:
+      "Нельзя копировать настройки выходного дня.",
+    scheduleSaved:
+      "Специальность, отделение, кабинет и расписание успешно сохранены.",
+    scheduleSaveError:
+      "Не удалось сохранить данные врача и расписание.",
+
+    validationDoctor:
+      "Выберите врача.",
+    validationSpecialty:
+      "Выберите специальность врача.",
+    validationDepartment:
+      "Выберите отделение.",
+    validationRoom:
+      "Выберите кабинет.",
+    validationRoomDepartment:
+      "Выбранный кабинет не относится к выбранному отделению.",
+    validationStartDate:
+      "Укажите дату начала действия расписания.",
+    validationWorkingDay:
+      "Выберите хотя бы один рабочий день.",
+
+    copyDaySuccess: (dayName) =>
+      `Настройки дня «${dayName}» скопированы на остальные рабочие дни.`,
+
+    validationWorkTime: (dayName) =>
+      `${dayName}: укажите рабочее время.`,
+
+    validationWorkEnd: (dayName) =>
+      `${dayName}: окончание работы должно быть позже начала.`,
+
+    validationLunchTime: (dayName) =>
+      `${dayName}: укажите время обеда.`,
+
+    validationLunchEnd: (dayName) =>
+      `${dayName}: окончание обеда должно быть позже начала.`,
+
+    validationLunchInside: (dayName) =>
+      `${dayName}: обед должен находиться внутри рабочего времени.`,
+
+    validationDuration: (dayName) =>
+      `${dayName}: продолжительность приёма должна составлять от 5 до 480 минут.`,
+  },
+
+  kk: {
+    pageTitle: "Дәрігерлер кестесі",
+    pageSubtitle:
+      "Дәрігерге мамандық, бөлімше, кабинет тағайындап, апталық қабылдау кестесін баптаңыз.",
+
+    refreshLoading: "Жаңартылуда...",
+    refreshData: "Деректерді жаңарту",
+
+    doctorSetupTitle:
+      "Дәрігерді баптау",
+    doctorSetupSubtitle:
+      "Дәрігерді, мамандықты, бөлімшені және жұмыс кабинетін таңдаңыз.",
+
+    doctorLabel: "Дәрігер",
+    specialtyLabel: "Мамандық",
+    departmentLabel: "Бөлімше",
+    roomLabel: "Кабинет",
+    scheduleStartLabel:
+      "Кестенің басталу күні",
+
+    selectDoctor: "Дәрігерді таңдаңыз",
+    selectSpecialty:
+      "Мамандықты таңдаңыз",
+    selectDepartment:
+      "Бөлімшені таңдаңыз",
+    selectRoom: "Кабинетті таңдаңыз",
+    loadingRooms:
+      "Кабинеттер жүктелуде...",
+
+    notSelectedFeminine: "Таңдалмаған",
+    notSelectedNeuter: "Таңдалмаған",
+    notSelectedMasculine: "Таңдалмаған",
+
+    commonSettingsTitle:
+      "Жалпы баптаулар",
+    commonSettingsSubtitle:
+      "Барлық таңдалған жұмыс күндеріне бірдей уақыт орнатыңыз.",
+
+    workStart: "Жұмыстың басталуы",
+    workEnd: "Жұмыстың аяқталуы",
+    lunchStart: "Түскі үзілістің басталуы",
+    lunchEnd: "Түскі үзілістің аяқталуы",
+    appointmentMinutes:
+      "Қабылдау ұзақтығы, минут",
+
+    disableAllDays:
+      "Барлық күнді өшіру",
+    selectAllDays:
+      "Барлық күнді таңдау",
+    selectWeekdays:
+      "Дүйсенбі–жұма күндерін таңдау",
+    applyToWorkingDays:
+      "Уақытты жұмыс күндеріне қолдану",
+
+    weeklySchedule:
+      "Апталық кесте",
+    selectedWorkingDays:
+      "Таңдалған жұмыс күндері",
+    loadingSchedule:
+      "Кесте жүктелуде...",
+
+    workingDay: "Жұмыс күні",
+    dayOff: "Демалыс күні",
+    copyDayTitle:
+      "Осы күннің баптауларын көшіру",
+
+    appointmentDuration:
+      "Қабылдау ұзақтығы",
+    minutes: "минут",
+
+    savePanelTitle:
+      "Кестені сақтау",
+    savePanelDescription:
+      "Таңдалған дәрігер үшін мамандық, кабинет және апталық кесте сақталады.",
+    saving: "Сақталуда...",
+    saveSchedule: "Кестені сақтау",
+
+    doctorWithoutName:
+      "Аты көрсетілмеген дәрігер",
+    unnamed: "Атауы жоқ",
+    roomDefault: "Кабинет",
+    roomPrefix: "Кабинет",
+
+    doctorsLoadError:
+      "Дәрігерлер тізімін жүктеу мүмкін болмады.",
+    referencesLoadError:
+      "Мамандықтар немесе бөлімшелер жүктелмеді.",
+    roomsLoadError:
+      "Бөлімше кабинеттерін жүктеу мүмкін болмады.",
+    scheduleNotConfigured:
+      "Таңдалған дәрігердің кестесі әлі бапталмаған.",
+    scheduleLoaded:
+      "Дәрігердің сақталған кестесі жүктелді.",
+    scheduleLoadError:
+      "Дәрігердің кестесін жүктеу мүмкін болмады.",
+    commonApplied:
+      "Жалпы баптаулар барлық жұмыс күндеріне қолданылды.",
+    cannotCopyDayOff:
+      "Демалыс күнінің баптауларын көшіруге болмайды.",
+    scheduleSaved:
+      "Мамандық, бөлімше, кабинет және кесте сәтті сақталды.",
+    scheduleSaveError:
+      "Дәрігер деректері мен кестесін сақтау мүмкін болмады.",
+
+    validationDoctor:
+      "Дәрігерді таңдаңыз.",
+    validationSpecialty:
+      "Дәрігердің мамандығын таңдаңыз.",
+    validationDepartment:
+      "Бөлімшені таңдаңыз.",
+    validationRoom:
+      "Кабинетті таңдаңыз.",
+    validationRoomDepartment:
+      "Таңдалған кабинет осы бөлімшеге жатпайды.",
+    validationStartDate:
+      "Кестенің басталу күнін көрсетіңіз.",
+    validationWorkingDay:
+      "Кемінде бір жұмыс күнін таңдаңыз.",
+
+    copyDaySuccess: (dayName) =>
+      `«${dayName}» күнінің баптаулары басқа жұмыс күндеріне көшірілді.`,
+
+    validationWorkTime: (dayName) =>
+      `${dayName}: жұмыс уақытын көрсетіңіз.`,
+
+    validationWorkEnd: (dayName) =>
+      `${dayName}: жұмыстың аяқталу уақыты басталу уақытынан кейін болуы керек.`,
+
+    validationLunchTime: (dayName) =>
+      `${dayName}: түскі үзіліс уақытын көрсетіңіз.`,
+
+    validationLunchEnd: (dayName) =>
+      `${dayName}: түскі үзілістің аяқталуы басталуынан кейін болуы керек.`,
+
+    validationLunchInside: (dayName) =>
+      `${dayName}: түскі үзіліс жұмыс уақытының ішінде болуы керек.`,
+
+    validationDuration: (dayName) =>
+      `${dayName}: қабылдау ұзақтығы 5-тен 480 минутқа дейін болуы керек.`,
+  },
+};
 
 const DEFAULT_DAY_SETTINGS = {
   isWorking: false,
@@ -94,37 +407,59 @@ function getErrorMessage(error, fallback) {
   );
 }
 
-function getDoctorName(doctor) {
+function getDayName(day, isKazakh) {
+  return isKazakh
+    ? day.nameKk
+    : day.nameRu;
+}
+
+function getDoctorName(doctor, text) {
   return (
     doctor?.fullName ||
     doctor?.full_name ||
     doctor?.profile?.full_name ||
     doctor?.profiles?.full_name ||
-    "Врач без указанного имени"
+    text.doctorWithoutName
   );
 }
 
-function getSpecialtyName(specialty) {
+function getSpecialtyName(
+  specialty,
+  isKazakh,
+  text
+) {
   return (
-    specialty?.name_ru ||
-    specialty?.name_kk ||
+    (isKazakh
+      ? specialty?.name_kk ||
+        specialty?.name_ru
+      : specialty?.name_ru ||
+        specialty?.name_kk) ||
     specialty?.name ||
-    "Без названия"
+    text.unnamed
   );
 }
 
-function getDepartmentName(department) {
+function getDepartmentName(
+  department,
+  isKazakh,
+  text
+) {
   return (
-    department?.name ||
-    department?.name_ru ||
-    "Без названия"
+    (isKazakh
+      ? department?.name_kk ||
+        department?.name ||
+        department?.name_ru
+      : department?.name_ru ||
+        department?.name ||
+        department?.name_kk) ||
+    text.unnamed
   );
 }
 
-function getRoomName(room) {
+function getRoomName(room, text) {
   const number = room?.number
-    ? `Кабинет №${room.number}`
-    : "Кабинет";
+    ? `${text.roomPrefix} №${room.number}`
+    : text.roomDefault;
 
   return room?.name
     ? `${number} — ${room.name}`
@@ -291,6 +626,44 @@ function buildWeekFromSchedule(schedule) {
 }
 
 export default function Schedules() {
+  const { language } = useLanguage();
+
+  const normalizedLanguage = String(
+    language || "ru"
+  )
+    .trim()
+    .toLowerCase();
+
+  const isKazakh = [
+    "kk",
+    "kz",
+    "kaz",
+    "kazakh",
+    "kk-kz",
+    "kz-kz",
+  ].includes(normalizedLanguage);
+
+  const text = isKazakh
+    ? TEXTS.kk
+    : TEXTS.ru;
+
+  const localizedErrorMessage = (
+    error,
+    fallback
+  ) =>
+    isKazakh
+      ? fallback
+      : getErrorMessage(error, fallback);
+
+  const localizedResponseMessage = (
+    response,
+    fallback
+  ) =>
+    isKazakh
+      ? fallback
+      : response?.data?.message ||
+        fallback;
+
   const [doctors, setDoctors] = useState([]);
   const [specialties, setSpecialties] =
     useState([]);
@@ -447,15 +820,15 @@ export default function Schedules() {
 
         setMessage({
           type: "error",
-          text: getErrorMessage(
+          text: localizedErrorMessage(
             error,
-            "Не удалось загрузить список врачей."
+            text.doctorsLoadError
           ),
         });
       } finally {
         setLoadingDoctors(false);
       }
-    }, []);
+    }, [text.doctorsLoadError]);
 
   const loadReferences =
     useCallback(async () => {
@@ -483,15 +856,15 @@ export default function Schedules() {
 
         setMessage({
           type: "error",
-          text: getErrorMessage(
+          text: localizedErrorMessage(
             error,
-            "Не удалось загрузить специальности или отделения."
+            text.referencesLoadError
           ),
         });
       } finally {
         setLoadingReferences(false);
       }
-    }, []);
+    }, [text.referencesLoadError]);
 
   useEffect(() => {
     loadDoctors();
@@ -577,9 +950,9 @@ export default function Schedules() {
 
         setMessage({
           type: "error",
-          text: getErrorMessage(
+          text: localizedErrorMessage(
             error,
-            "Не удалось загрузить кабинеты отделения."
+            text.roomsLoadError
           ),
         });
       } finally {
@@ -594,7 +967,10 @@ export default function Schedules() {
     return () => {
       cancelled = true;
     };
-  }, [selectedDepartmentId]);
+  }, [
+    selectedDepartmentId,
+    text.roomsLoadError,
+  ]);
 
   useEffect(() => {
     if (!selectedDoctorId) {
@@ -634,7 +1010,7 @@ export default function Schedules() {
 
           setMessage({
             type: "info",
-            text: "Для выбранного врача расписание ещё не настроено.",
+            text: text.scheduleNotConfigured,
           });
 
           return;
@@ -651,7 +1027,7 @@ export default function Schedules() {
 
         setMessage({
           type: "success",
-          text: "Сохранённое расписание врача загружено.",
+          text: text.scheduleLoaded,
         });
       } catch (error) {
         if (cancelled) {
@@ -664,9 +1040,9 @@ export default function Schedules() {
 
         setMessage({
           type: "error",
-          text: getErrorMessage(
+          text: localizedErrorMessage(
             error,
-            "Не удалось загрузить расписание врача."
+            text.scheduleLoadError
           ),
         });
       } finally {
@@ -681,7 +1057,10 @@ export default function Schedules() {
     return () => {
       cancelled = true;
     };
-  }, [selectedDoctorId]);
+  }, [
+    selectedDoctorId,
+    text,
+  ]);
 
   function handleDepartmentChange(event) {
     setSelectedDepartmentId(
@@ -783,7 +1162,7 @@ export default function Schedules() {
 
     setMessage({
       type: "info",
-      text: "Общие настройки применены ко всем рабочим дням.",
+      text: text.commonApplied,
     });
   }
 
@@ -794,7 +1173,7 @@ export default function Schedules() {
     if (!source?.isWorking) {
       setMessage({
         type: "error",
-        text: "Нельзя копировать настройки выходного дня.",
+        text: text.cannotCopyDayOff,
       });
 
       return;
@@ -832,33 +1211,40 @@ export default function Schedules() {
 
     setMessage({
       type: "info",
-      text: `Настройки дня «${sourceDay?.name}» скопированы на остальные рабочие дни.`,
+      text: text.copyDaySuccess(
+        sourceDay
+          ? getDayName(
+              sourceDay,
+              isKazakh
+            )
+          : ""
+      ),
     });
   }
 
   function validateSchedule() {
     if (!selectedDoctorId) {
-      return "Выберите врача.";
+      return text.validationDoctor;
     }
 
     if (!selectedSpecialtyId) {
-      return "Выберите специальность врача.";
+      return text.validationSpecialty;
     }
 
     if (!selectedDepartmentId) {
-      return "Выберите отделение.";
+      return text.validationDepartment;
     }
 
     if (!selectedRoomId) {
-      return "Выберите кабинет.";
+      return text.validationRoom;
     }
 
     if (!selectedRoom) {
-      return "Выбранный кабинет не относится к выбранному отделению.";
+      return text.validationRoomDepartment;
     }
 
     if (!startDate) {
-      return "Укажите дату начала действия расписания.";
+      return text.validationStartDate;
     }
 
     const workingDays = DAYS.filter(
@@ -868,7 +1254,7 @@ export default function Schedules() {
     );
 
     if (workingDays.length === 0) {
-      return "Выберите хотя бы один рабочий день.";
+      return text.validationWorkingDay;
     }
 
     for (const day of workingDays) {
@@ -893,14 +1279,18 @@ export default function Schedules() {
         ) ||
         !Number.isFinite(workEndMinutes)
       ) {
-        return `${day.name}: укажите рабочее время.`;
+        return text.validationWorkTime(
+          getDayName(day, isKazakh)
+        );
       }
 
       if (
         workEndMinutes <=
         workStartMinutes
       ) {
-        return `${day.name}: окончание работы должно быть позже начала.`;
+        return text.validationWorkEnd(
+          getDayName(day, isKazakh)
+        );
       }
 
       if (
@@ -909,14 +1299,18 @@ export default function Schedules() {
         ) ||
         !Number.isFinite(lunchEndMinutes)
       ) {
-        return `${day.name}: укажите время обеда.`;
+        return text.validationLunchTime(
+          getDayName(day, isKazakh)
+        );
       }
 
       if (
         lunchEndMinutes <=
         lunchStartMinutes
       ) {
-        return `${day.name}: окончание обеда должно быть позже начала.`;
+        return text.validationLunchEnd(
+          getDayName(day, isKazakh)
+        );
       }
 
       if (
@@ -924,7 +1318,9 @@ export default function Schedules() {
           workStartMinutes ||
         lunchEndMinutes > workEndMinutes
       ) {
-        return `${day.name}: обед должен находиться внутри рабочего времени.`;
+        return text.validationLunchInside(
+          getDayName(day, isKazakh)
+        );
       }
 
       const duration = Number(
@@ -936,7 +1332,9 @@ export default function Schedules() {
         duration < 5 ||
         duration > 480
       ) {
-        return `${day.name}: продолжительность приёма должна составлять от 5 до 480 минут.`;
+        return text.validationDuration(
+          getDayName(day, isKazakh)
+        );
       }
     }
 
@@ -1055,16 +1453,17 @@ export default function Schedules() {
 
       setMessage({
         type: "success",
-        text:
-          scheduleResponse?.data?.message ||
-          "Специальность, отделение, кабинет и расписание успешно сохранены.",
+        text: localizedResponseMessage(
+          scheduleResponse,
+          text.scheduleSaved
+        ),
       });
     } catch (error) {
       setMessage({
         type: "error",
-        text: getErrorMessage(
+        text: localizedErrorMessage(
           error,
-          "Не удалось сохранить данные врача и расписание."
+          text.scheduleSaveError
         ),
       });
     } finally {
@@ -1082,13 +1481,11 @@ export default function Schedules() {
       <header style={styles.header}>
         <div>
           <h1 style={styles.title}>
-            Расписание врачей
+            {text.pageTitle}
           </h1>
 
           <p style={styles.subtitle}>
-            Назначьте врачу специальность,
-            отделение, кабинет и настройте
-            недельный график приёма.
+            {text.pageSubtitle}
           </p>
         </div>
 
@@ -1114,8 +1511,8 @@ export default function Schedules() {
 
           {loadingDoctors ||
           loadingReferences
-            ? "Обновление..."
-            : "Обновить данные"}
+            ? text.refreshLoading
+            : text.refreshData}
         </button>
       </header>
 
@@ -1143,12 +1540,11 @@ export default function Schedules() {
 
           <div>
             <h2 style={styles.sectionTitle}>
-              Настройка врача
+              {text.doctorSetupTitle}
             </h2>
 
             <p style={styles.sectionSubtitle}>
-              Выберите врача, специальность,
-              отделение и рабочий кабинет.
+              {text.doctorSetupSubtitle}
             </p>
           </div>
         </div>
@@ -1156,7 +1552,7 @@ export default function Schedules() {
         <div style={styles.doctorGrid}>
           <div style={styles.inputGroup}>
             <label style={styles.label}>
-              Врач *
+              {text.doctorLabel} *
             </label>
 
             <select
@@ -1170,7 +1566,7 @@ export default function Schedules() {
               style={styles.select}
             >
               <option value="">
-                Выберите врача
+                {text.selectDoctor}
               </option>
 
               {doctors.map((doctor) => (
@@ -1178,7 +1574,7 @@ export default function Schedules() {
                   key={doctor.id}
                   value={doctor.id}
                 >
-                  {getDoctorName(doctor)}
+                  {getDoctorName(doctor, text)}
                 </option>
               ))}
             </select>
@@ -1186,7 +1582,7 @@ export default function Schedules() {
 
           <div style={styles.inputGroup}>
             <label style={styles.label}>
-              Специальность *
+              {text.specialtyLabel} *
             </label>
 
             <select
@@ -1204,7 +1600,7 @@ export default function Schedules() {
               style={styles.select}
             >
               <option value="">
-                Выберите специальность
+                {text.selectSpecialty}
               </option>
 
               {specialties.map(
@@ -1214,7 +1610,9 @@ export default function Schedules() {
                     value={specialty.id}
                   >
                     {getSpecialtyName(
-                      specialty
+                      specialty,
+                      isKazakh,
+                      text
                     )}
                   </option>
                 )
@@ -1224,7 +1622,7 @@ export default function Schedules() {
 
           <div style={styles.inputGroup}>
             <label style={styles.label}>
-              Отделение *
+              {text.departmentLabel} *
             </label>
 
             <select
@@ -1240,7 +1638,7 @@ export default function Schedules() {
               style={styles.select}
             >
               <option value="">
-                Выберите отделение
+                {text.selectDepartment}
               </option>
 
               {departments.map(
@@ -1250,7 +1648,9 @@ export default function Schedules() {
                     value={department.id}
                   >
                     {getDepartmentName(
-                      department
+                      department,
+                      isKazakh,
+                      text
                     )}
                   </option>
                 )
@@ -1260,7 +1660,7 @@ export default function Schedules() {
 
           <div style={styles.inputGroup}>
             <label style={styles.label}>
-              Кабинет *
+              {text.roomLabel} *
             </label>
 
             <select
@@ -1279,8 +1679,8 @@ export default function Schedules() {
             >
               <option value="">
                 {loadingRooms
-                  ? "Загрузка кабинетов..."
-                  : "Выберите кабинет"}
+                  ? text.loadingRooms
+                  : text.selectRoom}
               </option>
 
               {rooms.map((room) => (
@@ -1288,7 +1688,7 @@ export default function Schedules() {
                   key={room.id}
                   value={room.id}
                 >
-                  {getRoomName(room)}
+                  {getRoomName(room, text)}
                 </option>
               ))}
             </select>
@@ -1296,7 +1696,7 @@ export default function Schedules() {
 
           <div style={styles.inputGroup}>
             <label style={styles.label}>
-              Начало действия графика *
+              {text.scheduleStartLabel} *
             </label>
 
             <input
@@ -1317,53 +1717,58 @@ export default function Schedules() {
           <div style={styles.doctorInformation}>
             <div>
               <span style={styles.infoLabel}>
-                Врач
+                {text.doctorLabel}
               </span>
 
               <strong style={styles.infoValue}>
                 {getDoctorName(
-                  selectedDoctor
+                  selectedDoctor,
+                  text
                 )}
               </strong>
             </div>
 
             <div>
               <span style={styles.infoLabel}>
-                Специальность
+                {text.specialtyLabel}
               </span>
 
               <strong style={styles.infoValue}>
                 {selectedSpecialty
                   ? getSpecialtyName(
-                      selectedSpecialty
+                      selectedSpecialty,
+                      isKazakh,
+                      text
                     )
-                  : "Не выбрана"}
+                  : text.notSelectedFeminine}
               </strong>
             </div>
 
             <div>
               <span style={styles.infoLabel}>
-                Отделение
+                {text.departmentLabel}
               </span>
 
               <strong style={styles.infoValue}>
                 {selectedDepartment
                   ? getDepartmentName(
-                      selectedDepartment
+                      selectedDepartment,
+                      isKazakh,
+                      text
                     )
-                  : "Не выбрано"}
+                  : text.notSelectedNeuter}
               </strong>
             </div>
 
             <div>
               <span style={styles.infoLabel}>
-                Кабинет
+                {text.roomLabel}
               </span>
 
               <strong style={styles.infoValue}>
                 {selectedRoom
-                  ? getRoomName(selectedRoom)
-                  : "Не выбран"}
+                  ? getRoomName(selectedRoom, text)
+                  : text.notSelectedMasculine}
               </strong>
             </div>
           </div>
@@ -1379,12 +1784,11 @@ export default function Schedules() {
 
             <div>
               <h2 style={styles.sectionTitle}>
-                Общие настройки
+                {text.commonSettingsTitle}
               </h2>
 
               <p style={styles.sectionSubtitle}>
-                Установите одинаковое время для
-                всех выбранных рабочих дней.
+                {text.commonSettingsSubtitle}
               </p>
             </div>
           </div>
@@ -1392,7 +1796,7 @@ export default function Schedules() {
           <div style={styles.commonGrid}>
             <div style={styles.inputGroup}>
               <label style={styles.label}>
-                Начало работы
+                {text.workStart}
               </label>
 
               <input
@@ -1415,7 +1819,7 @@ export default function Schedules() {
 
             <div style={styles.inputGroup}>
               <label style={styles.label}>
-                Конец работы
+                {text.workEnd}
               </label>
 
               <input
@@ -1436,7 +1840,7 @@ export default function Schedules() {
 
             <div style={styles.inputGroup}>
               <label style={styles.label}>
-                Начало обеда
+                {text.lunchStart}
               </label>
 
               <input
@@ -1459,7 +1863,7 @@ export default function Schedules() {
 
             <div style={styles.inputGroup}>
               <label style={styles.label}>
-                Конец обеда
+                {text.lunchEnd}
               </label>
 
               <input
@@ -1482,7 +1886,7 @@ export default function Schedules() {
 
             <div style={styles.inputGroup}>
               <label style={styles.label}>
-                Приём, минут
+                {text.appointmentMinutes}
               </label>
 
               <input
@@ -1515,8 +1919,8 @@ export default function Schedules() {
               style={styles.secondaryButton}
             >
               {allDaysSelected
-                ? "Отключить все дни"
-                : "Выбрать все дни"}
+                ? text.disableAllDays
+                : text.selectAllDays}
             </button>
 
             <button
@@ -1524,7 +1928,7 @@ export default function Schedules() {
               onClick={selectWeekdays}
               style={styles.secondaryButton}
             >
-              Выбрать понедельник–пятницу
+              {text.selectWeekdays}
             </button>
 
             
@@ -1535,7 +1939,7 @@ export default function Schedules() {
               style={styles.applyButton}
             >
               <RiFileCopyLine />
-              Применить время к рабочим дням
+              {text.applyToWorkingDays}
             </button>
           </div>
         </section>
@@ -1543,18 +1947,18 @@ export default function Schedules() {
         <section style={styles.daysSection}>
           <div style={styles.daysHeader}>
             <h2 style={styles.sectionTitle}>
-              Недельный график
+              {text.weeklySchedule}
             </h2>
 
             <p style={styles.sectionSubtitle}>
-              Рабочих дней выбрано:{" "}
+              {text.selectedWorkingDays}:{" "}
               {workingDaysCount}
             </p>
           </div>
 
           {loadingSchedule ? (
             <div style={styles.loadingBox}>
-              Загрузка расписания...
+              {text.loadingSchedule}
             </div>
           ) : (
             <div style={styles.daysGrid}>
@@ -1594,7 +1998,10 @@ export default function Schedules() {
                           <strong
                             style={styles.dayName}
                           >
-                            {day.name}
+                            {getDayName(
+                              day,
+                              isKazakh
+                            )}
                           </strong>
 
                           <span
@@ -1608,8 +2015,8 @@ export default function Schedules() {
                             }}
                           >
                             {config.isWorking
-                              ? "Рабочий день"
-                              : "Выходной"}
+                              ? text.workingDay
+                              : text.dayOff}
                           </span>
                         </div>
                       </label>
@@ -1623,7 +2030,7 @@ export default function Schedules() {
                             )
                           }
                           style={styles.copyButton}
-                          title="Скопировать настройки этого дня"
+                          title={text.copyDayTitle}
                         >
                           <RiFileCopyLine />
                         </button>
@@ -1646,7 +2053,7 @@ export default function Schedules() {
                         }
                       >
                         <label style={styles.label}>
-                          Начало работы
+                          {text.workStart}
                         </label>
 
                         <input
@@ -1672,7 +2079,7 @@ export default function Schedules() {
                         }
                       >
                         <label style={styles.label}>
-                          Конец работы
+                          {text.workEnd}
                         </label>
 
                         <input
@@ -1698,7 +2105,7 @@ export default function Schedules() {
                         }
                       >
                         <label style={styles.label}>
-                          Начало обеда
+                          {text.lunchStart}
                         </label>
 
                         <input
@@ -1724,7 +2131,7 @@ export default function Schedules() {
                         }
                       >
                         <label style={styles.label}>
-                          Конец обеда
+                          {text.lunchEnd}
                         </label>
 
                         <input
@@ -1748,7 +2155,7 @@ export default function Schedules() {
                         style={styles.durationGroup}
                       >
                         <label style={styles.label}>
-                          Продолжительность приёма
+                          {text.appointmentDuration}
                         </label>
 
                         <div
@@ -1783,7 +2190,7 @@ export default function Schedules() {
                               styles.minutesLabel
                             }
                           >
-                            минут
+                            {text.minutes}
                           </span>
                         </div>
                       </div>
@@ -1798,13 +2205,11 @@ export default function Schedules() {
         <div style={styles.savePanel}>
           <div>
             <strong style={styles.saveTitle}>
-              Сохранение расписания
+              {text.savePanelTitle}
             </strong>
 
             <p style={styles.saveDescription}>
-              Специальность, кабинет и
-              недельный график будут сохранены
-              для выбранного врача.
+              {text.savePanelDescription}
             </p>
           </div>
 
@@ -1830,8 +2235,8 @@ export default function Schedules() {
             <RiSaveLine />
 
             {saving
-              ? "Сохранение..."
-              : "Сохранить расписание"}
+              ? text.saving
+              : text.saveSchedule}
           </button>
         </div>
       </form>

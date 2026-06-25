@@ -4,9 +4,22 @@ import crypto from "crypto";
 import { supabase } from "../config/supabaseClient.js";
 import { hashPassword } from "../utils/crypto.js";
 import { AppError } from "../utils/errorHandler.js";
+import { sendDoctorAccessEmail } from "./emailService.js";
+
+import {
+  cancelFutureAppointmentsForDoctor,
+} from "./appointmentService.js";
 
 function clean(value) {
   return String(value ?? "").trim();
+}
+
+function normalizeEmail(value) {
+  return clean(value).toLowerCase();
+}
+
+function normalizeUsername(value) {
+  return clean(value).toLowerCase();
 }
 
 function relationOne(value) {
@@ -17,13 +30,9 @@ function relationOne(value) {
   return value || null;
 }
 
-function normalizeUsername(value) {
-  return clean(value).toLowerCase();
-}
-
 function generateTemporaryPassword() {
   const randomPart = crypto
-    .randomBytes(8)
+    .randomBytes(9)
     .toString("base64url");
 
   return `A${randomPart}z7!`;
@@ -45,19 +54,48 @@ function getAccessStatus(profile, doctorStatus) {
   return "active";
 }
 
-function isMissingMustChangePasswordColumn(error) {
+function isUniqueViolation(error) {
+  return String(error?.code || "") === "23505";
+}
+
+function isMissingColumnError(
+  error,
+  columnName
+) {
+  const message = String(
+    error?.message || ""
+  ).toLowerCase();
+
+  const normalizedColumnName = String(
+    columnName || ""
+  ).toLowerCase();
+
+  return (
+    message.includes(normalizedColumnName) &&
+    (
+      message.includes("column") ||
+      message.includes("schema cache") ||
+      message.includes("could not find")
+    )
+  );
+}
+
+function isMissingTableError(
+  error,
+  tableName
+) {
   const message = String(
     error?.message || ""
   ).toLowerCase();
 
   return (
     message.includes(
-      "must_change_password"
+      String(tableName || "").toLowerCase()
     ) &&
     (
-      message.includes("column") ||
-      message.includes("schema cache") ||
-      message.includes("could not find")
+      message.includes("relation") ||
+      message.includes("does not exist") ||
+      message.includes("schema cache")
     )
   );
 }
@@ -73,13 +111,11 @@ async function updateProfile(
   };
 
   if (
-    options.mustChangePassword !==
-    undefined
+    options.mustChangePassword !== undefined
   ) {
-    payload.must_change_password =
-      Boolean(
-        options.mustChangePassword
-      );
+    payload.must_change_password = Boolean(
+      options.mustChangePassword
+    );
   }
 
   let result = await supabase
@@ -100,10 +136,10 @@ async function updateProfile(
 
   if (
     result.error &&
-    payload.must_change_password !==
-      undefined &&
-    isMissingMustChangePasswordColumn(
-      result.error
+    payload.must_change_password !== undefined &&
+    isMissingColumnError(
+      result.error,
+      "must_change_password"
     )
   ) {
     const fallbackPayload = {
@@ -130,6 +166,28 @@ async function updateProfile(
   }
 
   if (result.error || !result.data) {
+    if (isUniqueViolation(result.error)) {
+      const errorMessage = String(
+        result.error?.message || ""
+      ).toLowerCase();
+
+      if (
+        errorMessage.includes("username")
+      ) {
+        throw new AppError(
+          "Такой логин уже используется другим пользователем.",
+          409
+        );
+      }
+
+      if (errorMessage.includes("iin")) {
+        throw new AppError(
+          "Пользователь с таким ИИН уже существует.",
+          409
+        );
+      }
+    }
+
     throw new Error(
       `Ошибка обновления профиля врача: ${
         result.error?.message ||
@@ -139,6 +197,102 @@ async function updateProfile(
   }
 
   return result.data;
+}
+
+async function getProfileSecurityState(
+  profileId
+) {
+  let result = await supabase
+    .from("profiles")
+    .select(`
+      id,
+      username,
+      password_hash,
+      role,
+      status,
+      must_change_password
+    `)
+    .eq("id", profileId)
+    .single();
+
+  let mustChangePasswordSupported = true;
+
+  if (
+    result.error &&
+    isMissingColumnError(
+      result.error,
+      "must_change_password"
+    )
+  ) {
+    mustChangePasswordSupported = false;
+
+    result = await supabase
+      .from("profiles")
+      .select(`
+        id,
+        username,
+        password_hash,
+        role,
+        status
+      `)
+      .eq("id", profileId)
+      .single();
+  }
+
+  if (result.error || !result.data) {
+    throw new Error(
+      `Не удалось получить текущие данные доступа врача: ${
+        result.error?.message ||
+        "профиль не найден"
+      }`
+    );
+  }
+
+  return {
+    id: result.data.id,
+    username:
+      result.data.username || null,
+
+    passwordHash:
+      result.data.password_hash,
+
+    role: result.data.role,
+    status: result.data.status,
+
+    mustChangePasswordSupported,
+
+    mustChangePassword:
+      mustChangePasswordSupported
+        ? Boolean(
+            result.data
+              .must_change_password
+          )
+        : false,
+  };
+}
+
+async function restoreProfileSecurityState(
+  state
+) {
+  const options =
+    state.mustChangePasswordSupported
+      ? {
+          mustChangePassword:
+            state.mustChangePassword,
+        }
+      : {};
+
+  return updateProfile(
+    state.id,
+    {
+      username: state.username,
+      password_hash:
+        state.passwordHash,
+      role: state.role,
+      status: state.status,
+    },
+    options
+  );
 }
 
 async function revokeProfileSessions(
@@ -154,7 +308,13 @@ async function revokeProfileSessions(
     .eq("profile_id", profileId)
     .eq("is_revoked", false);
 
-  if (error) {
+  if (
+    error &&
+    !isMissingTableError(
+      error,
+      "user_refresh_tokens"
+    )
+  ) {
     throw new Error(
       `Не удалось завершить активные сессии врача: ${error.message}`
     );
@@ -173,9 +333,12 @@ async function ensureSpecialtyExists(
 
   const { data, error } = await supabase
     .from("specialties")
-    .select(
-      "id, name_ru, name_kk, status"
-    )
+    .select(`
+      id,
+      name_ru,
+      name_kk,
+      status
+    `)
     .eq("id", normalizedSpecialtyId)
     .maybeSingle();
 
@@ -265,9 +428,61 @@ async function ensureRoomBelongsToOrganization(
   return data;
 }
 
-async function getDoctorContext(
-  doctorId
+async function ensureIinAvailable(iin) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(`
+      id,
+      full_name,
+      role,
+      status
+    `)
+    .eq("iin", iin)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(
+      `Ошибка проверки ИИН: ${error.message}`
+    );
+  }
+
+  if (data) {
+    throw new AppError(
+      "Пользователь с таким ИИН уже существует.",
+      409
+    );
+  }
+}
+
+async function ensureUsernameAvailable(
+  username,
+  currentProfileId
 ) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("username", username)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(
+      `Ошибка проверки логина: ${error.message}`
+    );
+  }
+
+  if (
+    data &&
+    String(data.id) !==
+      String(currentProfileId)
+  ) {
+    throw new AppError(
+      "Этот логин уже используется другим пользователем.",
+      409
+    );
+  }
+}
+
+async function getDoctorContext(doctorId) {
   const { data, error } = await supabase
     .from("doctors")
     .select(`
@@ -358,36 +573,8 @@ async function ensureDoctorBelongsToOrganization(
   return context;
 }
 
-async function ensureUsernameAvailable(
-  username,
-  currentProfileId
-) {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("username", username)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(
-      `Ошибка проверки логина: ${error.message}`
-    );
-  }
-
-  if (
-    data &&
-    String(data.id) !==
-      String(currentProfileId)
-  ) {
-    throw new AppError(
-      "Этот логин уже используется другим пользователем.",
-      409
-    );
-  }
-}
-
 export async function listDoctors(
-  orgId,
+  organizationId,
   specialtyId
 ) {
   let query = supabase
@@ -429,7 +616,7 @@ export async function listDoctors(
     `)
     .eq(
       "organization_members.organization_id",
-      orgId
+      organizationId
     );
 
   if (specialtyId) {
@@ -439,7 +626,7 @@ export async function listDoctors(
     );
   }
 
-  const { data: docs, error } =
+  const { data: doctors, error } =
     await query.order("created_at", {
       ascending: false,
     });
@@ -450,9 +637,9 @@ export async function listDoctors(
     );
   }
 
-  return (docs || []).map((doc) => {
+  return (doctors || []).map((doctor) => {
     const member = relationOne(
-      doc.organization_members
+      doctor.organization_members
     );
 
     const profile = relationOne(
@@ -460,35 +647,49 @@ export async function listDoctors(
     );
 
     const specialty = relationOne(
-      doc.specialties
+      doctor.specialties
     );
 
     const room = relationOne(
-      doc.rooms
+      doctor.rooms
     );
 
     return {
-      id: doc.id,
-      status: doc.status,
+      id: doctor.id,
+      status: doctor.status,
 
       specialtyId:
-        doc.specialty_id || null,
+        doctor.specialty_id || null,
+
       specialty,
 
-      roomId: doc.room_id || null,
+      roomId:
+        doctor.room_id || null,
+
       room,
 
       departmentId:
         room?.department_id || null,
 
-      memberId: member?.id || null,
-      profileId: profile?.id || null,
+      memberId:
+        member?.id || null,
+
+      memberStatus:
+        member?.status || null,
+
+      profileId:
+        profile?.id || null,
 
       iin: profile?.iin || "",
+
       fullName:
         profile?.full_name || "",
-      email: profile?.email || "",
-      phone: profile?.phone || "",
+
+      email:
+        profile?.email || "",
+
+      phone:
+        profile?.phone || "",
 
       username:
         profile?.username || null,
@@ -498,19 +699,20 @@ export async function listDoctors(
 
       accessStatus: getAccessStatus(
         profile,
-        doc.status
+        doctor.status
       ),
 
-      accessIssued:
-        Boolean(profile?.username),
+      accessIssued: Boolean(
+        profile?.username
+      ),
     };
   });
 }
 
 export async function getDoctorById(
-  id
+  doctorId
 ) {
-  const { data: doc, error } =
+  const { data: doctor, error } =
     await supabase
       .from("doctors")
       .select(`
@@ -547,7 +749,7 @@ export async function getDoctorById(
           )
         )
       `)
-      .eq("id", id)
+      .eq("id", doctorId)
       .maybeSingle();
 
   if (error) {
@@ -556,7 +758,7 @@ export async function getDoctorById(
     );
   }
 
-  if (!doc) {
+  if (!doctor) {
     throw new AppError(
       "Врач не найден.",
       404
@@ -564,7 +766,7 @@ export async function getDoctorById(
   }
 
   const member = relationOne(
-    doc.organization_members
+    doctor.organization_members
   );
 
   const profile = relationOne(
@@ -572,20 +774,25 @@ export async function getDoctorById(
   );
 
   const specialty = relationOne(
-    doc.specialties
+    doctor.specialties
   );
 
-  const room = relationOne(doc.rooms);
+  const room = relationOne(
+    doctor.rooms
+  );
 
   return {
-    id: doc.id,
-    status: doc.status,
+    id: doctor.id,
+    status: doctor.status,
 
     specialtyId:
-      doc.specialty_id || null,
+      doctor.specialty_id || null,
+
     specialty,
 
-    roomId: doc.room_id || null,
+    roomId:
+      doctor.room_id || null,
+
     room,
 
     departmentId:
@@ -594,14 +801,25 @@ export async function getDoctorById(
     organizationId:
       member?.organization_id || null,
 
-    memberId: member?.id || null,
-    profileId: profile?.id || null,
+    memberId:
+      member?.id || null,
+
+    memberStatus:
+      member?.status || null,
+
+    profileId:
+      profile?.id || null,
 
     iin: profile?.iin || "",
+
     fullName:
       profile?.full_name || "",
-    email: profile?.email || "",
-    phone: profile?.phone || "",
+
+    email:
+      profile?.email || "",
+
+    phone:
+      profile?.phone || "",
 
     username:
       profile?.username || null,
@@ -611,16 +829,17 @@ export async function getDoctorById(
 
     accessStatus: getAccessStatus(
       profile,
-      doc.status
+      doctor.status
     ),
 
-    accessIssued:
-      Boolean(profile?.username),
+    accessIssued: Boolean(
+      profile?.username
+    ),
   };
 }
 
 export async function createDoctor(
-  orgId,
+  organizationId,
   data
 ) {
   const {
@@ -633,29 +852,48 @@ export async function createDoctor(
   } = data;
 
   const normalizedIin = clean(iin);
+
   const normalizedFullName =
     clean(fullName);
 
+  const normalizedEmail =
+    normalizeEmail(email);
+
+  const normalizedPhone =
+    clean(phone) || null;
+
   if (
     !normalizedIin ||
-    !normalizedFullName
+    !normalizedFullName ||
+    !normalizedEmail
   ) {
     throw new AppError(
-      "ИИН и ФИО обязательны для создания врача.",
+      "ИИН, ФИО и электронная почта обязательны.",
+      400
+    );
+  }
+
+  if (!/^\d{12}$/.test(normalizedIin)) {
+    throw new AppError(
+      "ИИН должен содержать ровно 12 цифр.",
       400
     );
   }
 
   if (
-    !/^\d{12}$/.test(
-      normalizedIin
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+      normalizedEmail
     )
   ) {
     throw new AppError(
-      "ИИН должен содержать 12 цифр.",
+      "Укажите корректную электронную почту.",
       400
     );
   }
+
+  await ensureIinAvailable(
+    normalizedIin
+  );
 
   if (specialtyId) {
     await ensureSpecialtyExists(
@@ -665,42 +903,17 @@ export async function createDoctor(
 
   if (roomId) {
     await ensureRoomBelongsToOrganization(
-      orgId,
+      organizationId,
       roomId
     );
   }
 
-  const {
-    data: existingProfile,
-    error: existingProfileError,
-  } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("iin", normalizedIin)
-    .maybeSingle();
-
-  if (existingProfileError) {
-    throw new Error(
-      `Ошибка проверки ИИН: ${existingProfileError.message}`
-    );
-  }
-
-  if (existingProfile) {
-    throw new AppError(
-      "Пользователь с таким ИИН уже существует.",
-      409
-    );
-  }
-
-  const unavailablePassword =
-    crypto
-      .randomBytes(48)
-      .toString("hex");
+  const unavailablePassword = crypto
+    .randomBytes(48)
+    .toString("hex");
 
   const unavailablePasswordHash =
-    hashPassword(
-      unavailablePassword
-    );
+    hashPassword(unavailablePassword);
 
   const {
     data: profile,
@@ -711,8 +924,8 @@ export async function createDoctor(
       username: null,
       iin: normalizedIin,
       full_name: normalizedFullName,
-      email: clean(email) || null,
-      phone: clean(phone) || null,
+      email: normalizedEmail,
+      phone: normalizedPhone,
       password_hash:
         unavailablePasswordHash,
       role: "doctor",
@@ -732,6 +945,33 @@ export async function createDoctor(
     .single();
 
   if (profileError || !profile) {
+    if (isUniqueViolation(profileError)) {
+      const errorMessage = String(
+        profileError?.message || ""
+      ).toLowerCase();
+
+      if (errorMessage.includes("iin")) {
+        throw new AppError(
+          "Пользователь с таким ИИН уже существует.",
+          409
+        );
+      }
+
+      if (
+        errorMessage.includes("username")
+      ) {
+        throw new AppError(
+          "Пользователь с таким логином уже существует.",
+          409
+        );
+      }
+
+      throw new AppError(
+        "Профиль с такими данными уже существует.",
+        409
+      );
+    }
+
     throw new Error(
       `Ошибка создания профиля врача: ${
         profileError?.message ||
@@ -746,7 +986,7 @@ export async function createDoctor(
   } = await supabase
     .from("organization_members")
     .insert({
-      organization_id: orgId,
+      organization_id: organizationId,
       profile_id: profile.id,
       role: "doctor",
       status: "active",
@@ -810,12 +1050,14 @@ export async function createDoctor(
     fullName:
       profile.full_name,
 
-    email: profile.email,
+    email:
+      profile.email,
 
     specialtyId:
       doctor.specialty_id,
 
-    roomId: doctor.room_id,
+    roomId:
+      doctor.room_id,
 
     username: null,
     accessStatus: "no_access",
@@ -824,7 +1066,7 @@ export async function createDoctor(
 }
 
 export async function updateDoctor(
-  orgId,
+  organizationId,
   doctorId,
   data
 ) {
@@ -835,7 +1077,7 @@ export async function updateDoctor(
   } = data;
 
   await ensureDoctorBelongsToOrganization(
-    orgId,
+    organizationId,
     doctorId
   );
 
@@ -858,7 +1100,7 @@ export async function updateDoctor(
   ) {
     selectedRoom =
       await ensureRoomBelongsToOrganization(
-        orgId,
+        organizationId,
         roomId
       );
   }
@@ -947,7 +1189,7 @@ export async function updateDoctor(
 }
 
 export async function grantDoctorAccess(
-  orgId,
+  organizationId,
   doctorId,
   username
 ) {
@@ -967,13 +1209,12 @@ export async function grantDoctorAccess(
 
   const context =
     await ensureDoctorBelongsToOrganization(
-      orgId,
+      organizationId,
       doctorId
     );
 
   if (
-    context.doctor.status ===
-    "archived"
+    context.doctor.status === "archived"
   ) {
     throw new AppError(
       "Нельзя выдать доступ архивному врачу.",
@@ -988,38 +1229,93 @@ export async function grantDoctorAccess(
     );
   }
 
+  if (!clean(context.profile.email)) {
+    throw new AppError(
+      "У врача не указана электронная почта.",
+      409
+    );
+  }
+
   await ensureUsernameAvailable(
     normalizedUsername,
     context.profile.id
   );
 
+  const previousSecurityState =
+    await getProfileSecurityState(
+      context.profile.id
+    );
+
   const temporaryPassword =
     generateTemporaryPassword();
 
   const passwordHash =
-    hashPassword(
-      temporaryPassword
+    hashPassword(temporaryPassword);
+
+  let updatedProfile;
+
+  try {
+    updatedProfile =
+      await updateProfile(
+        context.profile.id,
+        {
+          username:
+            normalizedUsername,
+
+          password_hash:
+            passwordHash,
+
+          role: "doctor",
+          status: "active",
+        },
+        {
+          mustChangePassword: true,
+        }
+      );
+
+    await revokeProfileSessions(
+      context.profile.id
     );
 
-  const updatedProfile =
-    await updateProfile(
-      context.profile.id,
-      {
-        username:
-          normalizedUsername,
-        password_hash:
-          passwordHash,
-        role: "doctor",
-        status: "active",
-      },
-      {
-        mustChangePassword: true,
-      }
-    );
+    await sendDoctorAccessEmail({
+      email:
+        context.profile.email,
 
-  await revokeProfileSessions(
-    context.profile.id
-  );
+      fullName:
+        context.profile.full_name,
+
+      username:
+        updatedProfile.username,
+
+      temporaryPassword,
+
+      isPasswordReset: false,
+    });
+  } catch (error) {
+    try {
+      await restoreProfileSecurityState(
+        previousSecurityState
+      );
+    } catch (rollbackError) {
+      console.error(
+        "[DOCTOR ACCESS ROLLBACK ERROR]",
+        rollbackError?.message ||
+          rollbackError
+      );
+    }
+
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    throw new AppError(
+      `Не удалось выдать доступ врачу: ${
+        error?.message ||
+        "неизвестная ошибка"
+      }`,
+      502
+    );
+  }
 
   return {
     doctorId:
@@ -1033,24 +1329,27 @@ export async function grantDoctorAccess(
 
     temporaryPassword,
 
+    email:
+      context.profile.email,
+
+    emailSent: true,
     accessStatus: "active",
     accessIssued: true,
   };
 }
 
 export async function resetDoctorPassword(
-  orgId,
+  organizationId,
   doctorId
 ) {
   const context =
     await ensureDoctorBelongsToOrganization(
-      orgId,
+      organizationId,
       doctorId
     );
 
   if (
-    context.doctor.status ===
-    "archived"
+    context.doctor.status === "archived"
   ) {
     throw new AppError(
       "Нельзя сбросить пароль архивному врачу.",
@@ -1065,29 +1364,82 @@ export async function resetDoctorPassword(
     );
   }
 
+  if (!clean(context.profile.email)) {
+    throw new AppError(
+      "У врача не указана электронная почта.",
+      409
+    );
+  }
+
+  const previousSecurityState =
+    await getProfileSecurityState(
+      context.profile.id
+    );
+
   const temporaryPassword =
     generateTemporaryPassword();
 
   const passwordHash =
-    hashPassword(
-      temporaryPassword
+    hashPassword(temporaryPassword);
+
+  let updatedProfile;
+
+  try {
+    updatedProfile =
+      await updateProfile(
+        context.profile.id,
+        {
+          password_hash:
+            passwordHash,
+        },
+        {
+          mustChangePassword: true,
+        }
+      );
+
+    await revokeProfileSessions(
+      context.profile.id
     );
 
-  const updatedProfile =
-    await updateProfile(
-      context.profile.id,
-      {
-        password_hash:
-          passwordHash,
-      },
-      {
-        mustChangePassword: true,
-      }
-    );
+    await sendDoctorAccessEmail({
+      email:
+        context.profile.email,
 
-  await revokeProfileSessions(
-    context.profile.id
-  );
+      fullName:
+        context.profile.full_name,
+
+      username:
+        updatedProfile.username,
+
+      temporaryPassword,
+
+      isPasswordReset: true,
+    });
+  } catch (error) {
+    try {
+      await restoreProfileSecurityState(
+        previousSecurityState
+      );
+    } catch (rollbackError) {
+      console.error(
+        "[DOCTOR PASSWORD ROLLBACK ERROR]",
+        rollbackError?.message ||
+          rollbackError
+      );
+    }
+
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    throw new AppError(
+      `Не удалось создать новый временный пароль: ${
+        error?.message ||
+        "неизвестная ошибка"
+      }`,
+      502
+    );
+  }
 
   return {
     doctorId:
@@ -1101,6 +1453,11 @@ export async function resetDoctorPassword(
 
     temporaryPassword,
 
+    email:
+      context.profile.email,
+
+    emailSent: true,
+
     accessStatus:
       updatedProfile.status ===
       "active"
@@ -1112,7 +1469,7 @@ export async function resetDoctorPassword(
 }
 
 export async function setDoctorAccessStatus(
-  orgId,
+  organizationId,
   doctorId,
   accessStatus
 ) {
@@ -1129,13 +1486,12 @@ export async function setDoctorAccessStatus(
 
   const context =
     await ensureDoctorBelongsToOrganization(
-      orgId,
+      organizationId,
       doctorId
     );
 
   if (
-    context.doctor.status ===
-    "archived"
+    context.doctor.status === "archived"
   ) {
     throw new AppError(
       "Нельзя изменить доступ архивного врача.",
@@ -1153,13 +1509,80 @@ export async function setDoctorAccessStatus(
     );
   }
 
-  const updatedProfile =
-    await updateProfile(
-      context.profile.id,
-      {
-        status: accessStatus,
-      }
+  const previousDoctorStatus =
+    context.doctor.status;
+
+  const now =
+    new Date().toISOString();
+
+  /*
+   * Меняем статус не только профиля,
+   * но и карточки врача.
+   *
+   * Это не позволит пациентам создавать
+   * новые записи к заблокированному врачу.
+   */
+  const {
+    data: updatedDoctor,
+    error: doctorUpdateError,
+  } = await supabase
+    .from("doctors")
+    .update({
+      status: accessStatus,
+      updated_at: now,
+    })
+    .eq("id", doctorId)
+    .select("id, status")
+    .single();
+
+  if (
+    doctorUpdateError ||
+    !updatedDoctor
+  ) {
+    throw new Error(
+      `Не удалось изменить статус врача: ${
+        doctorUpdateError?.message ||
+        "карточка врача не обновлена"
+      }`
     );
+  }
+
+  let updatedProfile;
+
+  try {
+    updatedProfile =
+      await updateProfile(
+        context.profile.id,
+        {
+          status: accessStatus,
+        }
+      );
+  } catch (error) {
+    /*
+     * Если профиль обновить не получилось,
+     * возвращаем карточке прежний статус.
+     */
+    const {
+      error: rollbackError,
+    } = await supabase
+      .from("doctors")
+      .update({
+        status:
+          previousDoctorStatus,
+        updated_at:
+          new Date().toISOString(),
+      })
+      .eq("id", doctorId);
+
+    if (rollbackError) {
+      console.error(
+        "[DOCTOR STATUS ROLLBACK ERROR]",
+        rollbackError.message
+      );
+    }
+
+    throw error;
+  }
 
   if (accessStatus === "blocked") {
     await revokeProfileSessions(
@@ -1169,7 +1592,10 @@ export async function setDoctorAccessStatus(
 
   return {
     doctorId:
-      context.doctor.id,
+      updatedDoctor.id,
+
+    doctorStatus:
+      updatedDoctor.status,
 
     profileId:
       updatedProfile.id,
@@ -1188,22 +1614,69 @@ export async function setDoctorAccessStatus(
           : "blocked"
         : "no_access",
 
-    accessIssued:
-      Boolean(
-        updatedProfile.username
-      ),
+    accessIssued: Boolean(
+      updatedProfile.username
+    ),
+  };
+}
+export async function blockDoctorAccessAndCancelAppointments(
+  organizationId,
+  doctorId,
+  cancelledByProfileId = ""
+) {
+  /*
+   * Сначала блокируем врача и закрываем
+   * его активные авторизационные сессии.
+   */
+  const doctor =
+    await setDoctorAccessStatus(
+      organizationId,
+      doctorId,
+      "blocked"
+    );
+
+  /*
+   * После блокировки отменяем только
+   * будущие активные записи.
+   *
+   * Завершённые и уже начатые приёмы
+   * эта функция не изменяет.
+   */
+  const cancellation =
+    await cancelFutureAppointmentsForDoctor(
+      doctorId,
+      cancelledByProfileId
+    );
+
+  return {
+    ...doctor,
+
+    cancelledAppointmentsCount:
+      cancellation.cancelledCount,
+
+    cancelledAppointmentIds:
+      cancellation.appointmentIds,
   };
 }
 
 export async function archiveDoctor(
-  orgId,
+  organizationId,
   doctorId
 ) {
   const context =
     await ensureDoctorBelongsToOrganization(
-      orgId,
+      organizationId,
       doctorId
     );
+
+  if (
+    context.doctor.status === "archived"
+  ) {
+    throw new AppError(
+      "Врач уже находится в архиве.",
+      409
+    );
+  }
 
   const {
     data: archivedDoctor,
@@ -1247,5 +1720,214 @@ export async function archiveDoctor(
     status: archivedDoctor.status,
     accessStatus: "archived",
   };
+}
+
+export async function restoreDoctor(
+  organizationId,
+  doctorId
+) {
+  const context =
+    await ensureDoctorBelongsToOrganization(
+      organizationId,
+      doctorId
+    );
+
+  if (
+    context.doctor.status !== "archived"
+  ) {
+    throw new AppError(
+      "Врач не находится в архиве.",
+      409
+    );
+  }
+
+  const nextProfileStatus =
+    context.profile.username
+      ? "active"
+      : "blocked";
+
+  const {
+    data: restoredDoctor,
+    error: restoreError,
+  } = await supabase
+    .from("doctors")
+    .update({
+      status: "active",
+      updated_at:
+        new Date().toISOString(),
+    })
+    .eq("id", doctorId)
+    .select("id, status")
+    .single();
+
+  if (
+    restoreError ||
+    !restoredDoctor
+  ) {
+    throw new Error(
+      `Ошибка восстановления врача: ${
+        restoreError?.message ||
+        "врач не восстановлен"
+      }`
+    );
+  }
+
+  const {
+    error: memberUpdateError,
+  } = await supabase
+    .from("organization_members")
+    .update({
+      status: "active",
+      updated_at:
+        new Date().toISOString(),
+    })
+    .eq("id", context.member.id);
+
+  if (memberUpdateError) {
+    await supabase
+      .from("doctors")
+      .update({
+        status: "archived",
+        updated_at:
+          new Date().toISOString(),
+      })
+      .eq("id", doctorId);
+
+    throw new Error(
+      `Не удалось восстановить членство врача: ${memberUpdateError.message}`
+    );
+  }
+
+  try {
+    const updatedProfile =
+      await updateProfile(
+        context.profile.id,
+        {
+          status: nextProfileStatus,
+        }
+      );
+
+    return {
+      id: restoredDoctor.id,
+      status: restoredDoctor.status,
+
+      profileStatus:
+        updatedProfile.status,
+
+      username:
+        updatedProfile.username,
+
+      accessStatus:
+        updatedProfile.username
+          ? updatedProfile.status ===
+            "active"
+            ? "active"
+            : "blocked"
+          : "no_access",
+
+      accessIssued: Boolean(
+        updatedProfile.username
+      ),
+    };
+  } catch (error) {
+    await supabase
+      .from("doctors")
+      .update({
+        status: "archived",
+        updated_at:
+          new Date().toISOString(),
+      })
+      .eq("id", doctorId);
+
+    await supabase
+      .from("organization_members")
+      .update({
+        status:
+          context.member.status ||
+          "active",
+
+        updated_at:
+          new Date().toISOString(),
+      })
+      .eq("id", context.member.id);
+
+    throw error;
+  }
+}
+
+export async function deleteDoctorPermanently(
+  organizationId,
+  doctorId
+) {
+  const context =
+    await ensureDoctorBelongsToOrganization(
+      organizationId,
+      doctorId
+    );
+
+  if (
+    context.doctor.status !== "archived"
+  ) {
+    throw new AppError(
+      "Перед полным удалением врач должен быть отправлен в архив.",
+      409
+    );
+  }
+
+  const { data, error } = await supabase.rpc(
+    "delete_doctor_permanently",
+    {
+      p_doctor_id: doctorId,
+
+      p_organization_id:
+        organizationId,
+    }
+  );
+
+  if (error) {
+    const errorMessage = String(
+      error.message || ""
+    );
+
+    if (
+      errorMessage.includes(
+        "есть записи"
+      ) ||
+      errorMessage.includes(
+        "история приёмов"
+      ) ||
+      errorMessage.includes(
+        "должен быть отправлен в архив"
+      )
+    ) {
+      throw new AppError(
+        errorMessage,
+        409
+      );
+    }
+
+    if (
+      error.code === "P0002" ||
+      errorMessage.includes(
+        "Врач не найден"
+      )
+    ) {
+      throw new AppError(
+        "Врач не найден или принадлежит другой организации.",
+        404
+      );
+    }
+
+    throw new Error(
+      `Ошибка полного удаления врача: ${errorMessage}`
+    );
+  }
+
+  return (
+    data || {
+      success: true,
+      doctorId,
+    }
+  );
 }
 

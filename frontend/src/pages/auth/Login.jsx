@@ -1,6 +1,11 @@
 
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+
+import {
+  Link,
+  useNavigate,
+} from "react-router-dom";
+
 import {
   RiBuilding4Line,
   RiLockPasswordLine,
@@ -14,45 +19,130 @@ import { useLanguage } from "../../i18n/LanguageContext";
 
 export default function Login() {
   const { login } = useAuth();
-  const { t, language, setLanguage } = useLanguage();
+
+  const {
+    t,
+    language,
+    setLanguage,
+  } = useLanguage();
+
   const navigate = useNavigate();
 
-  const [loginType, setLoginType] = useState("user");
-  const [loginValue, setLoginValue] = useState("");
-  const [organizationBin, setOrganizationBin] = useState("");
-  const [password, setPassword] = useState("");
-  const [authError, setAuthError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [
+    loginType,
+    setLoginType,
+  ] = useState("patient");
 
-  const isOrganizationAdmin = loginType === "organization_admin";
+  const [
+    loginValue,
+    setLoginValue,
+  ] = useState("");
 
-  async function handleLogin(event) {
+  const [
+    organizationBin,
+    setOrganizationBin,
+  ] = useState("");
+
+  const [
+    password,
+    setPassword,
+  ] = useState("");
+
+  const [
+    authError,
+    setAuthError,
+  ] = useState("");
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(false);
+
+  const isPatient =
+    loginType === "patient";
+
+  const isOrganizationAdmin =
+    loginType ===
+    "organization_admin";
+
+  const isStaff =
+    loginType === "staff";
+
+  function normalizeLoginValue() {
+    if (isPatient) {
+      return String(
+        loginValue || ""
+      )
+        .replace(/\D/g, "")
+        .slice(0, 12);
+    }
+
+    return String(
+      loginValue || ""
+    ).trim();
+  }
+
+  async function handleLogin(
+    event
+  ) {
     event.preventDefault();
 
     if (loading) {
       return;
     }
 
-    const normalizedLogin = loginValue.trim();
-    const normalizedBin = organizationBin.trim();
+    const normalizedLogin =
+      normalizeLoginValue();
 
-    if (!normalizedLogin) {
-      setAuthError("Введите логин.");
+    const normalizedBin =
+      String(
+        organizationBin || ""
+      )
+        .replace(/\D/g, "")
+        .slice(0, 12);
+
+    if (
+      isPatient &&
+      !/^\d{12}$/.test(
+        normalizedLogin
+      )
+    ) {
+      setAuthError(
+        t("patientIinLengthError")
+      );
+
+      return;
+    }
+
+    if (
+      !isPatient &&
+      !normalizedLogin
+    ) {
+      setAuthError(
+       t("loginRequiredError")
+      );
+
       return;
     }
 
     if (
       isOrganizationAdmin &&
-      !/^\d{12}$/.test(normalizedBin)
+      !/^\d{12}$/.test(
+        normalizedBin
+      )
     ) {
       setAuthError(
-        "БИН организации должен содержать ровно 12 цифр."
+        t("organizationBinLengthError")
       );
+
       return;
     }
 
     if (!password) {
-      setAuthError("Введите пароль.");
+      setAuthError(
+        t("passwordRequiredError")
+      );
+
       return;
     }
 
@@ -63,15 +153,21 @@ export default function Login() {
       await login(
         normalizedLogin,
         password,
-        isOrganizationAdmin ? normalizedBin : null
+        isOrganizationAdmin
+          ? normalizedBin
+          : null,
+        loginType
       );
 
-      navigate("/", { replace: true });
+      navigate("/", {
+        replace: true,
+      });
     } catch (error) {
       setAuthError(
-        error?.response?.data?.message ||
+        error?.response?.data
+          ?.message ||
           error?.message ||
-          "Не удалось выполнить вход. Проверьте введённые данные."
+          t("loginFailedError")
       );
     } finally {
       setLoading(false);
@@ -79,120 +175,285 @@ export default function Login() {
   }
 
   function switchLanguage() {
-    setLanguage(language === "ru" ? "kk" : "ru");
+    setLanguage(
+      language === "ru"
+        ? "kk"
+        : "ru"
+    );
   }
 
-  function selectLoginType(type) {
+  function selectLoginType(
+    type
+  ) {
     setLoginType(type);
+    setLoginValue("");
+    setPassword("");
     setAuthError("");
 
-    if (type !== "organization_admin") {
+    if (
+      type !==
+      "organization_admin"
+    ) {
       setOrganizationBin("");
     }
   }
+
+  function handleLoginValueChange(
+    event
+  ) {
+    const value =
+      event.target.value;
+
+    if (isPatient) {
+      setLoginValue(
+        value
+          .replace(/\D/g, "")
+          .slice(0, 12)
+      );
+
+      return;
+    }
+
+    setLoginValue(value);
+  }
+
+  function getLoginLabel() {
+  if (isPatient) {
+    return t("patientIinLabel");
+  }
+
+  if (isStaff) {
+    return t("staffLoginLabel");
+  }
+
+  return t("adminLoginLabel");
+}
+
+  function getLoginPlaceholder() {
+  if (isPatient) {
+    return t("patientIinPlaceholder");
+  }
+
+  if (isStaff) {
+    return t("staffLoginPlaceholder");
+  }
+
+  return t("adminLoginPlaceholder");
+}
 
   return (
     <div style={styles.container}>
       <div style={styles.bgBlob1} />
       <div style={styles.bgBlob2} />
 
-      <div style={styles.langSelector}>
+      <div
+        style={
+          styles.langSelector
+        }
+      >
         <button
           type="button"
           onClick={switchLanguage}
-          style={styles.langButton}
+          style={
+            styles.langButton
+          }
         >
-          {language === "ru" ? "ҚАЗ" : "РУС"}
+          {language === "ru"
+            ? "ҚАЗ"
+            : "РУС"}
         </button>
       </div>
 
       <main style={styles.card}>
-        <header style={styles.header}>
-          <div style={styles.logoContainer}>
-            <RiUserHeartLine style={styles.logoIcon} />
+        <header
+          style={styles.header}
+        >
+          <div
+            style={
+              styles.logoContainer
+            }
+          >
+            <RiUserHeartLine
+              style={styles.logoIcon}
+            />
           </div>
 
-          <h1 style={styles.title}>Clinic OS</h1>
+          <h1 style={styles.title}>
+            Clinis OS
+          </h1>
 
           <p style={styles.subtitle}>
-            {t("welcome_back") || "Единый портал здоровья"}
+            {t("welcome_back") ||
+              "Единый портал здоровья"}
           </p>
         </header>
 
-        <div style={styles.loginTitle}>
-          <RiLockPasswordLine style={styles.loginIcon} />
-          <span>{t("login_title") || "Вход в систему"}</span>
+        <div
+          style={
+            styles.loginTitle
+          }
+        >
+          <RiLockPasswordLine
+            style={styles.loginIcon}
+          />
+
+          <span>
+            {t("login_title") ||
+              "Вход в систему"}
+          </span>
         </div>
 
-        <div style={styles.typeSelector}>
+        <div
+          style={
+            styles.typeSelector
+          }
+        >
           <button
             type="button"
-            onClick={() => selectLoginType("user")}
+            onClick={() =>
+              selectLoginType(
+                "patient"
+              )
+            }
             disabled={loading}
             style={{
               ...styles.typeButton,
-              ...(loginType === "user"
+
+              ...(isPatient
                 ? styles.activeTypeButton
                 : {}),
             }}
           >
-            <RiUserLine />
-            <span>Пациент, врач или техподдержка</span>
+            <RiUserHeartLine />
+
+            <span>
+              {t("loginRolePatient")}
+            </span>
           </button>
 
           <button
             type="button"
             onClick={() =>
-              selectLoginType("organization_admin")
+              selectLoginType(
+                "staff"
+              )
             }
             disabled={loading}
             style={{
               ...styles.typeButton,
+
+              ...(isStaff
+                ? styles.activeTypeButton
+                : {}),
+            }}
+          >
+            <RiUserLine />
+
+            <span>
+              {t("loginRoleDoctor")}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              selectLoginType(
+                "organization_admin"
+              )
+            }
+            disabled={loading}
+            style={{
+              ...styles.typeButton,
+
               ...(isOrganizationAdmin
                 ? styles.activeTypeButton
                 : {}),
             }}
           >
             <RiBuilding4Line />
-            <span>Администратор поликлиники</span>
+
+            <span>
+              {t("loginRoleAdmin")}
+            </span>
           </button>
         </div>
 
         {authError && (
-          <div style={styles.errorAlert} role="alert">
+          <div
+            style={
+              styles.errorAlert
+            }
+            role="alert"
+          >
             {authError}
           </div>
         )}
 
-        <form onSubmit={handleLogin} style={styles.form}>
-          <div style={styles.inputGroup}>
-            <label htmlFor="login" style={styles.label}>
-              Логин
+        <form
+          onSubmit={handleLogin}
+          style={styles.form}
+        >
+          <div
+            style={
+              styles.inputGroup
+            }
+          >
+            <label
+              htmlFor="login"
+              style={styles.label}
+            >
+              {getLoginLabel()}
             </label>
 
             <input
               id="login"
               name="login"
               type="text"
-              value={loginValue}
-              onChange={(event) =>
-                setLoginValue(event.target.value)
+              inputMode={
+                isPatient
+                  ? "numeric"
+                  : "text"
               }
-              placeholder="Введите логин"
+              value={loginValue}
+              onChange={
+                handleLoginValueChange
+              }
+              placeholder={
+                getLoginPlaceholder()
+              }
               autoComplete="username"
+              maxLength={
+                isPatient
+                  ? 12
+                  : 50
+              }
               disabled={loading}
               style={styles.input}
               required
             />
+
+            {isPatient && (
+              <span
+                style={
+                  styles.valueCounter
+                }
+              >
+                {loginValue.length}/12
+              </span>
+            )}
           </div>
 
           {isOrganizationAdmin && (
-            <div style={styles.inputGroup}>
+            <div
+              style={
+                styles.inputGroup
+              }
+            >
               <label
                 htmlFor="organizationBin"
                 style={styles.label}
               >
-                БИН организации
+                {t("organizationBinLabel")}
               </label>
 
               <input
@@ -200,30 +461,53 @@ export default function Login() {
                 name="organizationBin"
                 type="text"
                 inputMode="numeric"
-                value={organizationBin}
+                value={
+                  organizationBin
+                }
                 onChange={(event) =>
                   setOrganizationBin(
                     event.target.value
-                      .replace(/\D/g, "")
+                      .replace(
+                        /\D/g,
+                        ""
+                      )
                       .slice(0, 12)
                   )
                 }
-                placeholder="Введите 12 цифр БИН"
+                placeholder={t(
+  "organizationBinPlaceholder"
+)}
                 maxLength={12}
                 disabled={loading}
                 style={styles.input}
                 required
               />
 
-              <span style={styles.binCounter}>
-                {organizationBin.length}/12
+              <span
+                style={
+                  styles.valueCounter
+                }
+              >
+                {
+                  organizationBin.length
+                }
+                /12
               </span>
             </div>
           )}
 
-          <div style={styles.inputGroup}>
-            <label htmlFor="password" style={styles.label}>
-              {t("password_label") || "Пароль"}
+          <div
+            style={
+              styles.inputGroup
+            }
+          >
+            <label
+              htmlFor="password"
+              style={styles.label}
+            >
+              {t(
+                "password_label"
+              ) || "Пароль"}
             </label>
 
             <input
@@ -232,7 +516,9 @@ export default function Login() {
               type="password"
               value={password}
               onChange={(event) =>
-                setPassword(event.target.value)
+                setPassword(
+                  event.target.value
+                )
               }
               placeholder="••••••••"
               autoComplete="current-password"
@@ -248,37 +534,81 @@ export default function Login() {
             disabled={loading}
             style={{
               ...styles.submitButton,
-              ...(loading ? styles.disabledButton : {}),
+
+              ...(loading
+                ? styles.disabledButton
+                : {}),
             }}
           >
             {loading
-              ? t("logging_in") || "Выполняется вход..."
-              : t("login_button") || "Войти"}
+              ? t("logging_in") ||
+                "Выполняется вход..."
+              : t("login_button") ||
+                "Войти"}
           </button>
         </form>
 
         <div style={styles.footer}>
-          <p style={styles.footerText}>
-            {t("no_account") || "Нет аккаунта?"}{" "}
-            <Link to="/register" style={styles.footerLink}>
-              <RiUserAddLine style={styles.footerLinkIcon} />
-              {t("register_button") || "Зарегистрироваться"}
+          <p
+            style={
+              styles.footerText
+            }
+          >
+            {t("no_account") ||
+              "Нет аккаунта?"}{" "}
+
+            <Link
+              to="/register"
+              style={
+                styles.footerLink
+              }
+            >
+              <RiUserAddLine
+                style={
+                  styles.footerLinkIcon
+                }
+              />
+
+              {t(
+                "register_button"
+              ) ||
+                "Зарегистрироваться"}
             </Link>
           </p>
 
-          <div style={styles.divider}>
-            <span style={styles.dividerLine} />
-            <span style={styles.dividerText}>
+          <div
+            style={styles.divider}
+          >
+            <span
+              style={
+                styles.dividerLine
+              }
+            />
+
+            <span
+              style={
+                styles.dividerText
+              }
+            >
               {t("or") || "или"}
             </span>
-            <span style={styles.dividerLine} />
+
+            <span
+              style={
+                styles.dividerLine
+              }
+            />
           </div>
 
           <Link
             to="/organization-application"
-            style={styles.organizationLink}
+            style={
+              styles.organizationLink
+            }
           >
-            {t("clinic_application_link") ||
+            {t(
+              "clinic_application_link"
+            ) ||
               "Подать заявку от медицинской организации"}
           </Link>
         </div>
@@ -290,15 +620,18 @@ export default function Login() {
 const styles = {
   container: {
     display: "flex",
-    justifyContent: "center",
+    justifyContent:
+      "center",
     alignItems: "center",
     minHeight: "100vh",
     width: "100%",
     boxSizing: "border-box",
-    padding: "80px 20px 40px",
+    padding:
+      "80px 20px 40px",
     background:
       "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
-    fontFamily: "'Outfit', 'Inter', sans-serif",
+    fontFamily:
+      "'Outfit', 'Inter', sans-serif",
     position: "relative",
     overflow: "hidden",
   },
@@ -333,8 +666,10 @@ const styles = {
   },
 
   langButton: {
-    background: "rgba(255,255,255,0.06)",
-    border: "1px solid rgba(255,255,255,0.14)",
+    background:
+      "rgba(255,255,255,0.06)",
+    border:
+      "1px solid rgba(255,255,255,0.14)",
     color: "#ffffff",
     padding: "9px 17px",
     borderRadius: "20px",
@@ -345,15 +680,20 @@ const styles = {
 
   card: {
     width: "100%",
-    maxWidth: "460px",
+    maxWidth: "560px",
     boxSizing: "border-box",
     padding: "34px",
-    background: "rgba(15,23,42,0.72)",
-    backdropFilter: "blur(20px)",
-    WebkitBackdropFilter: "blur(20px)",
-    border: "1px solid rgba(255,255,255,0.1)",
+    background:
+      "rgba(15,23,42,0.72)",
+    backdropFilter:
+      "blur(20px)",
+    WebkitBackdropFilter:
+      "blur(20px)",
+    border:
+      "1px solid rgba(255,255,255,0.1)",
     borderRadius: "24px",
-    boxShadow: "0 24px 60px rgba(0,0,0,0.35)",
+    boxShadow:
+      "0 24px 60px rgba(0,0,0,0.35)",
     position: "relative",
     zIndex: 10,
   },
@@ -371,9 +711,11 @@ const styles = {
     background:
       "linear-gradient(135deg, #6366f1 0%, #10b981 100%)",
     display: "flex",
-    justifyContent: "center",
+    justifyContent:
+      "center",
     alignItems: "center",
-    boxShadow: "0 12px 28px rgba(99,102,241,0.28)",
+    boxShadow:
+      "0 12px 28px rgba(99,102,241,0.28)",
   },
 
   logoIcon: {
@@ -396,13 +738,16 @@ const styles = {
 
   loginTitle: {
     display: "flex",
-    justifyContent: "center",
+    justifyContent:
+      "center",
     alignItems: "center",
     gap: "8px",
     marginBottom: "16px",
     padding: "11px",
-    background: "rgba(255,255,255,0.06)",
-    border: "1px solid rgba(255,255,255,0.07)",
+    background:
+      "rgba(255,255,255,0.06)",
+    border:
+      "1px solid rgba(255,255,255,0.07)",
     borderRadius: "12px",
     color: "#e2e8f0",
     fontSize: "14px",
@@ -415,32 +760,38 @@ const styles = {
 
   typeSelector: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
+    gridTemplateColumns:
+      "repeat(auto-fit, minmax(120px, 1fr))",
     gap: "8px",
     marginBottom: "18px",
   },
 
   typeButton: {
-    minHeight: "62px",
+    minHeight: "72px",
     padding: "9px",
     borderRadius: "11px",
-    border: "1px solid rgba(255,255,255,0.09)",
-    background: "rgba(0,0,0,0.16)",
+    border:
+      "1px solid rgba(255,255,255,0.09)",
+    background:
+      "rgba(0,0,0,0.16)",
     color: "#94a3b8",
     cursor: "pointer",
     display: "flex",
     flexDirection: "column",
-    justifyContent: "center",
+    justifyContent:
+      "center",
     alignItems: "center",
-    gap: "5px",
+    gap: "6px",
     fontSize: "11px",
     fontWeight: 700,
     lineHeight: 1.25,
   },
 
   activeTypeButton: {
-    background: "rgba(99,102,241,0.18)",
-    border: "1px solid rgba(99,102,241,0.55)",
+    background:
+      "rgba(99,102,241,0.18)",
+    border:
+      "1px solid rgba(99,102,241,0.55)",
     color: "#c7d2fe",
   },
 
@@ -448,8 +799,10 @@ const styles = {
     marginBottom: "18px",
     padding: "12px 15px",
     borderRadius: "12px",
-    background: "rgba(239,68,68,0.15)",
-    border: "1px solid rgba(239,68,68,0.32)",
+    background:
+      "rgba(239,68,68,0.15)",
+    border:
+      "1px solid rgba(239,68,68,0.32)",
     color: "#fca5a5",
     fontSize: "14px",
     lineHeight: 1.5,
@@ -479,20 +832,23 @@ const styles = {
     width: "100%",
     boxSizing: "border-box",
     padding: "13px 15px",
-    background: "rgba(0,0,0,0.22)",
-    border: "1px solid rgba(255,255,255,0.12)",
+    background:
+      "rgba(0,0,0,0.22)",
+    border:
+      "1px solid rgba(255,255,255,0.12)",
     borderRadius: "12px",
     color: "#ffffff",
     fontSize: "15px",
     outline: "none",
   },
 
-  binCounter: {
+  valueCounter: {
     position: "absolute",
     right: "12px",
     bottom: "14px",
     color: "#64748b",
     fontSize: "11px",
+    pointerEvents: "none",
   },
 
   submitButton: {
@@ -548,7 +904,8 @@ const styles = {
   dividerLine: {
     flex: 1,
     height: "1px",
-    background: "rgba(255,255,255,0.1)",
+    background:
+      "rgba(255,255,255,0.1)",
   },
 
   dividerText: {
@@ -564,4 +921,3 @@ const styles = {
     fontWeight: 600,
   },
 };
-

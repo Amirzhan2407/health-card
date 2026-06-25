@@ -9,6 +9,7 @@ import {
 import {
   RiArchiveLine,
   RiCloseLine,
+  RiDeleteBinLine,
   RiFileCopyLine,
   RiKeyLine,
   RiLockLine,
@@ -19,6 +20,208 @@ import {
 } from "react-icons/ri";
 
 import api from "../../api/api";
+import { useLanguage } from "../../i18n/LanguageContext";
+
+
+const TEXTS = {
+  ru: {
+    accessNoAccess: "Доступ не выдан",
+    accessActive: "Доступ активен",
+    accessBlocked: "Доступ заблокирован",
+    accessArchived: "В архиве",
+    unknown: "Неизвестно",
+
+    loadDoctorsError: "Не удалось загрузить врачей.",
+    invalidIin: "ИИН должен состоять ровно из 12 цифр.",
+    fullNameRequired: "Укажите ФИО врача.",
+    emailRequired: "Укажите электронную почту врача.",
+    doctorCreated:
+      "Карточка врача создана. Теперь можно выдать доступ.",
+    createDoctorError: "Не удалось создать врача.",
+    invalidUsername:
+      "Логин должен состоять из 3–30 букв, цифр или символов . _ -.",
+    doctorFallback: "Врач",
+    accessGranted: "Доступ врачу успешно выдан.",
+    grantAccessError: "Не удалось выдать доступ врачу.",
+    temporaryPasswordUpdated: "Временный пароль обновлён.",
+    resetPasswordError: "Не удалось сбросить пароль.",
+    accessBlockedMessage: "Доступ врача заблокирован.",
+    blockAccessError: "Не удалось заблокировать доступ.",
+    accessUnblockedMessage: "Доступ врача восстановлен.",
+    unblockAccessError: "Не удалось восстановить доступ.",
+    doctorArchived: "Врач отправлен в архив.",
+    archiveDoctorError: "Не удалось отправить врача в архив.",
+    doctorRestored: "Врач восстановлен из архива.",
+    restoreDoctorError: "Не удалось восстановить врача.",
+    doctorDeleted: "Врач полностью удалён из базы данных.",
+    deleteDoctorError: "Не удалось полностью удалить врача.",
+    credentialsCopied: "Данные для входа скопированы.",
+    credentialsCopyError:
+      "Не удалось скопировать данные. Скопируйте их вручную.",
+
+    title: "Управление врачами",
+    subtitle:
+      "Создавайте карточки врачей, выдавайте доступ и управляйте входом в систему.",
+    updating: "Обновление...",
+    refresh: "Обновить",
+    activeDoctors: "Действующие врачи",
+    blockedDoctors: "Заблокированы",
+    hideForm: "Скрыть форму",
+    addDoctor: "Добавить врача",
+    newDoctor: "Новый врач",
+    newDoctorDescription:
+      "Сначала создаётся карточка. Логин и временный пароль выдаются отдельно.",
+    iinLabel: "ИИН *",
+    iinShort: "ИИН",
+    iinPlaceholder: "12 цифр",
+    fullNameLabel: "ФИО *",
+    fullNamePlaceholder: "Фамилия Имя Отчество",
+    emailLabel: "Электронная почта *",
+    phoneLabel: "Телефон",
+    creating: "Создание...",
+    createCard: "Создать карточку",
+    clinicDoctors: "Врачи клиники",
+    clinicDoctorsDescription:
+      "Для входа врачу необходимо отдельно выдать доступ.",
+    loadingDoctors: "Загрузка врачей...",
+    noDoctors: "В организации пока нет врачей.",
+    fullNameMissing: "ФИО не указано",
+    notSpecifiedLower: "не указано",
+    emailMissing: "Электронная почта не указана",
+    login: "Логин",
+    grantAccess: "Выдать доступ",
+    resetPassword: "Сбросить пароль",
+    block: "Заблокировать",
+    unblock: "Разблокировать",
+    archive: "В архив",
+    deletePermanently: "Удалить полностью",
+    processing: "Выполнение операции...",
+    doctorLogin: "Логин врача *",
+    usernameHint:
+      "Разрешены буквы, цифры и символы точка, дефис, нижнее подчёркивание.",
+    cancel: "Отмена",
+    createAccess: "Создать доступ",
+    loginData: "Данные для входа",
+    temporaryPasswordWarning:
+      "Временный пароль показывается только сейчас. Скопируйте и передайте его врачу через WhatsApp, Telegram или другим безопасным способом.",
+    temporaryPassword: "Временный пароль",
+    copy: "Скопировать",
+    done: "Готово",
+
+    confirmResetPassword: (name) =>
+      `Создать новый временный пароль для врача «${name}»? Старый пароль перестанет работать.`,
+    confirmBlock: (name) =>
+      `Заблокировать доступ врачу «${name}»? Его активные сессии будут завершены.`,
+    confirmArchive: (name) =>
+      `Отправить врача «${name}» в архив? Его доступ будет заблокирован.`,
+    confirmRestore: (name) =>
+      `Разблокировать и восстановить врача «${name}» из архива?`,
+    confirmDeleteFirst: (name) =>
+      `Полностью удалить врача «${name}» из базы данных?\n\nБудут удалены карточка врача, членство в организации и учётная запись.`,
+    confirmDeleteSecond:
+      "Это действие нельзя отменить. Полностью удалить врача?",
+    copyDoctor: "Врач",
+  },
+
+  kk: {
+    accessNoAccess: "Кіру рұқсаты берілмеген",
+    accessActive: "Кіру рұқсаты белсенді",
+    accessBlocked: "Кіру рұқсаты бұғатталған",
+    accessArchived: "Мұрағатта",
+    unknown: "Белгісіз",
+
+    loadDoctorsError: "Дәрігерлерді жүктеу мүмкін болмады.",
+    invalidIin: "ЖСН дәл 12 цифрдан тұруы керек.",
+    fullNameRequired: "Дәрігердің ТАӘ-сін көрсетіңіз.",
+    emailRequired: "Дәрігердің электрондық поштасын көрсетіңіз.",
+    doctorCreated:
+      "Дәрігер карточкасы жасалды. Енді кіру рұқсатын беруге болады.",
+    createDoctorError: "Дәрігерді жасау мүмкін болмады.",
+    invalidUsername:
+      "Логин 3–30 әріптен, саннан немесе . _ - таңбаларынан тұруы керек.",
+    doctorFallback: "Дәрігер",
+    accessGranted: "Дәрігерге кіру рұқсаты сәтті берілді.",
+    grantAccessError: "Дәрігерге кіру рұқсатын беру мүмкін болмады.",
+    temporaryPasswordUpdated: "Уақытша құпиясөз жаңартылды.",
+    resetPasswordError: "Құпиясөзді қайта орнату мүмкін болмады.",
+    accessBlockedMessage: "Дәрігердің кіру рұқсаты бұғатталды.",
+    blockAccessError: "Кіру рұқсатын бұғаттау мүмкін болмады.",
+    accessUnblockedMessage: "Дәрігердің кіру рұқсаты қалпына келтірілді.",
+    unblockAccessError: "Кіру рұқсатын қалпына келтіру мүмкін болмады.",
+    doctorArchived: "Дәрігер мұрағатқа жіберілді.",
+    archiveDoctorError: "Дәрігерді мұрағатқа жіберу мүмкін болмады.",
+    doctorRestored: "Дәрігер мұрағаттан қалпына келтірілді.",
+    restoreDoctorError: "Дәрігерді қалпына келтіру мүмкін болмады.",
+    doctorDeleted: "Дәрігер дерекқордан толық жойылды.",
+    deleteDoctorError: "Дәрігерді толық жою мүмкін болмады.",
+    credentialsCopied: "Кіру деректері көшірілді.",
+    credentialsCopyError:
+      "Деректерді көшіру мүмкін болмады. Оларды қолмен көшіріңіз.",
+
+    title: "Дәрігерлерді басқару",
+    subtitle:
+      "Дәрігер карточкаларын жасап, кіру рұқсатын және жүйеге кіруді басқарыңыз.",
+    updating: "Жаңартылуда...",
+    refresh: "Жаңарту",
+    activeDoctors: "Белсенді дәрігерлер",
+    blockedDoctors: "Бұғатталған",
+    hideForm: "Нысанды жасыру",
+    addDoctor: "Дәрігер қосу",
+    newDoctor: "Жаңа дәрігер",
+    newDoctorDescription:
+      "Алдымен дәрігер карточкасы жасалады. Логин мен уақытша құпиясөз бөлек беріледі.",
+    iinLabel: "ЖСН *",
+    iinShort: "ЖСН",
+    iinPlaceholder: "12 цифр",
+    fullNameLabel: "ТАӘ *",
+    fullNamePlaceholder: "Тегі Аты Әкесінің аты",
+    emailLabel: "Электрондық пошта *",
+    phoneLabel: "Телефон",
+    creating: "Жасалуда...",
+    createCard: "Карточка жасау",
+    clinicDoctors: "Клиника дәрігерлері",
+    clinicDoctorsDescription:
+      "Жүйеге кіру үшін дәрігерге рұқсатты бөлек беру қажет.",
+    loadingDoctors: "Дәрігерлер жүктелуде...",
+    noDoctors: "Ұйымда әзірге дәрігерлер жоқ.",
+    fullNameMissing: "ТАӘ көрсетілмеген",
+    notSpecifiedLower: "көрсетілмеген",
+    emailMissing: "Электрондық пошта көрсетілмеген",
+    login: "Логин",
+    grantAccess: "Кіру рұқсатын беру",
+    resetPassword: "Құпиясөзді қайта орнату",
+    block: "Бұғаттау",
+    unblock: "Бұғаттан шығару",
+    archive: "Мұрағатқа",
+    deletePermanently: "Толық жою",
+    processing: "Операция орындалуда...",
+    doctorLogin: "Дәрігер логині *",
+    usernameHint:
+      "Әріптер, сандар және нүкте, дефис, астыңғы сызық таңбаларына рұқсат етіледі.",
+    cancel: "Бас тарту",
+    createAccess: "Кіру рұқсатын жасау",
+    loginData: "Кіру деректері",
+    temporaryPasswordWarning:
+      "Уақытша құпиясөз тек қазір көрсетіледі. Оны көшіріп, дәрігерге WhatsApp, Telegram немесе басқа қауіпсіз тәсілмен жіберіңіз.",
+    temporaryPassword: "Уақытша құпиясөз",
+    copy: "Көшіру",
+    done: "Дайын",
+
+    confirmResetPassword: (name) =>
+      `«${name}» дәрігері үшін жаңа уақытша құпиясөз жасалсын ба? Ескі құпиясөз жұмысын тоқтатады.`,
+    confirmBlock: (name) =>
+      `«${name}» дәрігерінің кіру рұқсатын бұғаттау керек пе? Оның белсенді сеанстары аяқталады.`,
+    confirmArchive: (name) =>
+      `«${name}» дәрігерін мұрағатқа жіберу керек пе? Оның кіру рұқсаты бұғатталады.`,
+    confirmRestore: (name) =>
+      `«${name}» дәрігерін мұрағаттан қалпына келтіріп, бұғаттан шығару керек пе?`,
+    confirmDeleteFirst: (name) =>
+      `«${name}» дәрігерін дерекқордан толық жою керек пе?\n\nДәрігер карточкасы, ұйым мүшелігі және есептік жазбасы жойылады.`,
+    confirmDeleteSecond:
+      "Бұл әрекетті қайтару мүмкін емес. Дәрігерді толық жою керек пе?",
+    copyDoctor: "Дәрігер",
+  },
+};
 
 function extractArray(response) {
   const body = response?.data;
@@ -63,15 +266,15 @@ function getAccessStatus(doctor) {
   return "blocked";
 }
 
-function getAccessStatusLabel(status) {
+function getAccessStatusLabel(status, text) {
   const labels = {
-    no_access: "Доступ не выдан",
-    active: "Доступ активен",
-    blocked: "Доступ заблокирован",
-    archived: "В архиве",
+    no_access: text.accessNoAccess,
+    active: text.accessActive,
+    blocked: text.accessBlocked,
+    archived: text.accessArchived,
   };
 
-  return labels[status] || "Неизвестно";
+  return labels[status] || text.unknown;
 }
 
 function getAccessBadgeStyle(status) {
@@ -121,6 +324,53 @@ function normalizeUsername(value) {
 }
 
 export default function OrgAdminDashboard() {
+  const languageContext = useLanguage();
+
+  const rawLanguage =
+    typeof languageContext === "string"
+      ? languageContext
+      : languageContext?.language ??
+        languageContext?.currentLanguage ??
+        languageContext?.selectedLanguage ??
+        languageContext?.lang ??
+        languageContext?.locale ??
+        "ru";
+
+  const normalizedLanguage = String(rawLanguage)
+    .trim()
+    .toLowerCase();
+
+  const isKazakh =
+    normalizedLanguage === "kk" ||
+    normalizedLanguage === "kz" ||
+    normalizedLanguage === "kaz" ||
+    normalizedLanguage === "kazakh" ||
+    normalizedLanguage === "қаз" ||
+    normalizedLanguage.startsWith("kk-") ||
+    normalizedLanguage.startsWith("kz-");
+
+  const text = isKazakh ? TEXTS.kk : TEXTS.ru;
+
+  const localizedResponseMessage = (
+    response,
+    fallback
+  ) =>
+    isKazakh
+      ? fallback
+      : response?.data?.message ||
+        fallback;
+
+  const localizedErrorMessage = (
+    error,
+    fallback
+  ) =>
+    isKazakh
+      ? fallback
+      : getErrorMessage(
+          error,
+          fallback
+        );
+
   const [doctors, setDoctors] =
     useState([]);
 
@@ -199,15 +449,18 @@ export default function OrgAdminDashboard() {
 
         setMessage({
           type: "error",
-          text: getErrorMessage(
+          text: localizedErrorMessage(
             error,
-            "Не удалось загрузить врачей."
+            text.loadDoctorsError
           ),
         });
       } finally {
         setLoading(false);
       }
-    }, []);
+    }, [
+      text.loadDoctorsError,
+      isKazakh,
+    ]);
 
   useEffect(() => {
     loadDoctors();
@@ -233,7 +486,7 @@ export default function OrgAdminDashboard() {
     if (!/^\d{12}$/.test(iin.trim())) {
       setMessage({
         type: "error",
-        text: "ИИН должен содержать ровно 12 цифр.",
+        text: text.invalidIin,
       });
 
       return;
@@ -242,7 +495,7 @@ export default function OrgAdminDashboard() {
     if (!fullName.trim()) {
       setMessage({
         type: "error",
-        text: "Укажите ФИО врача.",
+        text: text.fullNameRequired,
       });
 
       return;
@@ -251,7 +504,7 @@ export default function OrgAdminDashboard() {
     if (!email.trim()) {
       setMessage({
         type: "error",
-        text: "Укажите электронную почту врача.",
+        text: text.emailRequired,
       });
 
       return;
@@ -277,8 +530,10 @@ export default function OrgAdminDashboard() {
         setMessage({
           type: "success",
           text:
-            response.data.message ||
-            "Карточка врача создана. Теперь можно выдать доступ.",
+            localizedResponseMessage(
+              response,
+              text.doctorCreated
+            ),
         });
 
         await loadDoctors();
@@ -286,9 +541,9 @@ export default function OrgAdminDashboard() {
     } catch (error) {
       setMessage({
         type: "error",
-        text: getErrorMessage(
+        text: localizedErrorMessage(
           error,
-          "Не удалось создать врача."
+          text.createDoctorError
         ),
       });
     } finally {
@@ -304,7 +559,6 @@ export default function OrgAdminDashboard() {
         .toLowerCase();
 
     setAccessDoctor(doctor);
-
     setUsername(
       suggestedUsername || ""
     );
@@ -341,7 +595,7 @@ export default function OrgAdminDashboard() {
     ) {
       setMessage({
         type: "error",
-        text: "Логин должен содержать от 3 до 30 букв, цифр или символов . _ -",
+        text: text.invalidUsername,
       });
 
       return;
@@ -371,7 +625,7 @@ export default function OrgAdminDashboard() {
       setCredentials({
         doctorName:
           accessDoctor.fullName ||
-          "Врач",
+          text.doctorFallback,
 
         username:
           accessData?.username ||
@@ -388,17 +642,19 @@ export default function OrgAdminDashboard() {
       setMessage({
         type: "success",
         text:
-          response?.data?.message ||
-          "Доступ врачу успешно выдан.",
+          localizedResponseMessage(
+            response,
+            text.accessGranted
+          ),
       });
 
       await loadDoctors();
     } catch (error) {
       setMessage({
         type: "error",
-        text: getErrorMessage(
+        text: localizedErrorMessage(
           error,
-          "Не удалось выдать доступ врачу."
+          text.grantAccessError
         ),
       });
     } finally {
@@ -408,7 +664,7 @@ export default function OrgAdminDashboard() {
 
   async function resetPassword(doctor) {
     const confirmed = window.confirm(
-      `Создать новый временный пароль для врача «${doctor.fullName}»? Старый пароль перестанет работать.`
+      text.confirmResetPassword(doctor.fullName)
     );
 
     if (!confirmed) {
@@ -434,7 +690,7 @@ export default function OrgAdminDashboard() {
 
       setCredentials({
         doctorName:
-          doctor.fullName || "Врач",
+          doctor.fullName || text.doctorFallback,
 
         username:
           accessData?.username ||
@@ -449,17 +705,19 @@ export default function OrgAdminDashboard() {
       setMessage({
         type: "success",
         text:
-          response?.data?.message ||
-          "Временный пароль обновлён.",
+          localizedResponseMessage(
+            response,
+            text.temporaryPasswordUpdated
+          ),
       });
 
       await loadDoctors();
     } catch (error) {
       setMessage({
         type: "error",
-        text: getErrorMessage(
+        text: localizedErrorMessage(
           error,
-          "Не удалось сбросить пароль."
+          text.resetPasswordError
         ),
       });
     } finally {
@@ -469,7 +727,7 @@ export default function OrgAdminDashboard() {
 
   async function blockAccess(doctor) {
     const confirmed = window.confirm(
-      `Заблокировать доступ врачу «${doctor.fullName}»? Его активные сессии будут завершены.`
+      text.confirmBlock(doctor.fullName)
     );
 
     if (!confirmed) {
@@ -488,17 +746,19 @@ export default function OrgAdminDashboard() {
       setMessage({
         type: "success",
         text:
-          response?.data?.message ||
-          "Доступ врача заблокирован.",
+          localizedResponseMessage(
+            response,
+            text.accessBlockedMessage
+          ),
       });
 
       await loadDoctors();
     } catch (error) {
       setMessage({
         type: "error",
-        text: getErrorMessage(
+        text: localizedErrorMessage(
           error,
-          "Не удалось заблокировать доступ."
+          text.blockAccessError
         ),
       });
     } finally {
@@ -519,17 +779,19 @@ export default function OrgAdminDashboard() {
       setMessage({
         type: "success",
         text:
-          response?.data?.message ||
-          "Доступ врача разблокирован.",
+          localizedResponseMessage(
+            response,
+            text.accessUnblockedMessage
+          ),
       });
 
       await loadDoctors();
     } catch (error) {
       setMessage({
         type: "error",
-        text: getErrorMessage(
+        text: localizedErrorMessage(
           error,
-          "Не удалось разблокировать доступ."
+          text.unblockAccessError
         ),
       });
     } finally {
@@ -539,7 +801,7 @@ export default function OrgAdminDashboard() {
 
   async function archiveDoctor(doctor) {
     const confirmed = window.confirm(
-      `Отправить врача «${doctor.fullName}» в архив? Его доступ будет заблокирован.`
+      text.confirmArchive(doctor.fullName)
     );
 
     if (!confirmed) {
@@ -558,17 +820,125 @@ export default function OrgAdminDashboard() {
       setMessage({
         type: "success",
         text:
-          response?.data?.message ||
-          "Врач отправлен в архив.",
+          localizedResponseMessage(
+            response,
+            text.doctorArchived
+          ),
       });
 
       await loadDoctors();
     } catch (error) {
       setMessage({
         type: "error",
-        text: getErrorMessage(
+        text: localizedErrorMessage(
           error,
-          "Не удалось архивировать врача."
+          text.archiveDoctorError
+        ),
+      });
+    } finally {
+      setActiveAction("");
+    }
+  }
+
+  async function restoreArchivedDoctor(
+    doctor
+  ) {
+    const confirmed = window.confirm(
+      text.confirmRestore(doctor.fullName)
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setActiveAction(
+      `restore:${doctor.id}`
+    );
+
+    setMessage({
+      type: "",
+      text: "",
+    });
+
+    try {
+      const response = await api.patch(
+        `/doctors/${doctor.id}/restore`
+      );
+
+      setMessage({
+        type: "success",
+        text:
+          localizedResponseMessage(
+            response,
+            text.doctorRestored
+          ),
+      });
+
+      await loadDoctors();
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: localizedErrorMessage(
+          error,
+          text.restoreDoctorError
+        ),
+      });
+    } finally {
+      setActiveAction("");
+    }
+  }
+
+  async function deleteDoctorPermanently(
+    doctor
+  ) {
+    const firstConfirmation =
+      window.confirm(
+        text.confirmDeleteFirst(doctor.fullName)
+      );
+
+    if (!firstConfirmation) {
+      return;
+    }
+
+    const secondConfirmation =
+      window.confirm(
+        text.confirmDeleteSecond
+      );
+
+    if (!secondConfirmation) {
+      return;
+    }
+
+    setActiveAction(
+      `delete:${doctor.id}`
+    );
+
+    setMessage({
+      type: "",
+      text: "",
+    });
+
+    try {
+      const response = await api.delete(
+        `/doctors/${doctor.id}/permanent`
+      );
+
+      setMessage({
+        type: "success",
+        text:
+          localizedResponseMessage(
+            response,
+            text.doctorDeleted
+          ),
+      });
+
+      await loadDoctors();
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: localizedErrorMessage(
+          error,
+          text.deleteDoctorError
         ),
       });
     } finally {
@@ -581,25 +951,25 @@ export default function OrgAdminDashboard() {
       return;
     }
 
-    const text = [
-      `Врач: ${credentials.doctorName}`,
-      `Логин: ${credentials.username}`,
-      `Временный пароль: ${credentials.temporaryPassword}`,
+    const credentialsText = [
+      `${text.copyDoctor}: ${credentials.doctorName}`,
+      `${text.login}: ${credentials.username}`,
+      `${text.temporaryPassword}: ${credentials.temporaryPassword}`,
     ].join("\n");
 
     try {
       await navigator.clipboard.writeText(
-        text
+        credentialsText
       );
 
       setMessage({
         type: "success",
-        text: "Данные доступа скопированы.",
+        text: text.credentialsCopied,
       });
     } catch {
       setMessage({
         type: "error",
-        text: "Не удалось скопировать данные. Скопируйте их вручную.",
+        text: text.credentialsCopyError,
       });
     }
   }
@@ -615,13 +985,11 @@ export default function OrgAdminDashboard() {
       <header style={styles.header}>
         <div>
           <h1 style={styles.title}>
-            Управление врачами
+            {text.title}
           </h1>
 
           <p style={styles.sub}>
-            Создавайте карточки врачей,
-            выдавайте доступ и управляйте
-            входом в систему.
+            {text.subtitle}
           </p>
         </div>
 
@@ -639,8 +1007,8 @@ export default function OrgAdminDashboard() {
           <RiRefreshLine />
 
           {loading
-            ? "Обновление..."
-            : "Обновить"}
+            ? text.updating
+            : text.refresh}
         </button>
       </header>
 
@@ -651,8 +1019,7 @@ export default function OrgAdminDashboard() {
 
             ...(message.type === "error"
               ? styles.errorAlert
-              : message.type ===
-                "success"
+              : message.type === "success"
               ? styles.successAlert
               : styles.infoAlert),
           }}
@@ -664,7 +1031,7 @@ export default function OrgAdminDashboard() {
       <section style={styles.statsGrid}>
         <div style={styles.statCard}>
           <span style={styles.statLabel}>
-            Действующие врачи
+            {text.activeDoctors}
           </span>
 
           <strong style={styles.statValue}>
@@ -674,7 +1041,7 @@ export default function OrgAdminDashboard() {
 
         <div style={styles.statCard}>
           <span style={styles.statLabel}>
-            Доступ не выдан
+            {text.accessNoAccess}
           </span>
 
           <strong style={styles.statValue}>
@@ -691,7 +1058,7 @@ export default function OrgAdminDashboard() {
 
         <div style={styles.statCard}>
           <span style={styles.statLabel}>
-            Заблокированы
+            {text.blockedDoctors}
           </span>
 
           <strong style={styles.statValue}>
@@ -708,7 +1075,7 @@ export default function OrgAdminDashboard() {
 
         <div style={styles.statCard}>
           <span style={styles.statLabel}>
-            В архиве
+            {text.accessArchived}
           </span>
 
           <strong style={styles.statValue}>
@@ -730,8 +1097,8 @@ export default function OrgAdminDashboard() {
           <RiUserAddLine />
 
           {showAddForm
-            ? "Скрыть форму"
-            : "Добавить врача"}
+            ? text.hideForm
+            : text.addDoctor}
         </button>
       </div>
 
@@ -743,13 +1110,11 @@ export default function OrgAdminDashboard() {
           <div style={styles.formHeader}>
             <div>
               <h2 style={styles.cardTitle}>
-                Новый врач
+                {text.newDoctor}
               </h2>
 
               <p style={styles.cardSubtitle}>
-                Сначала создаётся карточка.
-                Логин и временный пароль
-                выдаются отдельно.
+                {text.newDoctorDescription}
               </p>
             </div>
 
@@ -767,7 +1132,7 @@ export default function OrgAdminDashboard() {
           <div style={styles.formGrid}>
             <div style={styles.inputGroup}>
               <label style={styles.label}>
-                ИИН *
+                {text.iinLabel}
               </label>
 
               <input
@@ -783,14 +1148,14 @@ export default function OrgAdminDashboard() {
                 }
                 style={styles.input}
                 maxLength={12}
-                placeholder="12 цифр"
+                placeholder={text.iinPlaceholder}
                 required
               />
             </div>
 
             <div style={styles.inputGroup}>
               <label style={styles.label}>
-                ФИО *
+                {text.fullNameLabel}
               </label>
 
               <input
@@ -802,14 +1167,14 @@ export default function OrgAdminDashboard() {
                   )
                 }
                 style={styles.input}
-                placeholder="Фамилия Имя Отчество"
+                placeholder={text.fullNamePlaceholder}
                 required
               />
             </div>
 
             <div style={styles.inputGroup}>
               <label style={styles.label}>
-                Электронная почта *
+                {text.emailLabel}
               </label>
 
               <input
@@ -828,7 +1193,7 @@ export default function OrgAdminDashboard() {
 
             <div style={styles.inputGroup}>
               <label style={styles.label}>
-                Телефон
+                {text.phoneLabel}
               </label>
 
               <input
@@ -858,8 +1223,8 @@ export default function OrgAdminDashboard() {
             <RiUserAddLine />
 
             {creating
-              ? "Создание..."
-              : "Создать карточку"}
+              ? text.creating
+              : text.createCard}
           </button>
         </form>
       )}
@@ -868,12 +1233,11 @@ export default function OrgAdminDashboard() {
         <div style={styles.listHeader}>
           <div>
             <h2 style={styles.cardTitle}>
-              Врачи клиники
+              {text.clinicDoctors}
             </h2>
 
             <p style={styles.cardSubtitle}>
-              Для входа врачу необходимо
-              отдельно выдать доступ.
+              {text.clinicDoctorsDescription}
             </p>
           </div>
 
@@ -884,11 +1248,11 @@ export default function OrgAdminDashboard() {
 
         {loading ? (
           <div style={styles.emptyState}>
-            Загрузка врачей...
+            {text.loadingDoctors}
           </div>
         ) : doctors.length === 0 ? (
           <div style={styles.emptyState}>
-            В организации пока нет врачей.
+            {text.noDoctors}
           </div>
         ) : (
           <div style={styles.grid}>
@@ -917,48 +1281,34 @@ export default function OrgAdminDashboard() {
                       : {}),
                   }}
                 >
-                  <div
-                    style={
-                      styles.doctorMain
-                    }
-                  >
-                    <div
-                      style={styles.avatar}
-                    >
+                  <div style={styles.doctorMain}>
+                    <div style={styles.avatar}>
                       <RiTeamLine />
                     </div>
 
                     <div
-                      style={
-                        styles.doctorDetails
-                      }
+                      style={styles.doctorDetails}
                     >
                       <h3
-                        style={
-                          styles.doctorName
-                        }
+                        style={styles.doctorName}
                       >
                         {doctor.fullName ||
-                          "ФИО не указано"}
+                          text.fullNameMissing}
                       </h3>
 
                       <p
-                        style={
-                          styles.doctorMeta
-                        }
+                        style={styles.doctorMeta}
                       >
-                        ИИН:{" "}
+                        {text.iinShort}:{" "}
                         {doctor.iin ||
-                          "не указан"}
+                          text.notSpecifiedLower}
                       </p>
 
                       <p
-                        style={
-                          styles.doctorMeta
-                        }
+                        style={styles.doctorMeta}
                       >
                         {doctor.email ||
-                          "Почта не указана"}
+                          text.emailMissing}
 
                         {doctor.phone
                           ? ` • ${doctor.phone}`
@@ -971,11 +1321,9 @@ export default function OrgAdminDashboard() {
                             styles.usernameText
                           }
                         >
-                          Логин:{" "}
+                          {text.login}:{" "}
                           <strong>
-                            {
-                              doctor.username
-                            }
+                            {doctor.username}
                           </strong>
                         </p>
                       )}
@@ -983,9 +1331,7 @@ export default function OrgAdminDashboard() {
                   </div>
 
                   <div
-                    style={
-                      styles.doctorControls
-                    }
+                    style={styles.doctorControls}
                   >
                     <span
                       style={{
@@ -994,15 +1340,12 @@ export default function OrgAdminDashboard() {
                       }}
                     >
                       {getAccessStatusLabel(
-                        accessStatus
+                        accessStatus,
+                        text
                       )}
                     </span>
 
-                    <div
-                      style={
-                        styles.buttonsRow
-                      }
-                    >
+                    <div style={styles.buttonsRow}>
                       {accessStatus ===
                         "no_access" && (
                         <button
@@ -1018,7 +1361,7 @@ export default function OrgAdminDashboard() {
                           }
                         >
                           <RiKeyLine />
-                          Выдать доступ
+                          {text.grantAccess}
                         </button>
                       )}
 
@@ -1039,7 +1382,7 @@ export default function OrgAdminDashboard() {
                             }
                           >
                             <RiKeyLine />
-                            Сбросить пароль
+                            {text.resetPassword}
                           </button>
                         )}
 
@@ -1058,7 +1401,7 @@ export default function OrgAdminDashboard() {
                           }
                         >
                           <RiLockLine />
-                          Заблокировать
+                          {text.block}
                         </button>
                       )}
 
@@ -1077,7 +1420,7 @@ export default function OrgAdminDashboard() {
                           }
                         >
                           <RiLockUnlockLine />
-                          Разблокировать
+                          {text.unblock}
                         </button>
                       )}
 
@@ -1096,8 +1439,45 @@ export default function OrgAdminDashboard() {
                           }
                         >
                           <RiArchiveLine />
-                          В архив
+                          {text.archive}
                         </button>
+                      )}
+
+                      {accessStatus ===
+                        "archived" && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              restoreArchivedDoctor(
+                                doctor
+                              )
+                            }
+                            disabled={busy}
+                            style={
+                              styles.successButton
+                            }
+                          >
+                            <RiLockUnlockLine />
+                            {text.unblock}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              deleteDoctorPermanently(
+                                doctor
+                              )
+                            }
+                            disabled={busy}
+                            style={
+                              styles.permanentDeleteButton
+                            }
+                          >
+                            <RiDeleteBinLine />
+                            {text.deletePermanently}
+                          </button>
+                        </>
                       )}
                     </div>
 
@@ -1107,7 +1487,7 @@ export default function OrgAdminDashboard() {
                           styles.processingText
                         }
                       >
-                        Выполнение операции...
+                        {text.processing}
                       </span>
                     )}
                   </div>
@@ -1127,13 +1507,11 @@ export default function OrgAdminDashboard() {
             <div style={styles.modalHeader}>
               <div>
                 <h2 style={styles.modalTitle}>
-                  Выдать доступ
+                  {text.grantAccess}
                 </h2>
 
                 <p
-                  style={
-                    styles.modalSubtitle
-                  }
+                  style={styles.modalSubtitle}
                 >
                   {accessDoctor.fullName}
                 </p>
@@ -1150,7 +1528,7 @@ export default function OrgAdminDashboard() {
 
             <div style={styles.inputGroup}>
               <label style={styles.label}>
-                Логин врача *
+                {text.doctorLogin}
               </label>
 
               <input
@@ -1170,9 +1548,7 @@ export default function OrgAdminDashboard() {
               />
 
               <small style={styles.hint}>
-                Разрешены буквы, цифры и
-                символы точка, дефис,
-                нижнее подчёркивание.
+                {text.usernameHint}
               </small>
             </div>
 
@@ -1183,11 +1559,9 @@ export default function OrgAdminDashboard() {
                 disabled={Boolean(
                   activeAction
                 )}
-                style={
-                  styles.cancelButton
-                }
+                style={styles.cancelButton}
               >
-                Отмена
+                {text.cancel}
               </button>
 
               <button
@@ -1206,8 +1580,8 @@ export default function OrgAdminDashboard() {
                 <RiKeyLine />
 
                 {activeAction
-                  ? "Создание..."
-                  : "Создать доступ"}
+                  ? text.creating
+                  : text.createAccess}
               </button>
             </div>
           </form>
@@ -1220,13 +1594,11 @@ export default function OrgAdminDashboard() {
             <div style={styles.modalHeader}>
               <div>
                 <h2 style={styles.modalTitle}>
-                  Данные для входа
+                  {text.loginData}
                 </h2>
 
                 <p
-                  style={
-                    styles.modalSubtitle
-                  }
+                  style={styles.modalSubtitle}
                 >
                   {credentials.doctorName}
                 </p>
@@ -1244,10 +1616,7 @@ export default function OrgAdminDashboard() {
             </div>
 
             <div style={styles.warningBox}>
-              Временный пароль показывается
-              только сейчас. Скопируйте и
-              передайте его врачу безопасным
-              способом.
+              {text.temporaryPasswordWarning}
             </div>
 
             <div style={styles.credentialBox}>
@@ -1257,7 +1626,7 @@ export default function OrgAdminDashboard() {
                     styles.credentialLabel
                   }
                 >
-                  Логин
+                  {text.login}
                 </span>
 
                 <strong
@@ -1275,7 +1644,7 @@ export default function OrgAdminDashboard() {
                     styles.credentialLabel
                   }
                 >
-                  Временный пароль
+                  {text.temporaryPassword}
                 </span>
 
                 <strong
@@ -1299,7 +1668,7 @@ export default function OrgAdminDashboard() {
                 }
               >
                 <RiFileCopyLine />
-                Скопировать
+                {text.copy}
               </button>
 
               <button
@@ -1309,7 +1678,7 @@ export default function OrgAdminDashboard() {
                 }
                 style={styles.accessButton}
               >
-                Готово
+                {text.done}
               </button>
             </div>
           </div>
@@ -1576,7 +1945,7 @@ const styles = {
   },
 
   archivedDoctor: {
-    opacity: 0.6,
+    opacity: 0.72,
   },
 
   doctorMain: {
@@ -1718,6 +2087,21 @@ const styles = {
     color: "#94a3b8",
     cursor: "pointer",
     fontWeight: 650,
+  },
+
+  permanentDeleteButton: {
+    display: "flex",
+    alignItems: "center",
+    gap: "7px",
+    padding: "9px 12px",
+    borderRadius: "9px",
+    border:
+      "1px solid rgba(239,68,68,0.4)",
+    background:
+      "rgba(127,29,29,0.3)",
+    color: "#fecaca",
+    cursor: "pointer",
+    fontWeight: 700,
   },
 
   processingText: {

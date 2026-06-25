@@ -1,12 +1,22 @@
 
 import * as orgService from "../services/orgService.js";
 
-export async function getOrganizations(req, res, next) {
+export async function getOrganizations(
+  req,
+  res,
+  next
+) {
   try {
-    const { status } = req.query;
+    const status = String(
+      req.query?.status || ""
+    )
+      .trim()
+      .toLowerCase();
 
     const organizations =
-      await orgService.listOrganizations(status);
+      await orgService.listOrganizations(
+        status || null
+      );
 
     return res.status(200).json({
       success: true,
@@ -17,12 +27,52 @@ export async function getOrganizations(req, res, next) {
   }
 }
 
-export async function getOrganization(req, res, next) {
+/**
+ * Список активных медицинских организаций
+ * для пациента.
+ */
+export async function getActiveOrganizations(
+  req,
+  res,
+  next
+) {
   try {
-    const { id } = req.params;
+    const organizations =
+      await orgService.listOrganizations(
+        "active"
+      );
+
+    return res.status(200).json({
+      success: true,
+      data: organizations,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getOrganization(
+  req,
+  res,
+  next
+) {
+  try {
+    const organizationId = String(
+      req.params?.id || ""
+    ).trim();
+
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Не указан идентификатор организации.",
+      });
+    }
 
     const organization =
-      await orgService.getOrganizationById(id);
+      await orgService.getOrganizationById(
+        organizationId
+      );
 
     return res.status(200).json({
       success: true,
@@ -33,13 +83,27 @@ export async function getOrganization(req, res, next) {
   }
 }
 
-export async function updateOrg(req, res, next) {
+export async function updateOrg(
+  req,
+  res,
+  next
+) {
   try {
-    const { id } = req.params;
+    const organizationId = String(
+      req.params?.id || ""
+    ).trim();
+
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Не указан идентификатор организации.",
+      });
+    }
 
     const organization =
       await orgService.updateOrganization(
-        id,
+        organizationId,
         req.body
       );
 
@@ -60,21 +124,38 @@ export async function changeOrgStatus(
   next
 ) {
   try {
-    const { id } = req.params;
-    const { status } = req.body;
+    const organizationId = String(
+      req.params?.id || ""
+    ).trim();
+
+    const status = String(
+      req.body?.status || ""
+    )
+      .trim()
+      .toLowerCase();
+
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Не указан идентификатор организации.",
+      });
+    }
 
     const organization =
       await orgService.blockOrganization(
-        id,
+        organizationId,
         status
       );
 
     return res.status(200).json({
       success: true,
+
       message:
         status === "blocked"
           ? "Организация успешно заблокирована."
           : "Организация успешно разблокирована.",
+
       data: organization,
     });
   } catch (error) {
@@ -82,11 +163,17 @@ export async function changeOrgStatus(
   }
 }
 
-export async function deleteOrg(req, res, next) {
+export async function deleteOrg(
+  req,
+  res,
+  next
+) {
   try {
-    const { id } = req.params;
+    const organizationId = String(
+      req.params?.id || ""
+    ).trim();
 
-    if (!id) {
+    if (!organizationId) {
       return res.status(400).json({
         success: false,
         message:
@@ -95,7 +182,9 @@ export async function deleteOrg(req, res, next) {
     }
 
     const result =
-      await orgService.deleteOrganization(id);
+      await orgService.deleteOrganization(
+        organizationId
+      );
 
     return res.status(200).json({
       success: true,
@@ -107,3 +196,4 @@ export async function deleteOrg(req, res, next) {
     next(error);
   }
 }
+

@@ -56,6 +56,10 @@ async function getAccessibleNotification(
   const accessFilter =
     buildAccessFilter(user);
 
+    if (!accessFilter) {
+  return null;
+}
+
   let query = supabase
     .from("notifications")
     .select("*")

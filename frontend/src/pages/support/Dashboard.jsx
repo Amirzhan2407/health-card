@@ -20,18 +20,239 @@ import {
 
 import api from "../../api/api";
 
-const APPLICATION_STATUS_LABELS = {
-  pending: "Ожидает рассмотрения",
-  approved: "Одобрена",
-  rejected: "Отклонена",
+import { useLanguage } from "../../i18n/LanguageContext";
+
+const TEXTS = {
+  ru: {
+    applicationStatusLabels: {
+      pending: "Ожидает рассмотрения",
+      approved: "Одобрена",
+      rejected: "Отклонена",
+    },
+    organizationStatusLabels: {
+      active: "Активна",
+      blocked: "Заблокирована",
+      pending: "Ожидает подключения",
+      archived: "В архиве",
+    },
+
+    dateNotSpecified: "Дата не указана",
+    medicalOrganization: "Медицинская организация",
+    binNotSpecified: "не указан",
+
+    loadDashboardError:
+      "Не удалось загрузить данные кабинета техподдержки.",
+    organizationsLoadedApplicationsUnavailable:
+      "Организации загружены, но список заявок недоступен.",
+    applicationsLoadedOrganizationsUnavailable:
+      "Заявки загружены, но список организаций недоступен.",
+
+    applicationMissingId:
+      "У заявки отсутствует идентификатор.",
+    promptAdminUsername: (name, bin) =>
+      `Введите логин администратора организации.\n\nОрганизация: ${name}\nБИН: ${bin}`,
+    invalidUsername:
+      "Логин должен содержать от 3 до 30 латинских букв, цифр или символов . _ -",
+    confirmApprove: (name, bin, username) =>
+      `Одобрить заявку?\n\nОрганизация: ${name}\nБИН: ${bin}\nЛогин администратора: ${username}\n\nНа Email будут отправлены БИН, логин и временный пароль.`,
+    applicationApproved:
+      "Заявка одобрена. Данные для входа отправлены на Email.",
+    approveApplicationError:
+      "Не удалось одобрить заявку.",
+    promptRejectReason:
+      "Укажите причину отклонения заявки:",
+    applicationRejected: "Заявка отклонена.",
+    rejectApplicationError:
+      "Не удалось отклонить заявку.",
+
+    organizationMissingId:
+      "У организации отсутствует идентификатор.",
+    confirmBlockOrganization: (name) =>
+      `Вы действительно хотите заблокировать организацию «${name}»?`,
+    confirmUnblockOrganization: (name) =>
+      `Вы действительно хотите разблокировать организацию «${name}»?`,
+    organizationBlocked:
+      "Организация заблокирована.",
+    organizationUnblocked:
+      "Организация разблокирована.",
+    blockOrganizationError:
+      "Не удалось заблокировать организацию.",
+    unblockOrganizationError:
+      "Не удалось разблокировать организацию.",
+    confirmDeleteOrganization: (name, bin) =>
+      `Полностью удалить организацию?\n\nОрганизация: ${name}\nБИН: ${bin}\n\nБудут удалены организация, её администратор, активные сессии, обращения и уведомления.`,
+    organizationDeleted: (name) =>
+      `Организация «${name}» удалена.`,
+    deleteOrganizationError:
+      "Не удалось удалить организацию.",
+
+    pageTitle: "Техническая поддержка",
+    pageSubtitle:
+      "Управление заявками и подключёнными медицинскими организациями.",
+    updating: "Обновление...",
+    refresh: "Обновить",
+
+    pendingApplications:
+      "Заявок на рассмотрении",
+    totalOrganizations:
+      "Всего организаций",
+    activeOrganizations:
+      "Активных организаций",
+    blockedOrganizations:
+      "Заблокированных",
+
+    searchPlaceholder:
+      "Поиск по названию, БИН, городу или Email",
+    loadingDashboard:
+      "Загрузка данных кабинета техподдержки...",
+
+    applicationsTitle:
+      "Заявки организаций",
+    applicationsSubtitle:
+      "Новые заявки на подключение к Clinic OS",
+    noNewApplications:
+      "Новых заявок нет",
+    allApplicationsProcessed:
+      "Все поступившие заявки обработаны.",
+
+    binLabel: "БИН",
+    cityLabel: "Город",
+    representativeLabel: "Представитель",
+    emailLabel: "Email",
+    receivedLabel: "Получена",
+    processing: "Обработка...",
+    approve: "Одобрить",
+    reject: "Отклонить",
+
+    organizationsTitle:
+      "Медицинские организации",
+    organizationsSubtitle:
+      "Подключённые поликлиники и их статусы",
+    noOrganizations:
+      "Организации не найдены",
+    organizationsAppear:
+      "Подключённые организации появятся здесь.",
+    unblock: "Разблокировать",
+    block: "Заблокировать",
+    delete: "Удалить",
+  },
+
+  kk: {
+    applicationStatusLabels: {
+      pending: "Қаралуда",
+      approved: "Мақұлданды",
+      rejected: "Қабылданбады",
+    },
+    organizationStatusLabels: {
+      active: "Белсенді",
+      blocked: "Бұғатталған",
+      pending: "Қосылуды күтуде",
+      archived: "Мұрағатта",
+    },
+
+    dateNotSpecified: "Күні көрсетілмеген",
+    medicalOrganization: "Медициналық ұйым",
+    binNotSpecified: "көрсетілмеген",
+
+    loadDashboardError:
+      "Техникалық қолдау кабинетінің деректерін жүктеу мүмкін болмады.",
+    organizationsLoadedApplicationsUnavailable:
+      "Ұйымдар жүктелді, бірақ өтінімдер тізімі қолжетімсіз.",
+    applicationsLoadedOrganizationsUnavailable:
+      "Өтінімдер жүктелді, бірақ ұйымдар тізімі қолжетімсіз.",
+
+    applicationMissingId:
+      "Өтінімнің идентификаторы жоқ.",
+    promptAdminUsername: (name, bin) =>
+      `Ұйым әкімшісінің логинін енгізіңіз.\n\nҰйым: ${name}\nБСН: ${bin}`,
+    invalidUsername:
+      "Логин 3-тен 30-ға дейін латын әріптерінен, сандардан немесе . _ - таңбаларынан тұруы керек.",
+    confirmApprove: (name, bin, username) =>
+      `Өтінімді мақұлдау керек пе?\n\nҰйым: ${name}\nБСН: ${bin}\nӘкімші логині: ${username}\n\nEmail-ге БСН, логин және уақытша құпиясөз жіберіледі.`,
+    applicationApproved:
+      "Өтінім мақұлданды. Кіру деректері Email-ге жіберілді.",
+    approveApplicationError:
+      "Өтінімді мақұлдау мүмкін болмады.",
+    promptRejectReason:
+      "Өтінімді қабылдамау себебін көрсетіңіз:",
+    applicationRejected:
+      "Өтінім қабылданбады.",
+    rejectApplicationError:
+      "Өтінімді қабылдамау мүмкін болмады.",
+
+    organizationMissingId:
+      "Ұйымның идентификаторы жоқ.",
+    confirmBlockOrganization: (name) =>
+      `«${name}» ұйымын бұғаттау керек пе?`,
+    confirmUnblockOrganization: (name) =>
+      `«${name}» ұйымын бұғаттан шығару керек пе?`,
+    organizationBlocked:
+      "Ұйым бұғатталды.",
+    organizationUnblocked:
+      "Ұйым бұғаттан шығарылды.",
+    blockOrganizationError:
+      "Ұйымды бұғаттау мүмкін болмады.",
+    unblockOrganizationError:
+      "Ұйымды бұғаттан шығару мүмкін болмады.",
+    confirmDeleteOrganization: (name, bin) =>
+      `Ұйымды толығымен жою керек пе?\n\nҰйым: ${name}\nБСН: ${bin}\n\nҰйым, оның әкімшісі, белсенді сессиялары, өтініштері және хабарландырулары жойылады.`,
+    organizationDeleted: (name) =>
+      `«${name}» ұйымы жойылды.`,
+    deleteOrganizationError:
+      "Ұйымды жою мүмкін болмады.",
+
+    pageTitle: "Техникалық қолдау",
+    pageSubtitle:
+      "Өтінімдер мен қосылған медициналық ұйымдарды басқару.",
+    updating: "Жаңартылуда...",
+    refresh: "Жаңарту",
+
+    pendingApplications:
+      "Қаралудағы өтінімдер",
+    totalOrganizations:
+      "Барлық ұйымдар",
+    activeOrganizations:
+      "Белсенді ұйымдар",
+    blockedOrganizations:
+      "Бұғатталған ұйымдар",
+
+    searchPlaceholder:
+      "Атауы, БСН, қала немесе Email бойынша іздеу",
+    loadingDashboard:
+      "Техникалық қолдау кабинетінің деректері жүктелуде...",
+
+    applicationsTitle:
+      "Ұйымдардың өтінімдері",
+    applicationsSubtitle:
+      "Clinic OS жүйесіне қосылуға арналған жаңа өтінімдер",
+    noNewApplications:
+      "Жаңа өтінімдер жоқ",
+    allApplicationsProcessed:
+      "Барлық түскен өтінімдер өңделді.",
+
+    binLabel: "БСН",
+    cityLabel: "Қала",
+    representativeLabel: "Өкіл",
+    emailLabel: "Email",
+    receivedLabel: "Алынған күні",
+    processing: "Өңделуде...",
+    approve: "Мақұлдау",
+    reject: "Қабылдамау",
+
+    organizationsTitle:
+      "Медициналық ұйымдар",
+    organizationsSubtitle:
+      "Қосылған емханалар және олардың мәртебелері",
+    noOrganizations:
+      "Ұйымдар табылмады",
+    organizationsAppear:
+      "Қосылған ұйымдар осы жерде көрсетіледі.",
+    unblock: "Бұғаттан шығару",
+    block: "Бұғаттау",
+    delete: "Жою",
+  },
 };
 
-const ORGANIZATION_STATUS_LABELS = {
-  active: "Активна",
-  blocked: "Заблокирована",
-  pending: "Ожидает подключения",
-  archived: "В архиве",
-};
 
 function getErrorMessage(error, fallback) {
   return (
@@ -55,18 +276,18 @@ function extractArray(response) {
   return [];
 }
 
-function formatDate(value) {
+function formatDate(value, text, locale) {
   if (!value) {
-    return "Дата не указана";
+    return text.dateNotSpecified;
   }
 
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return "Дата не указана";
+    return text.dateNotSpecified;
   }
 
-  return date.toLocaleString("ru-RU", {
+  return date.toLocaleString(locale, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -75,23 +296,62 @@ function formatDate(value) {
   });
 }
 
-function applicationName(application) {
+function applicationName(application, text) {
   return (
     application?.organization_name ||
     application?.name ||
-    "Медицинская организация"
+    text.medicalOrganization
   );
 }
 
-function organizationName(organization) {
+function organizationName(organization, text) {
   return (
     organization?.name ||
     organization?.organization_name ||
-    "Медицинская организация"
+    text.medicalOrganization
   );
 }
 
 export default function SupportDashboard() {
+  const { language } = useLanguage();
+
+  const currentLanguage = String(language || "ru")
+    .trim()
+    .toLowerCase();
+
+  const isKazakh = [
+    "kk",
+    "kz",
+    "kaz",
+    "kazakh",
+    "kk-kz",
+  ].includes(currentLanguage);
+
+  const text = isKazakh ? TEXTS.kk : TEXTS.ru;
+  const locale = isKazakh ? "kk-KZ" : "ru-RU";
+
+  const applicationStatusLabels =
+    text.applicationStatusLabels;
+
+  const organizationStatusLabels =
+    text.organizationStatusLabels;
+
+  const localizedResponseMessage = (
+    response,
+    fallback
+  ) =>
+    isKazakh
+      ? fallback
+      : response?.data?.message || fallback;
+
+  const localizedErrorMessage = (
+    error,
+    fallback
+  ) =>
+    isKazakh
+      ? fallback
+      : getErrorMessage(error, fallback);
+
   const [applications, setApplications] =
     useState([]);
 
@@ -176,9 +436,9 @@ export default function SupportDashboard() {
         "rejected"
     ) {
       setErrorMessage(
-        getErrorMessage(
+        localizedErrorMessage(
           applicationsResult.reason,
-          "Не удалось загрузить данные кабинета техподдержки."
+          text.loadDashboardError
         )
       );
     } else if (
@@ -186,14 +446,14 @@ export default function SupportDashboard() {
       "rejected"
     ) {
       setErrorMessage(
-        "Организации загружены, но список заявок недоступен."
+        text.organizationsLoadedApplicationsUnavailable
       );
     } else if (
       organizationsResult.status ===
       "rejected"
     ) {
       setErrorMessage(
-        "Заявки загружены, но список организаций недоступен."
+        text.applicationsLoadedOrganizationsUnavailable
       );
     }
 
@@ -201,6 +461,8 @@ export default function SupportDashboard() {
   }, [
     loadApplications,
     loadOrganizations,
+    isKazakh,
+    text,
   ]);
 
   useEffect(() => {
@@ -220,7 +482,7 @@ export default function SupportDashboard() {
       return applications.filter(
         (application) => {
           const values = [
-            applicationName(application),
+            applicationName(application, text),
             application?.bin,
             application?.city,
             application?.admin_name,
@@ -235,7 +497,7 @@ export default function SupportDashboard() {
           );
         }
       );
-    }, [applications, search]);
+    }, [applications, search, text]);
 
   const filteredOrganizations =
     useMemo(() => {
@@ -251,7 +513,8 @@ export default function SupportDashboard() {
         (organization) => {
           const values = [
             organizationName(
-              organization
+              organization,
+              text
             ),
             organization?.bin,
             organization?.city,
@@ -266,7 +529,7 @@ export default function SupportDashboard() {
           );
         }
       );
-    }, [organizations, search]);
+    }, [organizations, search, text]);
 
   const activeOrganizationsCount =
     useMemo(
@@ -301,19 +564,18 @@ export default function SupportDashboard() {
 
     if (!applicationId) {
       setErrorMessage(
-        "У заявки отсутствует идентификатор."
+        text.applicationMissingId
       );
       return;
     }
 
     const enteredUsername =
       window.prompt(
-        `Введите логин администратора организации.\n\nОрганизация: ${applicationName(
-          application
-        )}\nБИН: ${
+        text.promptAdminUsername(
+          applicationName(application, text),
           application?.bin ||
-          "не указан"
-        }`
+            text.binNotSpecified
+        )
       );
 
     if (enteredUsername === null) {
@@ -331,19 +593,19 @@ export default function SupportDashboard() {
       )
     ) {
       setErrorMessage(
-        "Логин должен содержать от 3 до 30 латинских букв, цифр или символов . _ -"
+        text.invalidUsername
       );
       return;
     }
 
     const confirmed =
       window.confirm(
-        `Одобрить заявку?\n\nОрганизация: ${applicationName(
-          application
-        )}\nБИН: ${
+        text.confirmApprove(
+          applicationName(application, text),
           application?.bin ||
-          "не указан"
-        }\nЛогин администратора: ${username}\n\nНа Email будут отправлены БИН, логин и временный пароль.`
+            text.binNotSpecified,
+          username
+        )
       );
 
     if (!confirmed) {
@@ -366,16 +628,18 @@ export default function SupportDashboard() {
       );
 
       setNotice(
-        response?.data?.message ||
-          "Заявка одобрена. Данные для входа отправлены на Email."
+        localizedResponseMessage(
+          response,
+          text.applicationApproved
+        )
       );
 
       await loadData();
     } catch (error) {
       setErrorMessage(
-        getErrorMessage(
+        localizedErrorMessage(
           error,
-          "Не удалось одобрить заявку."
+          text.approveApplicationError
         )
       );
     } finally {
@@ -387,7 +651,7 @@ export default function SupportDashboard() {
     applicationId
   ) {
     const reason = window.prompt(
-      "Укажите причину отклонения заявки:"
+      text.promptRejectReason
     );
 
     if (!reason?.trim()) {
@@ -410,16 +674,18 @@ export default function SupportDashboard() {
       );
 
       setNotice(
-        response?.data?.message ||
-          "Заявка отклонена."
+        localizedResponseMessage(
+          response,
+          text.applicationRejected
+        )
       );
 
       await loadData();
     } catch (error) {
       setErrorMessage(
-        getErrorMessage(
+        localizedErrorMessage(
           error,
-          "Не удалось отклонить заявку."
+          text.rejectApplicationError
         )
       );
     } finally {
@@ -436,21 +702,29 @@ export default function SupportDashboard() {
 
     if (!organizationId) {
       setErrorMessage(
-        "У организации отсутствует идентификатор."
+        text.organizationMissingId
       );
       return;
     }
 
-    const actionText =
-      nextStatus === "blocked"
-        ? "заблокировать"
-        : "разблокировать";
+    const isBlocking =
+      nextStatus === "blocked";
 
     const confirmed =
       window.confirm(
-        `Вы действительно хотите ${actionText} организацию «${organizationName(
-          organization
-        )}»?`
+        isBlocking
+          ? text.confirmBlockOrganization(
+              organizationName(
+                organization,
+                text
+              )
+            )
+          : text.confirmUnblockOrganization(
+              organizationName(
+                organization,
+                text
+              )
+            )
       );
 
     if (!confirmed) {
@@ -473,18 +747,22 @@ export default function SupportDashboard() {
       );
 
       setNotice(
-        response?.data?.message ||
-          (nextStatus === "blocked"
-            ? "Организация заблокирована."
-            : "Организация разблокирована.")
+        localizedResponseMessage(
+          response,
+          isBlocking
+            ? text.organizationBlocked
+            : text.organizationUnblocked
+        )
       );
 
       await loadData();
     } catch (error) {
       setErrorMessage(
-        getErrorMessage(
+        localizedErrorMessage(
           error,
-          `Не удалось ${actionText} организацию.`
+          isBlocking
+            ? text.blockOrganizationError
+            : text.unblockOrganizationError
         )
       );
     } finally {
@@ -500,21 +778,24 @@ export default function SupportDashboard() {
 
     if (!organizationId) {
       setErrorMessage(
-        "У организации отсутствует идентификатор."
+        text.organizationMissingId
       );
       return;
     }
 
     const name =
-      organizationName(organization);
+      organizationName(organization, text);
 
     const bin =
       organization?.bin ||
-      "не указан";
+      text.binNotSpecified;
 
     const confirmed =
       window.confirm(
-        `Полностью удалить организацию?\n\nОрганизация: ${name}\nБИН: ${bin}\n\nБудут удалены организация, её администратор, активные сессии, обращения и уведомления.`
+        text.confirmDeleteOrganization(
+          name,
+          bin
+        )
       );
 
     if (!confirmed) {
@@ -534,8 +815,10 @@ export default function SupportDashboard() {
       );
 
       setNotice(
-        response?.data?.message ||
-          `Организация «${name}» удалена.`
+        localizedResponseMessage(
+          response,
+          text.organizationDeleted(name)
+        )
       );
 
       setOrganizations(
@@ -548,9 +831,9 @@ export default function SupportDashboard() {
       );
     } catch (error) {
       setErrorMessage(
-        getErrorMessage(
+        localizedErrorMessage(
           error,
-          "Не удалось удалить организацию."
+          text.deleteOrganizationError
         )
       );
     } finally {
@@ -563,13 +846,11 @@ export default function SupportDashboard() {
       <div style={styles.header}>
         <div>
           <h1 style={styles.title}>
-            Техническая поддержка
+            {text.pageTitle}
           </h1>
 
           <p style={styles.subtitle}>
-            Управление заявками и
-            подключёнными медицинскими
-            организациями.
+            {text.pageSubtitle}
           </p>
         </div>
 
@@ -587,8 +868,8 @@ export default function SupportDashboard() {
           <RiRefreshLine />
 
           {loading
-            ? "Обновление..."
-            : "Обновить"}
+            ? text.updating
+            : text.refresh}
         </button>
       </div>
 
@@ -618,7 +899,7 @@ export default function SupportDashboard() {
             </div>
 
             <div style={styles.statLabel}>
-              Заявок на рассмотрении
+              {text.pendingApplications}
             </div>
           </div>
         </div>
@@ -634,7 +915,7 @@ export default function SupportDashboard() {
             </div>
 
             <div style={styles.statLabel}>
-              Всего организаций
+              {text.totalOrganizations}
             </div>
           </div>
         </div>
@@ -652,7 +933,7 @@ export default function SupportDashboard() {
             </div>
 
             <div style={styles.statLabel}>
-              Активных организаций
+              {text.activeOrganizations}
             </div>
           </div>
         </div>
@@ -670,7 +951,7 @@ export default function SupportDashboard() {
             </div>
 
             <div style={styles.statLabel}>
-              Заблокированных
+              {text.blockedOrganizations}
             </div>
           </div>
         </div>
@@ -687,15 +968,14 @@ export default function SupportDashboard() {
           onChange={(event) =>
             setSearch(event.target.value)
           }
-          placeholder="Поиск по названию, БИН, городу или Email"
+          placeholder={text.searchPlaceholder}
           style={styles.searchInput}
         />
       </div>
 
       {loading ? (
         <div style={styles.loadingCard}>
-          Загрузка данных кабинета
-          техподдержки...
+          {text.loadingDashboard}
         </div>
       ) : (
         <div style={styles.columns}>
@@ -703,7 +983,7 @@ export default function SupportDashboard() {
             <div style={styles.sectionHeader}>
               <div>
                 <h2 style={styles.sectionTitle}>
-                  Заявки организаций
+                  {text.applicationsTitle}
                 </h2>
 
                 <p
@@ -711,8 +991,7 @@ export default function SupportDashboard() {
                     styles.sectionDescription
                   }
                 >
-                  Новые заявки на подключение
-                  к Clinic OS
+                  {text.applicationsSubtitle}
                 </p>
               </div>
 
@@ -734,12 +1013,11 @@ export default function SupportDashboard() {
                   />
 
                   <strong>
-                    Новых заявок нет
+                    {text.noNewApplications}
                   </strong>
 
                   <span>
-                    Все поступившие заявки
-                    обработаны.
+                    {text.allApplicationsProcessed}
                   </span>
                 </div>
               ) : (
@@ -785,7 +1063,8 @@ export default function SupportDashboard() {
                               }
                             >
                               {applicationName(
-                                application
+                                application,
+                                text
                               )}
                             </h3>
 
@@ -794,7 +1073,7 @@ export default function SupportDashboard() {
                                 styles.statusPending
                               }
                             >
-                              {APPLICATION_STATUS_LABELS[
+                              {applicationStatusLabels[
                                 status
                               ] || status}
                             </span>
@@ -806,27 +1085,27 @@ export default function SupportDashboard() {
                             }
                           >
                             <span>
-                              <b>БИН:</b>{" "}
+                              <b>{text.binLabel}:</b>{" "}
                               {application?.bin ||
                                 "—"}
                             </span>
 
                             <span>
-                              <b>Город:</b>{" "}
+                              <b>{text.cityLabel}:</b>{" "}
                               {application?.city ||
                                 "—"}
                             </span>
 
                             <span>
                               <b>
-                                Представитель:
+                                {text.representativeLabel}:
                               </b>{" "}
                               {application?.admin_name ||
                                 "—"}
                             </span>
 
                             <span>
-                              <b>Email:</b>{" "}
+                              <b>{text.emailLabel}:</b>{" "}
                               {application?.contact_email ||
                                 "—"}
                             </span>
@@ -837,9 +1116,11 @@ export default function SupportDashboard() {
                               styles.dateText
                             }
                           >
-                            Получена:{" "}
+                            {text.receivedLabel}:{" "}
                             {formatDate(
-                              application?.created_at
+                              application?.created_at,
+                              text,
+                              locale
                             )}
                           </div>
 
@@ -868,8 +1149,8 @@ export default function SupportDashboard() {
                               <RiCheckboxCircleLine />
 
                               {isProcessing
-                                ? "Обработка..."
-                                : "Одобрить"}
+                                ? text.processing
+                                : text.approve}
                             </button>
 
                             <button
@@ -890,7 +1171,7 @@ export default function SupportDashboard() {
                               }}
                             >
                               <RiCloseCircleLine />
-                              Отклонить
+                              {text.reject}
                             </button>
                           </div>
                         </div>
@@ -906,7 +1187,7 @@ export default function SupportDashboard() {
             <div style={styles.sectionHeader}>
               <div>
                 <h2 style={styles.sectionTitle}>
-                  Медицинские организации
+                  {text.organizationsTitle}
                 </h2>
 
                 <p
@@ -914,8 +1195,7 @@ export default function SupportDashboard() {
                     styles.sectionDescription
                   }
                 >
-                  Подключённые поликлиники и
-                  их статусы
+                  {text.organizationsSubtitle}
                 </p>
               </div>
 
@@ -937,12 +1217,11 @@ export default function SupportDashboard() {
                   />
 
                   <strong>
-                    Организации не найдены
+                    {text.noOrganizations}
                   </strong>
 
                   <span>
-                    Подключённые организации
-                    появятся здесь.
+                    {text.organizationsAppear}
                   </span>
                 </div>
               ) : (
@@ -994,7 +1273,8 @@ export default function SupportDashboard() {
                               }
                             >
                               {organizationName(
-                                organization
+                                organization,
+                                text
                               )}
                             </h3>
 
@@ -1005,7 +1285,7 @@ export default function SupportDashboard() {
                                   : styles.statusActive
                               }
                             >
-                              {ORGANIZATION_STATUS_LABELS[
+                              {organizationStatusLabels[
                                 currentStatus
                               ] ||
                                 currentStatus}
@@ -1018,19 +1298,19 @@ export default function SupportDashboard() {
                             }
                           >
                             <span>
-                              <b>БИН:</b>{" "}
+                              <b>{text.binLabel}:</b>{" "}
                               {organization?.bin ||
                                 "—"}
                             </span>
 
                             <span>
-                              <b>Город:</b>{" "}
+                              <b>{text.cityLabel}:</b>{" "}
                               {organization?.city ||
                                 "—"}
                             </span>
 
                             <span>
-                              <b>Email:</b>{" "}
+                              <b>{text.emailLabel}:</b>{" "}
                               {organization?.email ||
                                 "—"}
                             </span>
@@ -1071,10 +1351,10 @@ export default function SupportDashboard() {
                               )}
 
                               {isProcessing
-                                ? "Обработка..."
+                                ? text.processing
                                 : isBlocked
-                                  ? "Разблокировать"
-                                  : "Заблокировать"}
+                                  ? text.unblock
+                                  : text.block}
                             </button>
 
                             <button
@@ -1097,8 +1377,8 @@ export default function SupportDashboard() {
                               <RiDeleteBinLine />
 
                               {isProcessing
-                                ? "Обработка..."
-                                : "Удалить"}
+                                ? text.processing
+                                : text.delete}
                             </button>
                           </div>
                         </div>

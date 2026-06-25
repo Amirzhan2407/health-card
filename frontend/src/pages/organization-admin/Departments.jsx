@@ -18,6 +18,302 @@ import {
 } from "react-icons/ri";
 
 import api from "../../api/api";
+import { useLanguage } from "../../i18n/LanguageContext";
+
+const TEXTS = {
+  ru: {
+    loadAllError:
+      "Не удалось загрузить отделения и кабинеты.",
+    roomsLoadedDepartmentsUnavailable:
+      "Кабинеты загружены, но отделения временно недоступны.",
+    departmentsLoadedRoomsUnavailable:
+      "Отделения загружены, но кабинеты временно недоступны.",
+
+    enterDepartmentName:
+      "Введите название отделения.",
+    departmentCreated:
+      "Отделение успешно создано.",
+    createDepartmentError:
+      "Не удалось создать отделение.",
+    departmentNameRequired:
+      "Название отделения обязательно.",
+    departmentUpdated:
+      "Отделение успешно обновлено.",
+    updateDepartmentError:
+      "Не удалось обновить отделение.",
+    departmentDeleted:
+      "Отделение успешно удалено.",
+    deleteDepartmentError:
+      "Не удалось удалить отделение.",
+
+    selectDepartmentFirst:
+      "Сначала выберите отделение.",
+    enterRoomNumber:
+      "Введите номер кабинета.",
+    roomCreated:
+      "Кабинет успешно создан.",
+    createRoomError:
+      "Не удалось создать кабинет.",
+    selectDepartment:
+      "Выберите отделение.",
+    roomNumberRequired:
+      "Номер кабинета обязателен.",
+    roomUpdated:
+      "Кабинет успешно обновлён.",
+    updateRoomError:
+      "Не удалось обновить кабинет.",
+    roomDeleted:
+      "Кабинет успешно удалён.",
+    deleteRoomError:
+      "Не удалось удалить кабинет.",
+
+    confirmDeleteDepartment: (
+      name,
+      roomsCount
+    ) =>
+      `Удалить отделение «${name}»?\n\nКабинетов внутри: ${roomsCount}.\nКабинеты останутся в системе, но будут отвязаны от отделения.`,
+
+    confirmDeleteRoom: (
+      number,
+      name
+    ) =>
+      `Удалить кабинет №${number}${
+        name ? ` — ${name}` : ""
+      }?\n\nЕсли кабинет назначен врачу, он будет отвязан от врача.`,
+
+    pageTitle:
+      "Отделения и кабинеты",
+    pageSubtitle:
+      "Настройте структуру медицинской организации перед назначением врачей и созданием расписания.",
+    refreshing: "Обновление...",
+    refresh: "Обновить",
+
+    newDepartment:
+      "Новое отделение",
+    newDepartmentSubtitle:
+      "Создайте медицинское отделение.",
+    departmentNameRequiredLabel:
+      "Название отделения *",
+    departmentNamePlaceholder:
+      "Например: Терапевтическое отделение",
+    description: "Описание",
+    departmentDescriptionPlaceholder:
+      "Краткое описание отделения",
+    creating: "Создание...",
+    createDepartment:
+      "Создать отделение",
+
+    newRoom: "Новый кабинет",
+    newRoomSubtitle:
+      "Добавьте кабинет в выбранное отделение.",
+    departmentRequired:
+      "Отделение *",
+    selectDepartmentOption:
+      "Выберите отделение",
+    roomNumberRequiredLabel:
+      "Номер кабинета *",
+    roomNumberPlaceholder:
+      "Например: 105",
+    roomName: "Название кабинета",
+    roomNamePlaceholder:
+      "Например: Кабинет терапевта",
+    createDepartmentFirst:
+      "Сначала создайте хотя бы одно отделение.",
+    createRoom: "Создать кабинет",
+
+    structureTitle:
+      "Структура организации",
+    departmentsCount:
+      "Отделений",
+    roomsCount: "кабинетов",
+    loadingStructure:
+      "Загрузка структуры организации...",
+    noDepartments:
+      "Отделения ещё не созданы",
+    noDepartmentsText:
+      "Создайте первое отделение, после чего добавьте в него кабинеты.",
+
+    departmentName:
+      "Название отделения",
+    roomsInDepartment:
+      "Кабинеты отделения",
+    noRooms:
+      "В этом отделении пока нет кабинетов.",
+    unassignedRooms:
+      "Кабинеты без отделения",
+    assignmentRequired:
+      "Требуется назначение",
+
+    department:
+      "Отделение",
+    roomNumber:
+      "Номер кабинета",
+    roomNameLabel:
+      "Название кабинета",
+    roomEditPlaceholder:
+      "Например: Процедурный",
+    save: "Сохранить",
+    saving: "Сохранение...",
+    cancel: "Отмена",
+    edit: "Изменить",
+    delete: "Удалить",
+    deleting: "Удаление...",
+    roomPrefix: "Кабинет №",
+    roomNameMissing:
+      "Название кабинета не указано",
+    withoutDepartment:
+      "Без отделения",
+    departmentDescriptionMissing:
+      "Описание отделения не указано.",
+    roomsLabel: "Кабинетов",
+  },
+
+  kk: {
+    loadAllError:
+      "Бөлімдер мен кабинеттерді жүктеу мүмкін болмады.",
+    roomsLoadedDepartmentsUnavailable:
+      "Кабинеттер жүктелді, бірақ бөлімдер уақытша қолжетімсіз.",
+    departmentsLoadedRoomsUnavailable:
+      "Бөлімдер жүктелді, бірақ кабинеттер уақытша қолжетімсіз.",
+
+    enterDepartmentName:
+      "Бөлім атауын енгізіңіз.",
+    departmentCreated:
+      "Бөлім сәтті құрылды.",
+    createDepartmentError:
+      "Бөлімді құру мүмкін болмады.",
+    departmentNameRequired:
+      "Бөлім атауын көрсету міндетті.",
+    departmentUpdated:
+      "Бөлім сәтті жаңартылды.",
+    updateDepartmentError:
+      "Бөлімді жаңарту мүмкін болмады.",
+    departmentDeleted:
+      "Бөлім сәтті жойылды.",
+    deleteDepartmentError:
+      "Бөлімді жою мүмкін болмады.",
+
+    selectDepartmentFirst:
+      "Алдымен бөлімді таңдаңыз.",
+    enterRoomNumber:
+      "Кабинет нөмірін енгізіңіз.",
+    roomCreated:
+      "Кабинет сәтті құрылды.",
+    createRoomError:
+      "Кабинетті құру мүмкін болмады.",
+    selectDepartment:
+      "Бөлімді таңдаңыз.",
+    roomNumberRequired:
+      "Кабинет нөмірін көрсету міндетті.",
+    roomUpdated:
+      "Кабинет сәтті жаңартылды.",
+    updateRoomError:
+      "Кабинетті жаңарту мүмкін болмады.",
+    roomDeleted:
+      "Кабинет сәтті жойылды.",
+    deleteRoomError:
+      "Кабинетті жою мүмкін болмады.",
+
+    confirmDeleteDepartment: (
+      name,
+      roomsCount
+    ) =>
+      `«${name}» бөлімін жою керек пе?\n\nІшіндегі кабинеттер саны: ${roomsCount}.\nКабинеттер жүйеде қалады, бірақ бөлімнен ажыратылады.`,
+
+    confirmDeleteRoom: (
+      number,
+      name
+    ) =>
+      `№${number} кабинет${name ? ` — ${name}` : ""} жойылсын ба?\n\nЕгер кабинет дәрігерге бекітілген болса, ол дәрігерден ажыратылады.`,
+
+    pageTitle:
+      "Бөлімдер мен кабинеттер",
+    pageSubtitle:
+      "Дәрігерлерді тағайындау және кесте құру алдында медициналық ұйым құрылымын реттеңіз.",
+    refreshing: "Жаңартылуда...",
+    refresh: "Жаңарту",
+
+    newDepartment:
+      "Жаңа бөлім",
+    newDepartmentSubtitle:
+      "Медициналық бөлім құрыңыз.",
+    departmentNameRequiredLabel:
+      "Бөлім атауы *",
+    departmentNamePlaceholder:
+      "Мысалы: Терапия бөлімі",
+    description: "Сипаттама",
+    departmentDescriptionPlaceholder:
+      "Бөлімнің қысқаша сипаттамасы",
+    creating: "Құрылуда...",
+    createDepartment:
+      "Бөлім құру",
+
+    newRoom: "Жаңа кабинет",
+    newRoomSubtitle:
+      "Таңдалған бөлімге кабинет қосыңыз.",
+    departmentRequired:
+      "Бөлім *",
+    selectDepartmentOption:
+      "Бөлімді таңдаңыз",
+    roomNumberRequiredLabel:
+      "Кабинет нөмірі *",
+    roomNumberPlaceholder:
+      "Мысалы: 105",
+    roomName: "Кабинет атауы",
+    roomNamePlaceholder:
+      "Мысалы: Терапевт кабинеті",
+    createDepartmentFirst:
+      "Алдымен кемінде бір бөлім құрыңыз.",
+    createRoom: "Кабинет құру",
+
+    structureTitle:
+      "Ұйым құрылымы",
+    departmentsCount:
+      "Бөлімдер",
+    roomsCount: "кабинеттер",
+    loadingStructure:
+      "Ұйым құрылымы жүктелуде...",
+    noDepartments:
+      "Бөлімдер әлі құрылмаған",
+    noDepartmentsText:
+      "Алғашқы бөлімді құрып, содан кейін оған кабинеттер қосыңыз.",
+
+    departmentName:
+      "Бөлім атауы",
+    roomsInDepartment:
+      "Бөлім кабинеттері",
+    noRooms:
+      "Бұл бөлімде әзірге кабинеттер жоқ.",
+    unassignedRooms:
+      "Бөлімге бекітілмеген кабинеттер",
+    assignmentRequired:
+      "Бөлімге бекіту қажет",
+
+    department:
+      "Бөлім",
+    roomNumber:
+      "Кабинет нөмірі",
+    roomNameLabel:
+      "Кабинет атауы",
+    roomEditPlaceholder:
+      "Мысалы: Емшара кабинеті",
+    save: "Сақтау",
+    saving: "Сақталуда...",
+    cancel: "Бас тарту",
+    edit: "Өзгерту",
+    delete: "Жою",
+    deleting: "Жойылуда...",
+    roomPrefix: "№",
+    roomNameMissing:
+      "Кабинет атауы көрсетілмеген",
+    withoutDepartment:
+      "Бөлімсіз",
+    departmentDescriptionMissing:
+      "Бөлім сипаттамасы көрсетілмеген.",
+    roomsLabel: "Кабинеттер",
+  },
+};
+
 
 function getErrorMessage(error, fallback) {
   return (
@@ -50,6 +346,26 @@ function getRoomDepartmentName(room) {
 }
 
 export default function Departments() {
+  const { language } = useLanguage();
+
+  const normalizedLanguage = String(
+    language || "ru"
+  )
+    .trim()
+    .toLowerCase();
+
+  const isKazakh =
+    normalizedLanguage === "kk" ||
+    normalizedLanguage === "kz" ||
+    normalizedLanguage === "kaz" ||
+    normalizedLanguage.startsWith("kk-") ||
+    normalizedLanguage.startsWith("kz-");
+
+  const text =
+    isKazakh
+      ? TEXTS.kk
+      : TEXTS.ru;
+
   const [departments, setDepartments] = useState([]);
   const [rooms, setRooms] = useState([]);
 
@@ -167,23 +483,23 @@ export default function Departments() {
       setErrorMessage(
         getErrorMessage(
           departmentsResult.reason,
-          "Не удалось загрузить отделения и кабинеты."
+          text.loadAllError
         )
       );
     } else if (
       departmentsResult.status === "rejected"
     ) {
       setErrorMessage(
-        "Кабинеты загружены, но отделения временно недоступны."
+        text.roomsLoadedDepartmentsUnavailable
       );
     } else if (roomsResult.status === "rejected") {
       setErrorMessage(
-        "Отделения загружены, но кабинеты временно недоступны."
+        text.departmentsLoadedRoomsUnavailable
       );
     }
 
     setLoading(false);
-  }, []);
+  }, [text]);
 
   useEffect(() => {
     loadData();
@@ -230,7 +546,7 @@ export default function Departments() {
 
     if (!name) {
       setErrorMessage(
-        "Введите название отделения."
+        text.enterDepartmentName
       );
       return;
     }
@@ -253,7 +569,7 @@ export default function Departments() {
 
       setSuccessMessage(
         response?.data?.message ||
-          "Отделение успешно создано."
+          text.departmentCreated
       );
 
       await loadData();
@@ -261,7 +577,7 @@ export default function Departments() {
       setErrorMessage(
         getErrorMessage(
           error,
-          "Не удалось создать отделение."
+          text.createDepartmentError
         )
       );
     } finally {
@@ -300,7 +616,7 @@ export default function Departments() {
 
     if (!name) {
       setErrorMessage(
-        "Название отделения обязательно."
+        text.departmentNameRequired
       );
       return;
     }
@@ -322,7 +638,7 @@ export default function Departments() {
 
       setSuccessMessage(
         response?.data?.message ||
-          "Отделение успешно обновлено."
+          text.departmentUpdated
       );
 
       await loadData();
@@ -330,7 +646,7 @@ export default function Departments() {
       setErrorMessage(
         getErrorMessage(
           error,
-          "Не удалось обновить отделение."
+          text.updateDepartmentError
         )
       );
     } finally {
@@ -343,7 +659,10 @@ export default function Departments() {
       roomsByDepartment[department.id] || [];
 
     const confirmed = window.confirm(
-      `Удалить отделение «${department.name}»?\n\nКабинетов внутри: ${departmentRooms.length}.\nКабинеты останутся в системе, но будут отвязаны от отделения.`
+      text.confirmDeleteDepartment(
+        department.name,
+        departmentRooms.length
+      )
     );
 
     if (!confirmed) {
@@ -367,7 +686,7 @@ export default function Departments() {
 
       setSuccessMessage(
         response?.data?.message ||
-          "Отделение успешно удалено."
+          text.departmentDeleted
       );
 
       await loadData();
@@ -375,7 +694,7 @@ export default function Departments() {
       setErrorMessage(
         getErrorMessage(
           error,
-          "Не удалось удалить отделение."
+          text.deleteDepartmentError
         )
       );
     } finally {
@@ -394,14 +713,14 @@ export default function Departments() {
 
     if (!departmentId) {
       setErrorMessage(
-        "Сначала выберите отделение."
+        text.selectDepartmentFirst
       );
       return;
     }
 
     if (!number) {
       setErrorMessage(
-        "Введите номер кабинета."
+        text.enterRoomNumber
       );
       return;
     }
@@ -425,7 +744,7 @@ export default function Departments() {
 
       setSuccessMessage(
         response?.data?.message ||
-          "Кабинет успешно создан."
+          text.roomCreated
       );
 
       await loadData();
@@ -433,7 +752,7 @@ export default function Departments() {
       setErrorMessage(
         getErrorMessage(
           error,
-          "Не удалось создать кабинет."
+          text.createRoomError
         )
       );
     } finally {
@@ -477,14 +796,14 @@ export default function Departments() {
 
     if (!departmentId) {
       setErrorMessage(
-        "Выберите отделение."
+        text.selectDepartment
       );
       return;
     }
 
     if (!number) {
       setErrorMessage(
-        "Номер кабинета обязателен."
+        text.roomNumberRequired
       );
       return;
     }
@@ -507,7 +826,7 @@ export default function Departments() {
 
       setSuccessMessage(
         response?.data?.message ||
-          "Кабинет успешно обновлён."
+          text.roomUpdated
       );
 
       await loadData();
@@ -515,7 +834,7 @@ export default function Departments() {
       setErrorMessage(
         getErrorMessage(
           error,
-          "Не удалось обновить кабинет."
+          text.updateRoomError
         )
       );
     } finally {
@@ -525,9 +844,10 @@ export default function Departments() {
 
   async function deleteRoom(room) {
     const confirmed = window.confirm(
-      `Удалить кабинет №${room.number}${
-        room.name ? ` — ${room.name}` : ""
-      }?\n\nЕсли кабинет назначен врачу, он будет отвязан от врача.`
+      text.confirmDeleteRoom(
+        room.number,
+        room.name
+      )
     );
 
     if (!confirmed) {
@@ -549,7 +869,7 @@ export default function Departments() {
 
       setSuccessMessage(
         response?.data?.message ||
-          "Кабинет успешно удалён."
+          text.roomDeleted
       );
 
       await loadData();
@@ -557,7 +877,7 @@ export default function Departments() {
       setErrorMessage(
         getErrorMessage(
           error,
-          "Не удалось удалить кабинет."
+          text.deleteRoomError
         )
       );
     } finally {
@@ -584,7 +904,7 @@ export default function Departments() {
               <div style={styles.editGrid}>
                 <div style={styles.inputGroup}>
                   <label style={styles.label}>
-                    Отделение
+                    {text.department}
                   </label>
 
                   <select
@@ -600,7 +920,7 @@ export default function Departments() {
                     style={styles.select}
                   >
                     <option value="">
-                      Выберите отделение
+                      {text.selectDepartmentOption}
                     </option>
 
                     {departments.map(
@@ -618,7 +938,7 @@ export default function Departments() {
 
                 <div style={styles.inputGroup}>
                   <label style={styles.label}>
-                    Номер кабинета
+                    {text.roomNumber}
                   </label>
 
                   <input
@@ -637,7 +957,7 @@ export default function Departments() {
 
               <div style={styles.inputGroup}>
                 <label style={styles.label}>
-                  Название кабинета
+                  {text.roomName}
                 </label>
 
                 <input
@@ -648,7 +968,7 @@ export default function Departments() {
                       event.target.value
                     )
                   }
-                  placeholder="Например: Процедурный"
+                  placeholder={text.roomEditPlaceholder}
                   disabled={isProcessing}
                   style={styles.input}
                 />
@@ -671,8 +991,8 @@ export default function Departments() {
                   <RiSaveLine />
 
                   {isProcessing
-                    ? "Сохранение..."
-                    : "Сохранить"}
+                    ? text.saving
+                    : text.save}
                 </button>
 
                 <button
@@ -682,7 +1002,7 @@ export default function Departments() {
                   style={styles.cancelButton}
                 >
                   <RiCloseLine />
-                  Отмена
+                  {text.cancel}
                 </button>
               </div>
             </>
@@ -690,12 +1010,12 @@ export default function Departments() {
             <div style={styles.roomTopRow}>
               <div>
                 <h4 style={styles.roomNumber}>
-                  Кабинет №{room.number}
+                  {text.roomPrefix}{room.number}
                 </h4>
 
                 <p style={styles.roomName}>
                   {room.name ||
-                    "Название кабинета не указано"}
+                    text.roomNameMissing}
                 </p>
 
                 {!room.department_id && (
@@ -704,7 +1024,7 @@ export default function Departments() {
                       styles.unassignedBadge
                     }
                   >
-                    Без отделения
+                    {text.withoutDepartment}
                   </span>
                 )}
               </div>
@@ -719,7 +1039,7 @@ export default function Departments() {
                   style={styles.editButton}
                 >
                   <RiEditLine />
-                  Изменить
+                  {text.edit}
                 </button>
 
                 <button
@@ -738,8 +1058,8 @@ export default function Departments() {
                   <RiDeleteBinLine />
 
                   {isProcessing
-                    ? "Удаление..."
-                    : "Удалить"}
+                    ? text.deleting
+                    : text.delete}
                 </button>
               </div>
             </div>
@@ -754,13 +1074,11 @@ export default function Departments() {
       <header style={styles.header}>
         <div>
           <h1 style={styles.title}>
-            Отделения и кабинеты
+            {text.pageTitle}
           </h1>
 
           <p style={styles.subtitle}>
-            Настройте структуру медицинской
-            организации перед назначением врачей
-            и созданием расписания.
+            {text.pageSubtitle}
           </p>
         </div>
 
@@ -778,8 +1096,8 @@ export default function Departments() {
           <RiRefreshLine />
 
           {loading
-            ? "Обновление..."
-            : "Обновить"}
+            ? text.refreshing
+            : text.refresh}
         </button>
       </header>
 
@@ -807,18 +1125,18 @@ export default function Departments() {
 
             <div>
               <h2 style={styles.cardTitle}>
-                Новое отделение
+                {text.newDepartment}
               </h2>
 
               <p style={styles.cardSubtitle}>
-                Создайте медицинское отделение.
+                {text.newDepartmentSubtitle}
               </p>
             </div>
           </div>
 
           <div style={styles.inputGroup}>
             <label style={styles.label}>
-              Название отделения *
+              {text.departmentNameRequiredLabel}
             </label>
 
             <input
@@ -829,7 +1147,7 @@ export default function Departments() {
                   event.target.value
                 )
               }
-              placeholder="Например: Терапевтическое отделение"
+              placeholder={text.departmentNamePlaceholder}
               maxLength={120}
               disabled={creatingDepartment}
               style={styles.input}
@@ -839,7 +1157,7 @@ export default function Departments() {
 
           <div style={styles.inputGroup}>
             <label style={styles.label}>
-              Описание
+              {text.description}
             </label>
 
             <textarea
@@ -849,7 +1167,7 @@ export default function Departments() {
                   event.target.value
                 )
               }
-              placeholder="Краткое описание отделения"
+              placeholder={text.departmentDescriptionPlaceholder}
               rows={4}
               maxLength={500}
               disabled={creatingDepartment}
@@ -875,8 +1193,8 @@ export default function Departments() {
             <RiAddLine />
 
             {creatingDepartment
-              ? "Создание..."
-              : "Создать отделение"}
+              ? text.creating
+              : text.createDepartment}
           </button>
         </form>
 
@@ -891,19 +1209,18 @@ export default function Departments() {
 
             <div>
               <h2 style={styles.cardTitle}>
-                Новый кабинет
+                {text.newRoom}
               </h2>
 
               <p style={styles.cardSubtitle}>
-                Добавьте кабинет в выбранное
-                отделение.
+                {text.newRoomSubtitle}
               </p>
             </div>
           </div>
 
           <div style={styles.inputGroup}>
             <label style={styles.label}>
-              Отделение *
+              {text.departmentRequired}
             </label>
 
             <select
@@ -921,7 +1238,7 @@ export default function Departments() {
               required
             >
               <option value="">
-                Выберите отделение
+                {text.selectDepartmentOption}
               </option>
 
               {departments.map(
@@ -939,7 +1256,7 @@ export default function Departments() {
 
           <div style={styles.inputGroup}>
             <label style={styles.label}>
-              Номер кабинета *
+              {text.roomNumberRequiredLabel}
             </label>
 
             <input
@@ -950,7 +1267,7 @@ export default function Departments() {
                   event.target.value
                 )
               }
-              placeholder="Например: 105"
+              placeholder={text.roomNumberPlaceholder}
               maxLength={30}
               disabled={creatingRoom}
               style={styles.input}
@@ -960,7 +1277,7 @@ export default function Departments() {
 
           <div style={styles.inputGroup}>
             <label style={styles.label}>
-              Название кабинета
+              {text.roomName}
             </label>
 
             <input
@@ -969,7 +1286,7 @@ export default function Departments() {
               onChange={(event) =>
                 setRoomName(event.target.value)
               }
-              placeholder="Например: Кабинет терапевта"
+              placeholder={text.roomNamePlaceholder}
               maxLength={120}
               disabled={creatingRoom}
               style={styles.input}
@@ -978,8 +1295,7 @@ export default function Departments() {
 
           {departments.length === 0 && (
             <p style={styles.formHint}>
-              Сначала создайте хотя бы одно
-              отделение.
+              {text.createDepartmentFirst}
             </p>
           )}
 
@@ -1000,8 +1316,8 @@ export default function Departments() {
             <RiAddLine />
 
             {creatingRoom
-              ? "Создание..."
-              : "Создать кабинет"}
+              ? text.creating
+              : text.createRoom}
           </button>
         </form>
       </div>
@@ -1010,20 +1326,20 @@ export default function Departments() {
         <div style={styles.structureHeader}>
           <div>
             <h2 style={styles.cardTitle}>
-              Структура организации
+              {text.structureTitle}
             </h2>
 
             <p style={styles.cardSubtitle}>
-              Отделений: {departments.length}
+              {text.departmentsCount}: {departments.length}
               {" · "}
-              кабинетов: {rooms.length}
+              {text.roomsCount}: {rooms.length}
             </p>
           </div>
         </div>
 
         {loading ? (
           <div style={styles.emptyState}>
-            Загрузка структуры организации...
+            {text.loadingStructure}
           </div>
         ) : departments.length === 0 ? (
           <div style={styles.emptyState}>
@@ -1032,12 +1348,11 @@ export default function Departments() {
             />
 
             <strong>
-              Отделения ещё не созданы
+              {text.noDepartments}
             </strong>
 
             <span>
-              Создайте первое отделение, после
-              чего добавьте в него кабинеты.
+              {text.noDepartmentsText}
             </span>
           </div>
         ) : (
@@ -1093,7 +1408,7 @@ export default function Departments() {
                             styles.roomsCountBadge
                           }
                         >
-                          Кабинетов:{" "}
+                          {text.roomsLabel}:{" "}
                           {departmentRooms.length}
                         </span>
                       </div>
@@ -1112,7 +1427,7 @@ export default function Departments() {
                           style={styles.editButton}
                         >
                           <RiEditLine />
-                          Изменить
+                          {text.edit}
                         </button>
 
                         <button
@@ -1133,8 +1448,8 @@ export default function Departments() {
                           <RiDeleteBinLine />
 
                           {isProcessing
-                            ? "Удаление..."
-                            : "Удалить"}
+                            ? text.deleting
+                            : text.delete}
                         </button>
                       </div>
                     )}
@@ -1150,7 +1465,7 @@ export default function Departments() {
                         style={styles.inputGroup}
                       >
                         <label style={styles.label}>
-                          Название отделения
+                          {text.departmentName}
                         </label>
 
                         <input
@@ -1172,7 +1487,7 @@ export default function Departments() {
                         style={styles.inputGroup}
                       >
                         <label style={styles.label}>
-                          Описание
+                          {text.description}
                         </label>
 
                         <textarea
@@ -1209,8 +1524,8 @@ export default function Departments() {
                           <RiSaveLine />
 
                           {isProcessing
-                            ? "Сохранение..."
-                            : "Сохранить"}
+                            ? text.saving
+                            : text.save}
                         </button>
 
                         <button
@@ -1224,7 +1539,7 @@ export default function Departments() {
                           }
                         >
                           <RiCloseLine />
-                          Отмена
+                          {text.cancel}
                         </button>
                       </div>
                     </div>
@@ -1235,7 +1550,7 @@ export default function Departments() {
                       }
                     >
                       {department.description ||
-                        "Описание отделения не указано."}
+                        text.departmentDescriptionMissing}
                     </p>
                   )}
 
@@ -1246,7 +1561,7 @@ export default function Departments() {
                       }
                     >
                       <RiDoorOpenLine />
-                      Кабинеты отделения
+                      {text.roomsInDepartment}
                     </div>
 
                     {departmentRooms.length ===
@@ -1256,8 +1571,7 @@ export default function Departments() {
                           styles.noRoomsMessage
                         }
                       >
-                        В этом отделении пока нет
-                        кабинетов.
+                        {text.noRooms}
                       </div>
                     ) : (
                       <div style={styles.roomList}>
@@ -1299,7 +1613,7 @@ export default function Departments() {
                           styles.departmentName
                         }
                       >
-                        Кабинеты без отделения
+                        {text.unassignedRooms}
                       </h3>
 
                       <span
@@ -1307,7 +1621,7 @@ export default function Departments() {
                           styles.unassignedBadge
                         }
                       >
-                        Требуется назначение
+                        {text.assignmentRequired}
                       </span>
                     </div>
                   </div>

@@ -7,6 +7,8 @@ import {
   addDoctor,
   updateDoctorDetails,
   removeDoctor,
+  restoreDoctor,
+  deleteDoctorPermanently,
   grantDoctorAccess,
   resetDoctorPassword,
   blockDoctorAccess,
@@ -25,75 +27,115 @@ import {
 
 const router = express.Router();
 
-// Просмотр врачей
+const organizationAdminOnly = [
+  authenticateToken,
+  requireRoles(["organization_admin"]),
+];
+
+/*
+ * Просмотр списка врачей.
+ */
 router.get(
   "/",
   authenticateToken,
   getDoctors
 );
 
+/*
+ * Просмотр одного врача.
+ */
 router.get(
   "/:id",
   authenticateToken,
   getDoctor
 );
 
-// Создание карточки врача
+/*
+ * Создание карточки врача.
+ * Логин и пароль при создании не выдаются.
+ */
 router.post(
   "/",
-  authenticateToken,
-  requireRoles(["organization_admin"]),
+  ...organizationAdminOnly,
   validateDoctorCreate,
   addDoctor
 );
 
-// Редактирование данных врача
+/*
+ * Редактирование специальности,
+ * кабинета и статуса врача.
+ */
 router.put(
   "/:id",
-  authenticateToken,
-  requireRoles(["organization_admin"]),
+  ...organizationAdminOnly,
   validateDoctorUpdate,
   updateDoctorDetails
 );
 
-// Выдача логина и временного пароля
+/*
+ * Выдача логина и временного пароля.
+ */
 router.post(
   "/:id/access",
-  authenticateToken,
-  requireRoles(["organization_admin"]),
+  ...organizationAdminOnly,
   grantDoctorAccess
 );
 
-// Создание нового временного пароля
+/*
+ * Создание нового временного пароля.
+ */
 router.post(
   "/:id/access/reset-password",
-  authenticateToken,
-  requireRoles(["organization_admin"]),
+  ...organizationAdminOnly,
   resetDoctorPassword
 );
 
-// Блокировка входа врача
+/*
+ * Блокировка входа врача.
+ */
 router.patch(
   "/:id/access/block",
-  authenticateToken,
-  requireRoles(["organization_admin"]),
+  ...organizationAdminOnly,
   blockDoctorAccess
 );
 
-// Разблокировка входа врача
+/*
+ * Разблокировка входа действующего врача.
+ */
 router.patch(
   "/:id/access/unblock",
-  authenticateToken,
-  requireRoles(["organization_admin"]),
+  ...organizationAdminOnly,
   unblockDoctorAccess
 );
 
-// Архивирование врача
+/*
+ * Восстановление врача из архива.
+ */
+router.patch(
+  "/:id/restore",
+  ...organizationAdminOnly,
+  restoreDoctor
+);
+
+/*
+ * Архивирование врача.
+ */
 router.delete(
   "/:id",
-  authenticateToken,
-  requireRoles(["organization_admin"]),
+  ...organizationAdminOnly,
   removeDoctor
+);
+
+/*
+ * Полное удаление врача из базы.
+ *
+ * Разрешено только для архивного врача,
+ * у которого отсутствуют записи и история приёмов.
+ */
+router.delete(
+  "/:id/permanent",
+  ...organizationAdminOnly,
+  deleteDoctorPermanently
 );
 
 export default router;

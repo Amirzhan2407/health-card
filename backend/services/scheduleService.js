@@ -23,6 +23,161 @@ function clean(value) {
   return String(value ?? "").trim();
 }
 
+async function getDoctorProfileId(
+  doctorId
+) {
+  const {
+    data: doctor,
+    error: doctorError,
+  } = await supabase
+    .from("doctors")
+    .select("id, member_id")
+    .eq("id", doctorId)
+    .maybeSingle();
+
+  if (doctorError) {
+    throw createServiceError(
+      `Ошибка получения профиля врача: ${doctorError.message}`
+    );
+  }
+
+  if (!doctor) {
+    throw createServiceError(
+      "Врач не найден.",
+      404
+    );
+  }
+
+  if (!doctor.member_id) {
+    throw createServiceError(
+      "Врач не привязан к сотруднику организации.",
+      409
+    );
+  }
+
+  const {
+    data: member,
+    error: memberError,
+  } = await supabase
+    .from("organization_members")
+    .select("profile_id")
+    .eq("id", doctor.member_id)
+    .maybeSingle();
+
+  if (memberError) {
+    throw createServiceError(
+      `Ошибка получения профиля врача: ${memberError.message}`
+    );
+  }
+
+  if (!member?.profile_id) {
+    throw createServiceError(
+      "Профиль врача не найден.",
+      409
+    );
+  }
+
+  return member.profile_id;
+}
+
+async function insertDoctorNotificationSafe({
+  doctorId,
+  title,
+  message,
+  link = "/doctor",
+}) {
+  try {
+    const profileId =
+      await getDoctorProfileId(
+        doctorId
+      );
+
+    const payload = {
+      profile_id:
+        profileId,
+
+      title:
+        clean(title) ||
+        "Уведомление",
+
+      message:
+        clean(message),
+
+      link:
+        clean(link) || "/doctor",
+
+      is_read: false,
+
+      created_at:
+        new Date().toISOString(),
+    };
+
+    const {
+      data,
+      error,
+    } = await supabase
+      .from("notifications")
+      .insert(payload)
+      .select(`
+        id,
+        profile_id,
+        title,
+        message,
+        link,
+        is_read,
+        read_at,
+        created_at
+      `)
+      .single();
+
+    if (error) {
+      console.error(
+        "[DOCTOR SCHEDULE NOTIFICATION ERROR]",
+        {
+          code:
+            error.code,
+
+          message:
+            error.message,
+
+          details:
+            error.details,
+
+          hint:
+            error.hint,
+
+          payload,
+        }
+      );
+
+      return false;
+    }
+
+    console.log(
+      "[DOCTOR SCHEDULE NOTIFICATION INSERTED]",
+      {
+        id:
+          data.id,
+
+        profileId:
+          data.profile_id,
+
+        title:
+          data.title,
+      }
+    );
+
+    return true;
+  } catch (error) {
+    console.error(
+      "[DOCTOR SCHEDULE NOTIFICATION EXCEPTION]",
+      error?.message || error
+    );
+
+    return false;
+  }
+}
+
 function normalizeDoctorId(value) {
   const doctorId = clean(value);
 
@@ -498,6 +653,22 @@ export async function setStandardSchedule(
     );
   }
 
+  await insertDoctorNotificationSafe({
+    doctorId: normalizedDoctorId,
+
+    title:
+      "Расписание врача обновлено",
+
+    message:
+      `Администратор обновил ваш стандартный график. ` +
+      `Дата начала: ${startDate}` +
+      (endDate
+        ? `. Дата окончания: ${endDate}.`
+        : "."),
+
+    link: "/doctor",
+  });
+
   return data;
 }
 
@@ -592,6 +763,19 @@ export async function addScheduleException(
     );
   }
 
+  await insertDoctorNotificationSafe({
+    doctorId: normalizedDoctorId,
+
+    title:
+      "Изменение графика врача",
+
+    message: isWorking
+      ? `На ${exceptionDate} установлен рабочий день с ${workStart} до ${workEnd}.`
+      : `На ${exceptionDate} установлен выходной день.`,
+
+    link: "/doctor",
+  });
+
   return data;
 }
 
@@ -667,6 +851,19 @@ export async function addDoctorAbsence(
       `Ошибка сохранения отсутствия: ${error.message}`
     );
   }
+
+  await insertDoctorNotificationSafe({
+    doctorId: normalizedDoctorId,
+
+    title:
+      "Добавлен период отсутствия",
+
+    message:
+      `В ваш график добавлено отсутствие с ${startDate} по ${endDate}. ` +
+      `Причина: ${reason}.`,
+
+    link: "/doctor",
+  });
 
   return data;
 }

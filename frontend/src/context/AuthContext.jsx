@@ -19,13 +19,60 @@ function getErrorMessage(
 ) {
   return (
     error?.response?.data?.message ||
+    error?.response?.data?.error ||
     error?.message ||
     fallbackMessage
   );
 }
 
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+function normalizeUser(userData) {
+  if (!userData) {
+    return null;
+  }
+
+  return {
+    ...userData,
+
+    fullName:
+      userData.fullName ||
+      userData.full_name ||
+      "",
+
+    iin:
+      userData.iin ||
+      "",
+
+    birthDate:
+      userData.birthDate ||
+      userData.birth_date ||
+      null,
+
+    gender:
+      userData.gender ||
+      null,
+
+    email:
+      userData.email ||
+      "",
+
+    preferredLanguage:
+      userData.preferredLanguage ||
+      userData.preferred_language ||
+      "ru",
+
+    organizationId:
+      userData.organizationId ||
+      userData.organization_id ||
+      null,
+  };
+}
+
+export function AuthProvider({
+  children,
+}) {
+  const [user, setUser] =
+    useState(null);
+
   const [loading, setLoading] =
     useState(true);
 
@@ -34,16 +81,19 @@ export function AuthProvider({ children }) {
 
     async function restoreSession() {
       try {
-        const response = await api.get(
-          "/auth/me"
-        );
+        const response =
+          await api.get("/auth/me");
 
         if (
           isMounted &&
           response.data?.success &&
           response.data?.user
         ) {
-          setUser(response.data.user);
+          setUser(
+            normalizeUser(
+              response.data.user
+            )
+          );
         }
       } catch {
         if (isMounted) {
@@ -79,97 +129,171 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
+  /*
+   * Пациент входит по ИИН.
+   * Сотрудники входят по логину.
+   * Администратор входит по логину и БИН.
+   */
+  async function login(
+    loginValue,
+    password,
+    organizationBin = null,
+    loginType = "patient"
+  ) {
+    try {
+      const normalizedLoginType =
+        [
+          "patient",
+          "staff",
+          "organization_admin",
+        ].includes(loginType)
+          ? loginType
+          : "patient";
 
-async function login(
-  loginValue,
-  password,
-  organizationBin = null
-) {
-  try {
-    const response = await api.post(
-      "/auth/login",
-      {
-        login: String(loginValue || "").trim(),
-
-        password: String(password || ""),
-
-        organizationBin: organizationBin
-          ? String(organizationBin)
+      const normalizedLogin =
+        normalizedLoginType ===
+        "patient"
+          ? String(
+              loginValue || ""
+            )
               .replace(/\D/g, "")
               .slice(0, 12)
-          : null,
-      }
-    );
+          : String(
+              loginValue || ""
+            ).trim();
 
-    if (
-      !response.data?.success ||
-      !response.data?.accessToken ||
-      !response.data?.user
-    ) {
+      const response =
+        await api.post(
+          "/auth/login",
+          {
+            login:
+              normalizedLogin,
+
+            loginType:
+              normalizedLoginType,
+
+            password: String(
+              password || ""
+            ),
+
+            organizationBin:
+              normalizedLoginType ===
+                "organization_admin" &&
+              organizationBin
+                ? String(
+                    organizationBin
+                  )
+                    .replace(/\D/g, "")
+                    .slice(0, 12)
+                : null,
+          }
+        );
+
+      if (
+        !response.data?.success ||
+        !response.data?.accessToken ||
+        !response.data?.user
+      ) {
+        throw new Error(
+          response.data?.message ||
+            "Не удалось выполнить вход."
+        );
+      }
+
+      setInMemoryToken(
+        response.data.accessToken
+      );
+
+      const nextUser =
+        normalizeUser(
+          response.data.user
+        );
+
+      setUser(nextUser);
+
+      return {
+        success: true,
+        user: nextUser,
+        message:
+          response.data.message,
+      };
+    } catch (error) {
       throw new Error(
-        response.data?.message ||
-          "Не удалось выполнить вход."
+        getErrorMessage(
+          error,
+          "Ошибка входа в систему."
+        )
       );
     }
-
-    setInMemoryToken(
-      response.data.accessToken
-    );
-
-    setUser(response.data.user);
-
-    return {
-      success: true,
-      user: response.data.user,
-      message: response.data.message,
-    };
-  } catch (error) {
-    throw new Error(
-      getErrorMessage(
-        error,
-        "Ошибка входа в систему."
-      )
-    );
   }
-}
 
-
-
+  /*
+   * При регистрации пациента логин больше
+   * не передаётся. ИИН становится данными
+   * для входа пациента.
+   */
   async function requestRegistrationCode(
     registrationData
   ) {
     try {
-      const response = await api.post(
-        "/auth/register/request-code",
-        {
-          username: String(
-            registrationData?.username || ""
-          ).trim(),
+      const response =
+        await api.post(
+          "/auth/register/request-code",
+          {
+            fullName: String(
+              registrationData
+                ?.fullName || ""
+            )
+              .trim()
+              .replace(/\s+/g, " "),
 
-          email: String(
-            registrationData?.email || ""
-          )
-            .trim()
-            .toLowerCase(),
+            iin: String(
+              registrationData?.iin ||
+                ""
+            )
+              .replace(/\D/g, "")
+              .slice(0, 12),
 
-          fullName: String(
-            registrationData?.fullName || ""
-          ).trim(),
+            birthDate: String(
+              registrationData
+                ?.birthDate || ""
+            )
+              .trim()
+              .slice(0, 10),
 
-          password:
-            registrationData?.password || "",
+            gender: String(
+              registrationData
+                ?.gender || ""
+            )
+              .trim()
+              .toLowerCase(),
 
-          confirmPassword:
-            registrationData?.confirmPassword ||
-            "",
+            email: String(
+              registrationData
+                ?.email || ""
+            )
+              .trim()
+              .toLowerCase(),
 
-          preferredLanguage:
-            registrationData
-              ?.preferredLanguage || "ru",
-        }
-      );
+            password:
+              registrationData
+                ?.password || "",
 
-      if (!response.data?.success) {
+            confirmPassword:
+              registrationData
+                ?.confirmPassword ||
+              "",
+
+            preferredLanguage:
+              registrationData
+                ?.preferredLanguage ||
+              "ru",
+          }
+        );
+
+      if (
+        !response.data?.success
+      ) {
         throw new Error(
           response.data?.message ||
             "Не удалось отправить код."
@@ -178,10 +302,14 @@ async function login(
 
       return {
         success: true,
-        message: response.data.message,
+
+        message:
+          response.data.message,
+
         expiresInSeconds:
           response.data
-            .expiresInSeconds || 600,
+            ?.expiresInSeconds ||
+          600,
       };
     } catch (error) {
       throw new Error(
@@ -198,16 +326,21 @@ async function login(
     code
   ) {
     try {
-      const response = await api.post(
-        "/auth/register/confirm",
-        {
-          email: String(email || "")
-            .trim()
-            .toLowerCase(),
+      const response =
+        await api.post(
+          "/auth/register/confirm",
+          {
+            email: String(
+              email || ""
+            )
+              .trim()
+              .toLowerCase(),
 
-          code: String(code || "").trim(),
-        }
-      );
+            code: String(
+              code || ""
+            ).trim(),
+          }
+        );
 
       if (
         !response.data?.success ||
@@ -224,12 +357,18 @@ async function login(
         response.data.accessToken
       );
 
-      setUser(response.data.user);
+      const nextUser =
+        normalizeUser(
+          response.data.user
+        );
+
+      setUser(nextUser);
 
       return {
         success: true,
-        user: response.data.user,
-        message: response.data.message,
+        user: nextUser,
+        message:
+          response.data.message,
       };
     } catch (error) {
       throw new Error(
@@ -245,16 +384,21 @@ async function login(
     email
   ) {
     try {
-      const response = await api.post(
-        "/auth/register/resend-code",
-        {
-          email: String(email || "")
-            .trim()
-            .toLowerCase(),
-        }
-      );
+      const response =
+        await api.post(
+          "/auth/register/resend-code",
+          {
+            email: String(
+              email || ""
+            )
+              .trim()
+              .toLowerCase(),
+          }
+        );
 
-      if (!response.data?.success) {
+      if (
+        !response.data?.success
+      ) {
         throw new Error(
           response.data?.message ||
             "Не удалось отправить новый код."
@@ -263,10 +407,14 @@ async function login(
 
       return {
         success: true,
-        message: response.data.message,
+
+        message:
+          response.data.message,
+
         expiresInSeconds:
           response.data
-            .expiresInSeconds || 600,
+            ?.expiresInSeconds ||
+          600,
       };
     } catch (error) {
       throw new Error(
@@ -278,9 +426,59 @@ async function login(
     }
   }
 
+  async function refreshCurrentUser() {
+    try {
+      const response =
+        await api.get("/auth/me");
+
+      if (
+        !response.data?.success ||
+        !response.data?.user
+      ) {
+        throw new Error(
+          response.data?.message ||
+            "Не удалось обновить данные пользователя."
+        );
+      }
+
+      const nextUser =
+        normalizeUser(
+          response.data.user
+        );
+
+      setUser(nextUser);
+
+      return nextUser;
+    } catch (error) {
+      throw new Error(
+        getErrorMessage(
+          error,
+          "Не удалось обновить данные пользователя."
+        )
+      );
+    }
+  }
+
+  function updateUserLocally(
+    changes
+  ) {
+    setUser((currentUser) => {
+      if (!currentUser) {
+        return currentUser;
+      }
+
+      return normalizeUser({
+        ...currentUser,
+        ...changes,
+      });
+    });
+  }
+
   async function logout() {
     try {
-      await api.post("/auth/logout");
+      await api.post(
+        "/auth/logout"
+      );
     } catch {
       console.warn(
         "Сервер не подтвердил выход. Локальная сессия очищена."
@@ -295,25 +493,39 @@ async function login(
     () => ({
       user,
       loading,
-      isAuthenticated: Boolean(user),
+
+      isAuthenticated:
+        Boolean(user),
+
       login,
+
       requestRegistrationCode,
+
       confirmRegistration,
+
       resendRegistrationCode,
+
+      refreshCurrentUser,
+
+      updateUserLocally,
+
       logout,
     }),
     [user, loading]
   );
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={value}
+    >
       {children}
     </AuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
+  const context =
+    useContext(AuthContext);
 
   if (!context) {
     throw new Error(
@@ -323,4 +535,3 @@ export function useAuth() {
 
   return context;
 }
-

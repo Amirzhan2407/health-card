@@ -3,7 +3,8 @@ import jwt from "jsonwebtoken";
 
 import { supabase } from "../config/supabaseClient.js";
 
-const JWT_SECRET = process.env.JWT_ACCESS_SECRET;
+const JWT_SECRET =
+  process.env.JWT_ACCESS_SECRET;
 
 function normalizeRole(value) {
   return String(value || "")
@@ -15,23 +16,30 @@ function normalizeId(value) {
   return String(value || "").trim();
 }
 
-async function loadLegacyMembership(profileId) {
+function isMissingStructureError(error) {
+  return ["42703", "42P01"].includes(
+    String(error?.code || "")
+  );
+}
+
+async function loadLegacyMembership(
+  profileId
+) {
   const { data, error } = await supabase
     .from("organization_members")
-    .select("id, organization_id, status")
+    .select(`
+      id,
+      organization_id,
+      profile_id,
+      role,
+      status
+    `)
     .eq("profile_id", profileId)
     .eq("status", "active")
     .maybeSingle();
 
   if (error) {
-    /*
-     * В новой структуре таблица organization_members
-     * может отсутствовать или больше не использоваться.
-     */
-    if (
-      error.code === "42P01" ||
-      error.code === "42703"
-    ) {
+    if (isMissingStructureError(error)) {
       return null;
     }
 
@@ -41,14 +49,20 @@ async function loadLegacyMembership(profileId) {
   return data || null;
 }
 
-async function loadOrganization(organizationId) {
+async function loadOrganization(
+  organizationId
+) {
   if (!organizationId) {
     return null;
   }
 
   const { data, error } = await supabase
     .from("organizations")
-    .select("id, status, bin")
+    .select(`
+      id,
+      status,
+      bin
+    `)
     .eq("id", organizationId)
     .maybeSingle();
 
@@ -59,64 +73,128 @@ async function loadOrganization(organizationId) {
   return data || null;
 }
 
+async function loadDoctorDepartmentId(
+  roomId
+) {
+  if (!roomId) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("rooms")
+    .select("department_id")
+    .eq("id", roomId)
+    .maybeSingle();
+
+  if (error) {
+    if (isMissingStructureError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
+
+  return data?.department_id || null;
+}
+
+async function enrichDoctorProfile(doctor) {
+  if (!doctor) {
+    return null;
+  }
+
+  const departmentId =
+    await loadDoctorDepartmentId(
+      doctor.room_id
+    );
+
+  return {
+    ...doctor,
+    department_id: departmentId,
+  };
+}
+
+async function loadDoctorByProfileId(
+  profileId
+) {
+  const { data, error } = await supabase
+    .from("doctors")
+    .select(`
+      id,
+      specialty_id,
+      room_id,
+      status
+    `)
+    .eq("profile_id", profileId)
+    .maybeSingle();
+
+  if (error) {
+    /*
+     * В текущей структуре doctors.profile_id
+     * может отсутствовать. Тогда используем
+     * связь через organization_members.
+     */
+    if (isMissingStructureError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
+
+  return enrichDoctorProfile(data);
+}
+
+async function loadDoctorByMemberId(
+  memberId
+) {
+  if (!memberId) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("doctors")
+    .select(`
+      id,
+      specialty_id,
+      room_id,
+      status
+    `)
+    .eq("member_id", memberId)
+    .maybeSingle();
+
+  if (error) {
+    if (isMissingStructureError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
+
+  return enrichDoctorProfile(data);
+}
+
 async function loadDoctorProfile(
   profileId,
   memberId = null
 ) {
   /*
-   * Сначала пробуем новую структуру:
-   * doctors.profile_id.
+   * Сначала поддерживаем вариант,
+   * где doctors напрямую содержит profile_id.
    */
-  const byProfile = await supabase
-    .from("doctors")
-    .select(
-      "id, specialty_id, room_id, department_id, status"
-    )
-    .eq("profile_id", profileId)
-    .maybeSingle();
+  const doctorByProfile =
+    await loadDoctorByProfileId(profileId);
 
-  if (!byProfile.error && byProfile.data) {
-    return byProfile.data;
-  }
-
-  if (
-    byProfile.error &&
-    !["42703", "42P01"].includes(
-      byProfile.error.code
-    )
-  ) {
-    throw byProfile.error;
+  if (doctorByProfile) {
+    return doctorByProfile;
   }
 
   /*
-   * Поддержка старой структуры:
-   * doctors.member_id.
+   * Основная структура текущего проекта:
+   *
+   * profiles
+   *   -> organization_members
+   *   -> doctors
    */
-  if (!memberId) {
-    return null;
-  }
-
-  const byMember = await supabase
-    .from("doctors")
-    .select(
-      "id, specialty_id, room_id, department_id, status"
-    )
-    .eq("member_id", memberId)
-    .maybeSingle();
-
-  if (byMember.error) {
-    if (
-      ["42703", "42P01"].includes(
-        byMember.error.code
-      )
-    ) {
-      return null;
-    }
-
-    throw byMember.error;
-  }
-
-  return byMember.data || null;
+  return loadDoctorByMemberId(memberId);
 }
 
 export async function authenticateToken(
@@ -131,14 +209,16 @@ export async function authenticateToken(
     let token = authHeader.startsWith(
       "Bearer "
     )
-      ? authHeader.slice(7)
+      ? authHeader.slice(7).trim()
       : "";
 
     if (
       !token &&
       req.cookies?.accessToken
     ) {
-      token = req.cookies.accessToken;
+      token = String(
+        req.cookies.accessToken
+      ).trim();
     }
 
     if (!token) {
@@ -147,6 +227,12 @@ export async function authenticateToken(
         message:
           "Доступ запрещён. Отсутствует токен авторизации.",
       });
+    }
+
+    if (!JWT_SECRET) {
+      throw new Error(
+        "Переменная JWT_ACCESS_SECRET не настроена."
+      );
     }
 
     let decoded;
@@ -164,7 +250,11 @@ export async function authenticateToken(
       });
     }
 
-    if (!decoded?.id) {
+    const profileId = normalizeId(
+      decoded?.id
+    );
+
+    if (!profileId) {
       return res.status(401).json({
         success: false,
         message:
@@ -178,7 +268,7 @@ export async function authenticateToken(
     } = await supabase
       .from("profiles")
       .select("*")
-      .eq("id", decoded.id)
+      .eq("id", profileId)
       .maybeSingle();
 
     if (profileError) {
@@ -193,10 +283,11 @@ export async function authenticateToken(
       });
     }
 
-    if (
-      String(profile.status).toLowerCase() !==
-      "active"
-    ) {
+    const profileStatus = String(
+      profile.status || ""
+    ).toLowerCase();
+
+    if (profileStatus !== "active") {
       return res.status(403).json({
         success: false,
         message:
@@ -210,23 +301,34 @@ export async function authenticateToken(
 
     req.user = {
       id: profile.id,
-      username: profile.username || null,
+
+      username:
+        profile.username || null,
+
       iin: profile.iin || null,
+
       fullName:
         profile.full_name || null,
+
       full_name:
         profile.full_name || null,
+
       email: profile.email || null,
       phone: profile.phone || null,
+
       role,
+
       preferredLanguage:
         profile.preferred_language ||
         "ru",
+
       preferred_language:
         profile.preferred_language ||
         "ru",
+
       organization_id:
         profile.organization_id || null,
+
       organizationId:
         profile.organization_id || null,
     };
@@ -235,18 +337,16 @@ export async function authenticateToken(
       role === "organization_admin" ||
       role === "doctor"
     ) {
-      /*
-       * Новая структура использует
-       * profiles.organization_id.
-       */
       let organizationId =
-        profile.organization_id || null;
+        normalizeId(
+          profile.organization_id
+        );
 
       let membership = null;
 
       /*
-       * Для старых профилей оставляем
-       * резервную поддержку organization_members.
+       * В текущей базе организация врача
+       * определяется через organization_members.
        */
       if (!organizationId) {
         membership =
@@ -254,9 +354,30 @@ export async function authenticateToken(
             profile.id
           );
 
-        organizationId =
-          membership?.organization_id ||
-          null;
+        organizationId = normalizeId(
+          membership?.organization_id
+        );
+      }
+
+      /*
+       * Даже если organization_id есть в profiles,
+       * членство всё равно требуется врачу,
+       * поскольку doctors связан через member_id.
+       */
+      if (
+        role === "doctor" &&
+        !membership
+      ) {
+        membership =
+          await loadLegacyMembership(
+            profile.id
+          );
+
+        if (!organizationId) {
+          organizationId = normalizeId(
+            membership?.organization_id
+          );
+        }
       }
 
       if (!organizationId) {
@@ -280,10 +401,13 @@ export async function authenticateToken(
         });
       }
 
-      if (
+      const organizationStatus =
         String(
           organization.status || ""
-        ).toLowerCase() === "blocked"
+        ).toLowerCase();
+
+      if (
+        organizationStatus === "blocked"
       ) {
         return res.status(403).json({
           success: false,
@@ -304,37 +428,46 @@ export async function authenticateToken(
       if (membership?.id) {
         req.user.member_id =
           membership.id;
+
+        req.user.memberId =
+          membership.id;
       }
 
       if (role === "doctor") {
-        if (!membership) {
-          membership =
-            await loadLegacyMembership(
-              profile.id
-            );
-
-          if (membership?.id) {
-            req.user.member_id =
-              membership.id;
-          }
+        if (!membership?.id) {
+          return res.status(403).json({
+            success: false,
+            message:
+              "Профиль врача не привязан к организации.",
+          });
         }
 
         const doctor =
           await loadDoctorProfile(
             profile.id,
-            membership?.id || null
+            membership.id
           );
 
-        if (
-          !doctor ||
+        if (!doctor) {
+          return res.status(403).json({
+            success: false,
+            message:
+              "Профиль врача не найден.",
+          });
+        }
+
+        const doctorStatus =
           String(
-            doctor.status || "active"
-          ).toLowerCase() !== "active"
+            doctor.status || ""
+          ).toLowerCase();
+
+        if (
+          doctorStatus !== "active"
         ) {
           return res.status(403).json({
             success: false,
             message:
-              "Профиль врача не найден или архивирован.",
+              "Профиль врача архивирован или заблокирован.",
           });
         }
 
@@ -347,10 +480,19 @@ export async function authenticateToken(
         req.user.specialty_id =
           doctor.specialty_id || null;
 
+        req.user.specialtyId =
+          doctor.specialty_id || null;
+
         req.user.room_id =
           doctor.room_id || null;
 
+        req.user.roomId =
+          doctor.room_id || null;
+
         req.user.department_id =
+          doctor.department_id || null;
+
+        req.user.departmentId =
           doctor.department_id || null;
       }
     }

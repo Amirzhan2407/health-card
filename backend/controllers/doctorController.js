@@ -10,10 +10,58 @@ function getOrganizationId(req) {
 }
 
 function getDoctorId(req) {
-  return String(req.params?.id || "").trim();
+  return String(
+    req.params?.id || ""
+  ).trim();
+}
+function getCurrentProfileId(req) {
+  return String(
+    req.user?.profile_id ||
+      req.user?.profileId ||
+      req.user?.id ||
+      ""
+  ).trim();
+}
+function validateOrganizationAndDoctor(
+  req,
+  res
+) {
+  const organizationId =
+    getOrganizationId(req);
+
+  const doctorId = getDoctorId(req);
+
+  if (!organizationId) {
+    res.status(403).json({
+      success: false,
+      message:
+        "Администратор не привязан к организации.",
+    });
+
+    return null;
+  }
+
+  if (!doctorId) {
+    res.status(400).json({
+      success: false,
+      message:
+        "Не указан идентификатор врача.",
+    });
+
+    return null;
+  }
+
+  return {
+    organizationId,
+    doctorId,
+  };
 }
 
-export async function getDoctors(req, res, next) {
+export async function getDoctors(
+  req,
+  res,
+  next
+) {
   try {
     const role = String(
       req.user?.role || ""
@@ -69,7 +117,11 @@ export async function getDoctors(req, res, next) {
   }
 }
 
-export async function getDoctor(req, res, next) {
+export async function getDoctor(
+  req,
+  res,
+  next
+) {
   try {
     const doctorId = getDoctorId(req);
 
@@ -95,7 +147,11 @@ export async function getDoctor(req, res, next) {
   }
 }
 
-export async function addDoctor(req, res, next) {
+export async function addDoctor(
+  req,
+  res,
+  next
+) {
   try {
     const organizationId =
       getOrganizationId(req);
@@ -108,7 +164,7 @@ export async function addDoctor(req, res, next) {
       });
     }
 
-    const result =
+    const doctor =
       await doctorService.createDoctor(
         organizationId,
         req.body
@@ -118,7 +174,7 @@ export async function addDoctor(req, res, next) {
       success: true,
       message:
         "Карточка врача успешно создана.",
-      data: result,
+      data: doctor,
     });
   } catch (error) {
     next(error);
@@ -131,31 +187,20 @@ export async function updateDoctorDetails(
   next
 ) {
   try {
-    const organizationId =
-      getOrganizationId(req);
+    const context =
+      validateOrganizationAndDoctor(
+        req,
+        res
+      );
 
-    const doctorId = getDoctorId(req);
-
-    if (!organizationId) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "Администратор не привязан к организации.",
-      });
-    }
-
-    if (!doctorId) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Не указан идентификатор врача.",
-      });
+    if (!context) {
+      return;
     }
 
     const doctor =
       await doctorService.updateDoctor(
-        organizationId,
-        doctorId,
+        context.organizationId,
+        context.doctorId,
         req.body
       );
 
@@ -176,32 +221,21 @@ export async function grantDoctorAccess(
   next
 ) {
   try {
-    const organizationId =
-      getOrganizationId(req);
+    const context =
+      validateOrganizationAndDoctor(
+        req,
+        res
+      );
 
-    const doctorId = getDoctorId(req);
+    if (!context) {
+      return;
+    }
 
     const username = String(
       req.body?.username || ""
     )
       .trim()
       .toLowerCase();
-
-    if (!organizationId) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "Администратор не привязан к организации.",
-      });
-    }
-
-    if (!doctorId) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Не указан идентификатор врача.",
-      });
-    }
 
     if (!username) {
       return res.status(400).json({
@@ -225,15 +259,15 @@ export async function grantDoctorAccess(
 
     const access =
       await doctorService.grantDoctorAccess(
-        organizationId,
-        doctorId,
+        context.organizationId,
+        context.doctorId,
         username
       );
 
     return res.status(200).json({
       success: true,
       message:
-        "Доступ врачу успешно выдан.",
+        "Доступ врачу успешно выдан. Скопируйте логин и временный пароль.",
       data: access,
     });
   } catch (error) {
@@ -247,37 +281,26 @@ export async function resetDoctorPassword(
   next
 ) {
   try {
-    const organizationId =
-      getOrganizationId(req);
+    const context =
+      validateOrganizationAndDoctor(
+        req,
+        res
+      );
 
-    const doctorId = getDoctorId(req);
-
-    if (!organizationId) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "Администратор не привязан к организации.",
-      });
-    }
-
-    if (!doctorId) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Не указан идентификатор врача.",
-      });
+    if (!context) {
+      return;
     }
 
     const access =
       await doctorService.resetDoctorPassword(
-        organizationId,
-        doctorId
+        context.organizationId,
+        context.doctorId
       );
 
     return res.status(200).json({
       success: true,
       message:
-        "Временный пароль врача обновлён.",
+        "Новый временный пароль создан. Скопируйте его и передайте врачу.",
       data: access,
     });
   } catch (error) {
@@ -291,39 +314,43 @@ export async function blockDoctorAccess(
   next
 ) {
   try {
-    const organizationId =
-      getOrganizationId(req);
+    const context =
+      validateOrganizationAndDoctor(
+        req,
+        res
+      );
 
-    const doctorId = getDoctorId(req);
-
-    if (!organizationId) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "Администратор не привязан к организации.",
-      });
+    if (!context) {
+      return;
     }
 
-    if (!doctorId) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Не указан идентификатор врача.",
-      });
-    }
+    const administratorProfileId =
+      getCurrentProfileId(req);
 
-    const doctor =
-      await doctorService.setDoctorAccessStatus(
-        organizationId,
-        doctorId,
-        "blocked"
+    const result =
+      await doctorService.blockDoctorAccessAndCancelAppointments(
+        context.organizationId,
+        context.doctorId,
+        administratorProfileId
+      );
+
+    const cancelledAppointmentsCount =
+      Number(
+        result?.cancelledAppointmentsCount ||
+          0
       );
 
     return res.status(200).json({
       success: true,
+
       message:
-        "Доступ врача заблокирован.",
-      data: doctor,
+        cancelledAppointmentsCount > 0
+          ? `Доступ врача заблокирован. Отменено будущих записей: ${cancelledAppointmentsCount}.`
+          : "Доступ врача заблокирован. Активных будущих записей не найдено.",
+
+      data: result,
+
+      cancelledAppointmentsCount,
     });
   } catch (error) {
     next(error);
@@ -336,31 +363,20 @@ export async function unblockDoctorAccess(
   next
 ) {
   try {
-    const organizationId =
-      getOrganizationId(req);
+    const context =
+      validateOrganizationAndDoctor(
+        req,
+        res
+      );
 
-    const doctorId = getDoctorId(req);
-
-    if (!organizationId) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "Администратор не привязан к организации.",
-      });
-    }
-
-    if (!doctorId) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Не указан идентификатор врача.",
-      });
+    if (!context) {
+      return;
     }
 
     const doctor =
       await doctorService.setDoctorAccessStatus(
-        organizationId,
-        doctorId,
+        context.organizationId,
+        context.doctorId,
         "active"
       );
 
@@ -381,36 +397,93 @@ export async function removeDoctor(
   next
 ) {
   try {
-    const organizationId =
-      getOrganizationId(req);
+    const context =
+      validateOrganizationAndDoctor(
+        req,
+        res
+      );
 
-    const doctorId = getDoctorId(req);
-
-    if (!organizationId) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "Администратор не привязан к организации.",
-      });
+    if (!context) {
+      return;
     }
 
-    if (!doctorId) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Не указан идентификатор врача.",
-      });
-    }
-
-    await doctorService.archiveDoctor(
-      organizationId,
-      doctorId
-    );
+    const doctor =
+      await doctorService.archiveDoctor(
+        context.organizationId,
+        context.doctorId
+      );
 
     return res.status(200).json({
       success: true,
       message:
         "Врач успешно отправлен в архив.",
+      data: doctor,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function restoreDoctor(
+  req,
+  res,
+  next
+) {
+  try {
+    const context =
+      validateOrganizationAndDoctor(
+        req,
+        res
+      );
+
+    if (!context) {
+      return;
+    }
+
+    const doctor =
+      await doctorService.restoreDoctor(
+        context.organizationId,
+        context.doctorId
+      );
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Врач восстановлен из архива.",
+      data: doctor,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteDoctorPermanently(
+  req,
+  res,
+  next
+) {
+  try {
+    const context =
+      validateOrganizationAndDoctor(
+        req,
+        res
+      );
+
+    if (!context) {
+      return;
+    }
+
+    const result =
+      await doctorService.deleteDoctorPermanently(
+        context.organizationId,
+        context.doctorId
+      );
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Врач и связанные с ним учётные данные полностью удалены из базы.",
+      data: result,
     });
   } catch (error) {
     next(error);

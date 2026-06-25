@@ -185,12 +185,27 @@ async function touchConversation(conversationId) {
 
 async function createNotificationSafe(payload) {
   try {
-    await supabase
+    const { error } = await supabase
       .from("notifications")
       .insert(payload);
-  } catch {
-    // Уведомление вспомогательное и не должно отменять
-    // создание обращения или отправку сообщения.
+
+    if (error) {
+      console.error(
+        "[SUPPORT NOTIFICATION ERROR]",
+        error.message
+      );
+
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error(
+      "[SUPPORT NOTIFICATION EXCEPTION]",
+      error?.message || error
+    );
+
+    return false;
   }
 }
 
@@ -609,7 +624,10 @@ export async function postMessage({
     recipient_role: recipientRole,
     organization_id:
       conversation.organization_id,
-    title: "Новое сообщение техподдержки",
+    title:
+  senderRole === "support"
+    ? "Ответ технической поддержки"
+    : "Новое сообщение в обращении",
     message:
       senderRole === "support"
         ? "Техническая поддержка ответила на обращение."

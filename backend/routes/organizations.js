@@ -1,8 +1,9 @@
-  
+
 import express from "express";
 
 import {
   getOrganizations,
+  getActiveOrganizations,
   getOrganization,
   updateOrg,
   changeOrgStatus,
@@ -22,7 +23,10 @@ import {
 
 const router = express.Router();
 
-// Техподдержка получает все организации
+/*
+ * Техническая поддержка получает
+ * полный список организаций.
+ */
 router.get(
   "/",
   authenticateToken,
@@ -30,21 +34,31 @@ router.get(
   getOrganizations
 );
 
-// Пользователи получают активные организации
+/*
+ * Пациенты и другие авторизованные
+ * пользователи получают только
+ * активные медицинские организации.
+ *
+ * GET /api/organizations/active/list
+ */
 router.get(
   "/active/list",
   authenticateToken,
-  getOrganizations
+  getActiveOrganizations
 );
 
-// Просмотр организации
+/*
+ * Просмотр одной организации.
+ */
 router.get(
   "/:id",
   authenticateToken,
   getOrganization
 );
 
-// Изменение организации
+/*
+ * Изменение данных организации.
+ */
 router.put(
   "/:id",
   authenticateToken,
@@ -57,7 +71,9 @@ router.put(
   updateOrg
 );
 
-// Блокировка и разблокировка
+/*
+ * Блокировка и разблокировка организации.
+ */
 router.patch(
   "/:id/status",
   authenticateToken,
@@ -66,7 +82,10 @@ router.patch(
   changeOrgStatus
 );
 
-// Полное удаление организации техподдержкой
+/*
+ * Полное удаление организации
+ * технической поддержкой.
+ */
 router.delete(
   "/:id",
   authenticateToken,

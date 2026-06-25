@@ -1,6 +1,14 @@
 
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  Link,
+  useNavigate,
+} from "react-router-dom";
+
 import {
   RiArrowLeftLine,
   RiMailCheckLine,
@@ -11,6 +19,159 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../i18n/LanguageContext";
 
+
+const REGISTER_TEXTS = {
+  ru: {
+    registrationTitle: "Регистрация",
+    confirmationTitle: "Подтверждение электронной почты",
+    registrationSubtitle: "Создание медицинского аккаунта пациента",
+    codeSentTo: "Код отправлен на",
+
+    personalDataTitle: "Личные данные",
+    personalDataHint:
+      "В дальнейшем вход в аккаунт пациента будет выполняться по ИИН.",
+    fullNameLabel: "ФИО",
+    fullNamePlaceholder: "Ещанов Амиржан Галинурович",
+    iinLabel: "ИИН",
+    iinPlaceholder: "12 цифр",
+    iinHint: "ИИН будет использоваться для входа.",
+    birthDateLabel: "Дата рождения",
+    genderLabel: "Пол",
+    genderPlaceholder: "Выберите пол",
+    male: "Мужской",
+    female: "Женский",
+    emailLabel: "Электронная почта",
+    emailHint: "На эту почту придёт код подтверждения.",
+
+    passwordSectionTitle: "Пароль",
+    passwordHint: "Для входа используйте ИИН и указанный пароль.",
+    passwordLabel: "Пароль",
+    repeatPasswordLabel: "Повторите пароль",
+    passwordPlaceholder: "Минимум 8 символов",
+    repeatPasswordPlaceholder: "Повторите пароль",
+
+    sendingCode: "Отправка кода...",
+    getCode: "Получить код",
+    confirmationCodeLabel: "Код подтверждения",
+    codeValidFor: "Код действует ещё",
+    codeExpired: "Срок действия кода истёк",
+    checkingCode: "Проверка кода...",
+    confirmRegistration: "Подтвердить регистрацию",
+    sending: "Отправка...",
+    resendAfter: "Отправить повторно через",
+    secondsShort: "сек.",
+    sendNewCode: "Отправить новый код",
+    changeData: "Изменить данные",
+
+    alreadyHaveAccount: "Уже есть аккаунт?",
+    login: "Войти",
+
+    fullNameRequired: "Введите полное ФИО.",
+    fullNameInvalid:
+      "ФИО может содержать только буквы, пробелы, дефис и апостроф.",
+    iinInvalid: "ИИН должен содержать ровно 12 цифр.",
+    birthDateRequired: "Укажите дату рождения.",
+    birthDateInvalid: "Укажите корректную дату рождения.",
+    birthDateFuture: "Дата рождения не может быть в будущем.",
+    genderRequired: "Выберите пол.",
+    emailInvalid: "Введите корректную электронную почту.",
+    passwordShort: "Пароль должен содержать минимум 8 символов.",
+    passwordsMismatch: "Пароли не совпадают.",
+    codeInvalid: "Введите код из 6 цифр.",
+    codeExpiredRequestNew:
+      "Срок действия кода истёк. Запросите новый код.",
+    codeSentSuccess:
+      "Код подтверждения отправлен на электронную почту.",
+    codeSendFailed: "Не удалось отправить код подтверждения.",
+    confirmFailed: "Не удалось подтвердить регистрацию.",
+    newCodeSent: "Новый код отправлен на электронную почту.",
+    resendFailed: "Не удалось повторно отправить код.",
+  },
+
+  kk: {
+    registrationTitle: "Тіркелу",
+    confirmationTitle: "Электрондық поштаны растау",
+    registrationSubtitle: "Емделушінің медициналық аккаунтын жасау",
+    codeSentTo: "Код мына поштаға жіберілді:",
+
+    personalDataTitle: "Жеке деректер",
+    personalDataHint:
+      "Кейін емделуші аккаунтына ЖСН арқылы кіресіз.",
+    fullNameLabel: "Аты-жөні",
+    fullNamePlaceholder: "Ещанов Амиржан Галинурович",
+    iinLabel: "ЖСН",
+    iinPlaceholder: "12 цифр",
+    iinHint: "ЖСН жүйеге кіру үшін пайдаланылады.",
+    birthDateLabel: "Туған күні",
+    genderLabel: "Жынысы",
+    genderPlaceholder: "Жынысты таңдаңыз",
+    male: "Ер",
+    female: "Әйел",
+    emailLabel: "Электрондық пошта",
+    emailHint: "Растау коды осы поштаға жіберіледі.",
+
+    passwordSectionTitle: "Құпиясөз",
+    passwordHint:
+      "Жүйеге кіру үшін ЖСН мен көрсетілген құпиясөзді пайдаланыңыз.",
+    passwordLabel: "Құпиясөз",
+    repeatPasswordLabel: "Құпиясөзді қайталаңыз",
+    passwordPlaceholder: "Кемінде 8 таңба",
+    repeatPasswordPlaceholder: "Құпиясөзді қайталаңыз",
+
+    sendingCode: "Код жіберілуде...",
+    getCode: "Код алу",
+    confirmationCodeLabel: "Растау коды",
+    codeValidFor: "Кодтың жарамдылық уақыты:",
+    codeExpired: "Кодтың жарамдылық мерзімі аяқталды",
+    checkingCode: "Код тексерілуде...",
+    confirmRegistration: "Тіркелуді растау",
+    sending: "Жіберілуде...",
+    resendAfter: "Қайта жіберуге дейін",
+    secondsShort: "сек.",
+    sendNewCode: "Жаңа код жіберу",
+    changeData: "Деректерді өзгерту",
+
+    alreadyHaveAccount: "Аккаунтыңыз бар ма?",
+    login: "Кіру",
+
+    fullNameRequired: "Аты-жөніңізді толық енгізіңіз.",
+    fullNameInvalid:
+      "Аты-жөні тек әріптерден, бос орыннан, дефис пен апострофтан тұруы керек.",
+    iinInvalid: "ЖСН дәл 12 цифрдан тұруы керек.",
+    birthDateRequired: "Туған күніңізді көрсетіңіз.",
+    birthDateInvalid: "Туған күніңізді дұрыс енгізіңіз.",
+    birthDateFuture: "Туған күн болашақта болмауы керек.",
+    genderRequired: "Жынысты таңдаңыз.",
+    emailInvalid: "Электрондық поштаны дұрыс енгізіңіз.",
+    passwordShort: "Құпиясөз кемінде 8 таңбадан тұруы керек.",
+    passwordsMismatch: "Құпиясөздер сәйкес келмейді.",
+    codeInvalid: "6 цифрдан тұратын кодты енгізіңіз.",
+    codeExpiredRequestNew:
+      "Кодтың жарамдылық мерзімі аяқталды. Жаңа код сұраңыз.",
+    codeSentSuccess: "Растау коды электрондық поштаға жіберілді.",
+    codeSendFailed: "Растау кодын жіберу мүмкін болмады.",
+    confirmFailed: "Тіркелуді растау мүмкін болмады.",
+    newCodeSent: "Жаңа код электрондық поштаға жіберілді.",
+    resendFailed: "Кодты қайта жіберу мүмкін болмады.",
+  },
+};
+
+function getTodayString() {
+  const today = new Date();
+
+  const year = today.getFullYear();
+
+  const month = String(
+    today.getMonth() + 1
+  ).padStart(2, "0");
+
+  const day = String(
+    today.getDate()
+  ).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 export default function Register() {
   const {
     requestRegistrationCode,
@@ -19,38 +180,82 @@ export default function Register() {
   } = useAuth();
 
   const {
-    t,
     language,
     setLanguage,
   } = useLanguage();
 
+  const locale =
+    language === "kk" ||
+    language === "kz"
+      ? "kk"
+      : "ru";
+
+  function tr(key) {
+    return (
+      REGISTER_TEXTS[locale]?.[key] ||
+      REGISTER_TEXTS.ru[key] ||
+      key
+    );
+  }
+
   const navigate = useNavigate();
 
-  const [step, setStep] = useState("form");
+  const [step, setStep] =
+    useState("form");
 
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] =
+  const [fullName, setFullName] =
     useState("");
 
-  const [code, setCode] = useState("");
-
-  const [errorMessage, setErrorMessage] =
+  const [iin, setIin] =
     useState("");
 
-  const [successMessage, setSuccessMessage] =
+  const [birthDate, setBirthDate] =
     useState("");
 
-  const [loading, setLoading] = useState(false);
-  const [resendLoading, setResendLoading] =
+  const [gender, setGender] =
+    useState("");
+
+  const [email, setEmail] =
+    useState("");
+
+  const [password, setPassword] =
+    useState("");
+
+  const [
+    confirmPassword,
+    setConfirmPassword,
+  ] = useState("");
+
+  const [code, setCode] =
+    useState("");
+
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] = useState("");
+
+  const [
+    successMessage,
+    setSuccessMessage,
+  ] = useState("");
+
+  const [loading, setLoading] =
     useState(false);
 
-  const [codeExpiresIn, setCodeExpiresIn] =
-    useState(0);
+  const [
+    resendLoading,
+    setResendLoading,
+  ] = useState(false);
 
-  const [resendDelay, setResendDelay] =
-    useState(0);
+  const [
+    codeExpiresIn,
+    setCodeExpiresIn,
+  ] = useState(0);
+
+  const [
+    resendDelay,
+    setResendDelay,
+  ] = useState(0);
 
   useEffect(() => {
     if (
@@ -60,22 +265,34 @@ export default function Register() {
       return undefined;
     }
 
-    const timer = window.setInterval(() => {
-      setCodeExpiresIn((current) =>
-        current > 0 ? current - 1 : 0
-      );
+    const timer =
+      window.setInterval(() => {
+        setCodeExpiresIn(
+          (current) =>
+            current > 0
+              ? current - 1
+              : 0
+        );
 
-      setResendDelay((current) =>
-        current > 0 ? current - 1 : 0
-      );
-    }, 1000);
+        setResendDelay(
+          (current) =>
+            current > 0
+              ? current - 1
+              : 0
+        );
+      }, 1000);
 
     return () => {
       window.clearInterval(timer);
     };
-  }, [codeExpiresIn, resendDelay]);
+  }, [
+    codeExpiresIn,
+    resendDelay,
+  ]);
 
-  function formatTime(totalSeconds) {
+  function formatTime(
+    totalSeconds
+  ) {
     const minutes = Math.floor(
       totalSeconds / 60
     );
@@ -83,41 +300,88 @@ export default function Register() {
     const seconds =
       totalSeconds % 60;
 
-    return `${String(minutes).padStart(
-      2,
-      "0"
-    )}:${String(seconds).padStart(
-      2,
-      "0"
-    )}`;
+    return `${String(
+      minutes
+    ).padStart(2, "0")}:${String(
+      seconds
+    ).padStart(2, "0")}`;
   }
 
   function switchLanguage() {
     setLanguage(
-      language === "ru" ? "kk" : "ru"
+      language === "ru"
+        ? "kk"
+        : "ru"
     );
   }
 
   function validateRegistrationForm() {
-    const normalizedUsername =
-      username.trim();
+    const normalizedFullName =
+      fullName
+        .trim()
+        .replace(/\s+/g, " ");
 
     const normalizedEmail =
-      email.trim().toLowerCase();
+      email
+        .trim()
+        .toLowerCase();
+
+    const normalizedIin =
+      iin.replace(/\D/g, "");
 
     if (
-      normalizedUsername.length < 3 ||
-      normalizedUsername.length > 30
+      normalizedFullName.length < 5 ||
+      normalizedFullName.length > 120
     ) {
-      return "Логин должен содержать от 3 до 30 символов.";
+      return tr("fullNameRequired");
     }
 
     if (
-      !/^[\p{L}\p{N}._-]+$/u.test(
-        normalizedUsername
+      !/^[\p{L}\s.'’\-]+$/u.test(
+        normalizedFullName
       )
     ) {
-      return "Логин может содержать буквы, цифры и символы . _ -";
+      return tr("fullNameInvalid");
+    }
+
+    if (
+      !/^\d{12}$/.test(
+        normalizedIin
+      )
+    ) {
+      return tr("iinInvalid");
+    }
+
+    if (!birthDate) {
+      return tr("birthDateRequired");
+    }
+
+    const selectedBirthDate =
+      new Date(
+        `${birthDate}T00:00:00`
+      );
+
+    const today = new Date();
+
+    if (
+      Number.isNaN(
+        selectedBirthDate.getTime()
+      )
+    ) {
+      return tr("birthDateInvalid");
+    }
+
+    if (
+      selectedBirthDate > today
+    ) {
+      return tr("birthDateFuture");
+    }
+
+    if (
+      gender !== "male" &&
+      gender !== "female"
+    ) {
+      return tr("genderRequired");
     }
 
     if (
@@ -125,21 +389,28 @@ export default function Register() {
         normalizedEmail
       )
     ) {
-      return "Введите корректную электронную почту.";
+      return tr("emailInvalid");
     }
 
-    if (password.length < 8) {
-      return "Пароль должен содержать минимум 8 символов.";
+    if (
+      password.length < 8
+    ) {
+      return tr("passwordShort");
     }
 
-    if (password !== confirmPassword) {
-      return "Пароли не совпадают.";
+    if (
+      password !==
+      confirmPassword
+    ) {
+      return tr("passwordsMismatch");
     }
 
     return "";
   }
 
-  async function handleRequestCode(event) {
+  async function handleRequestCode(
+    event
+  ) {
     event.preventDefault();
 
     if (loading) {
@@ -153,7 +424,10 @@ export default function Register() {
       validateRegistrationForm();
 
     if (validationError) {
-      setErrorMessage(validationError);
+      setErrorMessage(
+        validationError
+      );
+
       return;
     }
 
@@ -161,41 +435,62 @@ export default function Register() {
 
     try {
       const result =
-        await requestRegistrationCode({
-          username: username.trim(),
-          email: email
-            .trim()
-            .toLowerCase(),
-          password,
-          confirmPassword,
-          preferredLanguage:
-            language === "kk"
-              ? "kz"
-              : "ru",
-        });
+        await requestRegistrationCode(
+          {
+            fullName: fullName
+              .trim()
+              .replace(/\s+/g, " "),
+
+            iin: iin
+              .replace(/\D/g, "")
+              .slice(0, 12),
+
+            birthDate,
+
+            gender,
+
+            email: email
+              .trim()
+              .toLowerCase(),
+
+            password,
+
+            confirmPassword,
+
+            preferredLanguage:
+              locale === "kk"
+                ? "kz"
+                : "ru",
+          }
+        );
 
       setStep("code");
       setCode("");
+
       setCodeExpiresIn(
-        result.expiresInSeconds || 600
+        result.expiresInSeconds ||
+          600
       );
+
       setResendDelay(30);
 
       setSuccessMessage(
         result.message ||
-          "Код подтверждения отправлен на электронную почту."
+          tr("codeSentSuccess")
       );
     } catch (error) {
       setErrorMessage(
         error?.message ||
-          "Не удалось отправить код подтверждения."
+          tr("codeSendFailed")
       );
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleConfirmCode(event) {
+  async function handleConfirmCode(
+    event
+  ) {
     event.preventDefault();
 
     if (loading) {
@@ -205,17 +500,23 @@ export default function Register() {
     setErrorMessage("");
     setSuccessMessage("");
 
-    if (!/^\d{6}$/.test(code)) {
+    if (
+      !/^\d{6}$/.test(code)
+    ) {
       setErrorMessage(
-        "Введите код из 6 цифр."
+        tr("codeInvalid")
       );
+
       return;
     }
 
-    if (codeExpiresIn <= 0) {
+    if (
+      codeExpiresIn <= 0
+    ) {
       setErrorMessage(
-        "Срок действия кода истёк. Запросите новый код."
+        tr("codeExpiredRequestNew")
       );
+
       return;
     }
 
@@ -223,7 +524,9 @@ export default function Register() {
 
     try {
       await confirmRegistration(
-        email.trim().toLowerCase(),
+        email
+          .trim()
+          .toLowerCase(),
         code
       );
 
@@ -233,7 +536,7 @@ export default function Register() {
     } catch (error) {
       setErrorMessage(
         error?.message ||
-          "Не удалось подтвердить регистрацию."
+          tr("confirmFailed")
       );
     } finally {
       setLoading(false);
@@ -255,23 +558,28 @@ export default function Register() {
     try {
       const result =
         await resendRegistrationCode(
-          email.trim().toLowerCase()
+          email
+            .trim()
+            .toLowerCase()
         );
 
       setCode("");
+
       setCodeExpiresIn(
-        result.expiresInSeconds || 600
+        result.expiresInSeconds ||
+          600
       );
+
       setResendDelay(30);
 
       setSuccessMessage(
         result.message ||
-          "Новый код отправлен на электронную почту."
+          tr("newCodeSent")
       );
     } catch (error) {
       setErrorMessage(
         error?.message ||
-          "Не удалось повторно отправить код."
+          tr("resendFailed")
       );
     } finally {
       setResendLoading(false);
@@ -306,38 +614,44 @@ export default function Register() {
 
       <main style={styles.card}>
         <header style={styles.header}>
-          <div style={styles.logoContainer}>
+          <div
+            style={
+              styles.logoContainer
+            }
+          >
             {step === "form" ? (
               <RiUserHeartLine
-                style={styles.logoIcon}
+                style={
+                  styles.logoIcon
+                }
               />
             ) : (
               <RiMailCheckLine
-                style={styles.logoIcon}
+                style={
+                  styles.logoIcon
+                }
               />
             )}
           </div>
 
           <h1 style={styles.title}>
             {step === "form"
-              ? t("registration_title") ||
-                "Регистрация"
-              : "Подтверждение Email"}
+              ? tr("registrationTitle")
+              : tr("confirmationTitle")}
           </h1>
 
           <p style={styles.subtitle}>
             {step === "form"
-              ? t(
-                  "registration_subtitle"
-                ) ||
-                "Создание аккаунта пациента"
-              : `Код отправлен на ${email}`}
+              ? tr("registrationSubtitle")
+              : `${tr("codeSentTo")} ${email}`}
           </p>
         </header>
 
         {errorMessage && (
           <div
-            style={styles.errorAlert}
+            style={
+              styles.errorAlert
+            }
             role="alert"
           >
             {errorMessage}
@@ -346,7 +660,9 @@ export default function Register() {
 
         {successMessage && (
           <div
-            style={styles.successAlert}
+            style={
+              styles.successAlert
+            }
             role="status"
           >
             {successMessage}
@@ -355,169 +671,425 @@ export default function Register() {
 
         {step === "form" ? (
           <form
-            onSubmit={handleRequestCode}
+            onSubmit={
+              handleRequestCode
+            }
             style={styles.form}
           >
-            <div style={styles.inputGroup}>
-              <label
-                htmlFor="username"
-                style={styles.label}
-              >
-                Логин
-              </label>
-
-              <input
-                id="username"
-                name="username"
-                type="text"
-                value={username}
-                onChange={(event) =>
-                  setUsername(
-                    event.target.value
-                  )
+            <section
+              style={
+                styles.formSection
+              }
+            >
+              <h2
+                style={
+                  styles.formSectionTitle
                 }
-                placeholder="Например: amir123"
-                autoComplete="username"
-                minLength={3}
-                maxLength={30}
-                disabled={loading}
-                style={styles.input}
-                required
-              />
-            </div>
-
-            <div style={styles.inputGroup}>
-              <label
-                htmlFor="email"
-                style={styles.label}
               >
-                Электронная почта
-              </label>
+                {tr("personalDataTitle")}
+              </h2>
 
-              <input
-                id="email"
-                name="email"
-                type="email"
-                value={email}
-                onChange={(event) =>
-                  setEmail(
-                    event.target.value
-                  )
+              <p
+                style={
+                  styles.formSectionText
                 }
-                placeholder="example@gmail.com"
-                autoComplete="email"
-                disabled={loading}
-                style={styles.input}
-                required
-              />
-            </div>
-
-            <div style={styles.inputGroup}>
-              <label
-                htmlFor="password"
-                style={styles.label}
               >
-                {t("password_label") ||
-                  "Пароль"}
-              </label>
+                {tr("personalDataHint")}
+              </p>
 
-              <input
-                id="password"
-                name="password"
-                type="password"
-                value={password}
-                onChange={(event) =>
-                  setPassword(
-                    event.target.value
-                  )
+              <div
+                style={
+                  styles.inputGroup
                 }
-                placeholder="Минимум 8 символов"
-                autoComplete="new-password"
-                minLength={8}
-                disabled={loading}
-                style={styles.input}
-                required
-              />
-            </div>
-
-            <div style={styles.inputGroup}>
-              <label
-                htmlFor="confirmPassword"
-                style={styles.label}
               >
-                {t(
-                  "confirm_password_label"
-                ) ||
-                  "Повторите пароль"}
-              </label>
+                <label
+                  htmlFor="fullName"
+                  style={styles.label}
+                >
+                  {tr("fullNameLabel")}
+                </label>
 
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(event) =>
-                  setConfirmPassword(
-                    event.target.value
-                  )
+                <input
+                  id="fullName"
+                  type="text"
+                  value={fullName}
+                  onChange={(event) =>
+                    setFullName(
+                      event.target.value
+                    )
+                  }
+                  placeholder={tr("fullNamePlaceholder")}
+                  autoComplete="name"
+                  maxLength={120}
+                  disabled={loading}
+                  style={styles.input}
+                  required
+                />
+              </div>
+
+              <div
+                style={
+                  styles.twoColumnGrid
                 }
-                placeholder="Повторите пароль"
-                autoComplete="new-password"
-                minLength={8}
-                disabled={loading}
-                style={styles.input}
-                required
-              />
-            </div>
+              >
+                <div
+                  style={
+                    styles.inputGroup
+                  }
+                >
+                  <label
+                    htmlFor="iin"
+                    style={styles.label}
+                  >
+                    {tr("iinLabel")}
+                  </label>
+
+                  <input
+                    id="iin"
+                    type="text"
+                    inputMode="numeric"
+                    value={iin}
+                    onChange={(
+                      event
+                    ) => {
+                      const digits =
+                        event.target.value
+                          .replace(
+                            /\D/g,
+                            ""
+                          )
+                          .slice(
+                            0,
+                            12
+                          );
+
+                      setIin(digits);
+                    }}
+                    placeholder={tr("iinPlaceholder")}
+                    minLength={12}
+                    maxLength={12}
+                    disabled={loading}
+                    style={styles.input}
+                    required
+                  />
+
+                  <span
+                    style={
+                      styles.inputHint
+                    }
+                  >
+                    {tr("iinHint")}
+                  </span>
+                </div>
+
+                <div
+                  style={
+                    styles.inputGroup
+                  }
+                >
+                  <label
+                    htmlFor="birthDate"
+                    style={styles.label}
+                  >
+                    {tr("birthDateLabel")}
+                  </label>
+
+                  <input
+                    id="birthDate"
+                    type="date"
+                    value={birthDate}
+                    onChange={(
+                      event
+                    ) =>
+                      setBirthDate(
+                        event.target.value
+                      )
+                    }
+                    max={getTodayString()}
+                    disabled={loading}
+                    style={styles.input}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div
+                style={
+                  styles.inputGroup
+                }
+              >
+                <label
+                  htmlFor="gender"
+                  style={styles.label}
+                >
+                  {tr("genderLabel")}
+                </label>
+
+                <select
+                  id="gender"
+                  value={gender}
+                  onChange={(event) =>
+                    setGender(
+                      event.target.value
+                    )
+                  }
+                  disabled={loading}
+                  style={styles.select}
+                  required
+                >
+                  <option value="">
+                    {tr("genderPlaceholder")}
+                  </option>
+
+                  <option value="male">
+                    {tr("male")}
+                  </option>
+
+                  <option value="female">
+                    {tr("female")}
+                  </option>
+                </select>
+              </div>
+
+              <div
+                style={
+                  styles.inputGroup
+                }
+              >
+                <label
+                  htmlFor="email"
+                  style={styles.label}
+                >
+                  {tr("emailLabel")}
+                </label>
+
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(event) =>
+                    setEmail(
+                      event.target.value
+                    )
+                  }
+                  placeholder="example@gmail.com"
+                  autoComplete="email"
+                  disabled={loading}
+                  style={styles.input}
+                  required
+                />
+
+                <span
+                  style={
+                    styles.inputHint
+                  }
+                >
+                  {tr("emailHint")}
+                </span>
+              </div>
+            </section>
+
+            <section
+              style={
+                styles.formSection
+              }
+            >
+              <h2
+                style={
+                  styles.formSectionTitle
+                }
+              >
+                {tr("passwordSectionTitle")}
+              </h2>
+
+              <p
+                style={
+                  styles.formSectionText
+                }
+              >
+                {tr("passwordHint")}
+              </p>
+
+              <div
+                style={
+                  styles.twoColumnGrid
+                }
+              >
+                <div
+                  style={
+                    styles.inputGroup
+                  }
+                >
+                  <label
+                    htmlFor="password"
+                    style={styles.label}
+                  >
+                    {tr("passwordLabel")}
+                  </label>
+
+                  <input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(
+                      event
+                    ) =>
+                      setPassword(
+                        event.target.value
+                      )
+                    }
+                    placeholder={tr("passwordPlaceholder")}
+                    autoComplete="new-password"
+                    minLength={8}
+                    disabled={loading}
+                    style={styles.input}
+                    required
+                  />
+                </div>
+
+                <div
+                  style={
+                    styles.inputGroup
+                  }
+                >
+                  <label
+                    htmlFor="confirmPassword"
+                    style={styles.label}
+                  >
+                    {tr("repeatPasswordLabel")}
+                  </label>
+
+                  <input
+                    id="confirmPassword"
+                    type="password"
+                    value={
+                      confirmPassword
+                    }
+                    onChange={(
+                      event
+                    ) =>
+                      setConfirmPassword(
+                        event.target.value
+                      )
+                    }
+                    placeholder={tr("repeatPasswordPlaceholder")}
+                    autoComplete="new-password"
+                    minLength={8}
+                    disabled={loading}
+                    style={styles.input}
+                    required
+                  />
+                </div>
+              </div>
+            </section>
 
             <button
               type="submit"
               disabled={loading}
               style={{
                 ...styles.submitButton,
+
                 ...(loading
                   ? styles.disabledButton
                   : {}),
               }}
             >
               {loading
-                ? "Отправка кода..."
-                : "Получить код"}
+                ? tr("sendingCode")
+                : tr("getCode")}
             </button>
           </form>
         ) : (
           <form
-            onSubmit={handleConfirmCode}
+            onSubmit={
+              handleConfirmCode
+            }
             style={styles.form}
           >
-            <div style={styles.emailBox}>
-              <span style={styles.emailLabel}>
-                Электронная почта
-              </span>
+            <div
+              style={
+                styles.registrationSummary
+              }
+            >
+              <div>
+                <span
+                  style={
+                    styles.summaryLabel
+                  }
+                >
+                  {tr("fullNameLabel")}
+                </span>
 
-              <strong style={styles.emailValue}>
-                {email}
-              </strong>
+                <strong
+                  style={
+                    styles.summaryValue
+                  }
+                >
+                  {fullName}
+                </strong>
+              </div>
+
+              <div>
+                <span
+                  style={
+                    styles.summaryLabel
+                  }
+                >
+                  {tr("iinLabel")}
+                </span>
+
+                <strong
+                  style={
+                    styles.summaryValue
+                  }
+                >
+                  {iin}
+                </strong>
+              </div>
+
+              <div>
+                <span
+                  style={
+                    styles.summaryLabel
+                  }
+                >
+                  {tr("emailLabel")}
+                </span>
+
+                <strong
+                  style={
+                    styles.summaryValue
+                  }
+                >
+                  {email}
+                </strong>
+              </div>
             </div>
 
-            <div style={styles.inputGroup}>
+            <div
+              style={
+                styles.inputGroup
+              }
+            >
               <label
                 htmlFor="confirmationCode"
                 style={styles.label}
               >
-                Код подтверждения
+                {tr("confirmationCodeLabel")}
               </label>
 
               <input
                 id="confirmationCode"
-                name="confirmationCode"
                 type="text"
                 inputMode="numeric"
                 value={code}
                 onChange={(event) => {
                   const digits =
                     event.target.value
-                      .replace(/\D/g, "")
+                      .replace(
+                        /\D/g,
+                        ""
+                      )
                       .slice(0, 6);
 
                   setCode(digits);
@@ -526,16 +1098,22 @@ export default function Register() {
                 autoComplete="one-time-code"
                 maxLength={6}
                 disabled={loading}
-                style={styles.codeInput}
+                style={
+                  styles.codeInput
+                }
                 required
                 autoFocus
               />
             </div>
 
-            <div style={styles.codeInfo}>
+            <div
+              style={
+                styles.codeInfo
+              }
+            >
               {codeExpiresIn > 0 ? (
                 <span>
-                  Код действует ещё{" "}
+                  {tr("codeValidFor")}{" "}
                   <strong>
                     {formatTime(
                       codeExpiresIn
@@ -543,8 +1121,12 @@ export default function Register() {
                   </strong>
                 </span>
               ) : (
-                <span style={styles.expiredText}>
-                  Срок действия кода истёк
+                <span
+                  style={
+                    styles.expiredText
+                  }
+                >
+                  {tr("codeExpired")}
                 </span>
               )}
             </div>
@@ -558,6 +1140,7 @@ export default function Register() {
               }
               style={{
                 ...styles.submitButton,
+
                 ...(loading ||
                 code.length !== 6 ||
                 codeExpiresIn <= 0
@@ -566,19 +1149,22 @@ export default function Register() {
               }}
             >
               {loading
-                ? "Проверка кода..."
-                : "Подтвердить регистрацию"}
+                ? tr("checkingCode")
+                : tr("confirmRegistration")}
             </button>
 
             <button
               type="button"
-              onClick={handleResendCode}
+              onClick={
+                handleResendCode
+              }
               disabled={
                 resendLoading ||
                 resendDelay > 0
               }
               style={{
                 ...styles.secondaryButton,
+
                 ...(resendLoading ||
                 resendDelay > 0
                   ? styles.disabledButton
@@ -588,10 +1174,10 @@ export default function Register() {
               <RiRefreshLine />
 
               {resendLoading
-                ? "Отправка..."
+                ? tr("sending")
                 : resendDelay > 0
-                  ? `Отправить повторно через ${resendDelay} сек.`
-                  : "Отправить новый код"}
+                  ? `${tr("resendAfter")} ${resendDelay} ${tr("secondsShort")}`
+                  : tr("sendNewCode")}
             </button>
 
             <button
@@ -603,22 +1189,20 @@ export default function Register() {
               style={styles.backButton}
             >
               <RiArrowLeftLine />
-              Изменить данные
+              {tr("changeData")}
             </button>
           </form>
         )}
 
         <footer style={styles.footer}>
           <p style={styles.footerText}>
-            {t(
-              "already_have_account"
-            ) || "Уже есть аккаунт?"}{" "}
+            {tr("alreadyHaveAccount")}{" "}
 
             <Link
               to="/login"
               style={styles.footerLink}
             >
-              {t("login_link") || "Войти"}
+              {tr("login")}
             </Link>
           </p>
         </footer>
@@ -641,7 +1225,7 @@ const styles = {
     fontFamily:
       "'Outfit', 'Inter', sans-serif",
     position: "relative",
-    overflow: "hidden",
+    overflowX: "hidden",
   },
 
   bgBlob1: {
@@ -688,13 +1272,14 @@ const styles = {
 
   card: {
     width: "100%",
-    maxWidth: "460px",
+    maxWidth: "720px",
     boxSizing: "border-box",
     padding: "38px",
     background:
       "rgba(15,23,42,0.72)",
     backdropFilter: "blur(20px)",
-    WebkitBackdropFilter: "blur(20px)",
+    WebkitBackdropFilter:
+      "blur(20px)",
     border:
       "1px solid rgba(255,255,255,0.1)",
     borderRadius: "24px",
@@ -719,8 +1304,6 @@ const styles = {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    boxShadow:
-      "0 12px 28px rgba(99,102,241,0.28)",
   },
 
   logoIcon: {
@@ -739,8 +1322,6 @@ const styles = {
     margin: 0,
     color: "#94a3b8",
     fontSize: "14px",
-    lineHeight: 1.5,
-    overflowWrap: "anywhere",
   },
 
   errorAlert: {
@@ -752,8 +1333,6 @@ const styles = {
     border:
       "1px solid rgba(239,68,68,0.32)",
     color: "#fca5a5",
-    fontSize: "14px",
-    lineHeight: 1.5,
     textAlign: "center",
   },
 
@@ -766,21 +1345,48 @@ const styles = {
     border:
       "1px solid rgba(16,185,129,0.32)",
     color: "#6ee7b7",
-    fontSize: "14px",
-    lineHeight: 1.5,
     textAlign: "center",
   },
 
   form: {
     display: "flex",
     flexDirection: "column",
-    gap: "17px",
+    gap: "20px",
+  },
+
+  formSection: {
+    padding: "20px",
+    borderRadius: "16px",
+    border:
+      "1px solid rgba(255,255,255,0.08)",
+    background:
+      "rgba(255,255,255,0.025)",
+  },
+
+  formSectionTitle: {
+    margin: "0 0 5px",
+    color: "#ffffff",
+    fontSize: "17px",
+  },
+
+  formSectionText: {
+    margin: "0 0 18px",
+    color: "#64748b",
+    fontSize: "12px",
+  },
+
+  twoColumnGrid: {
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: "15px",
   },
 
   inputGroup: {
     display: "flex",
     flexDirection: "column",
     gap: "7px",
+    marginBottom: "15px",
   },
 
   label: {
@@ -801,6 +1407,25 @@ const styles = {
     color: "#ffffff",
     fontSize: "15px",
     outline: "none",
+    colorScheme: "dark",
+  },
+
+  select: {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "13px 15px",
+    background: "#10172a",
+    border:
+      "1px solid rgba(255,255,255,0.12)",
+    borderRadius: "12px",
+    color: "#ffffff",
+    fontSize: "15px",
+    outline: "none",
+  },
+
+  inputHint: {
+    color: "#64748b",
+    fontSize: "11px",
   },
 
   codeInput: {
@@ -822,14 +1447,11 @@ const styles = {
 
   submitButton: {
     width: "100%",
-    marginTop: "4px",
     padding: "14px",
     border: "none",
     borderRadius: "12px",
     background:
       "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
-    boxShadow:
-      "0 10px 22px rgba(99,102,241,0.24)",
     color: "#ffffff",
     fontSize: "16px",
     fontWeight: 700,
@@ -845,7 +1467,6 @@ const styles = {
     border:
       "1px solid rgba(16,185,129,0.25)",
     color: "#6ee7b7",
-    fontSize: "14px",
     fontWeight: 700,
     cursor: "pointer",
     display: "flex",
@@ -858,8 +1479,6 @@ const styles = {
     background: "transparent",
     border: "none",
     color: "#94a3b8",
-    fontSize: "14px",
-    fontWeight: 600,
     cursor: "pointer",
     display: "flex",
     alignItems: "center",
@@ -872,32 +1491,31 @@ const styles = {
     opacity: 0.55,
   },
 
-  emailBox: {
-    padding: "13px 15px",
-    borderRadius: "12px",
+  registrationSummary: {
+    display: "grid",
+    gap: "12px",
+    padding: "17px",
+    borderRadius: "14px",
     background:
-      "rgba(255,255,255,0.05)",
-    border:
-      "1px solid rgba(255,255,255,0.08)",
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
+      "rgba(255,255,255,0.045)",
   },
 
-  emailLabel: {
+  summaryLabel: {
+    display: "block",
+    marginBottom: "3px",
     color: "#64748b",
-    fontSize: "12px",
+    fontSize: "10px",
+    textTransform: "uppercase",
   },
 
-  emailValue: {
+  summaryValue: {
+    display: "block",
     color: "#e2e8f0",
     fontSize: "14px",
-    overflowWrap: "anywhere",
   },
 
   codeInfo: {
     color: "#94a3b8",
-    fontSize: "13px",
     textAlign: "center",
   },
 
@@ -913,7 +1531,6 @@ const styles = {
   footerText: {
     margin: 0,
     color: "#94a3b8",
-    fontSize: "14px",
   },
 
   footerLink: {
@@ -922,3 +1539,4 @@ const styles = {
     fontWeight: 700,
   },
 };
+
